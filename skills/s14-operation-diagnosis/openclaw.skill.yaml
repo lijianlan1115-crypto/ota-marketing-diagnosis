@@ -1,0 +1,66 @@
+skill_id: s14-operation-diagnosis
+name: S14 Hotel OTA Marketing Diagnosis
+version: 0.2.0
+description: "Independent OpenClaw Skill for third-party hotel OTA marketing diagnosis."
+
+entrypoint:
+  language: python
+  file: runtime/__init__.py
+  class: S14OperationDiagnosis
+  method: execute
+
+schemas:
+  input: references/input_schema.json
+  output: references/output_schema.json
+
+triggers:
+  file: config/triggers.yaml
+  reply_field: feishu_card
+  fallback_reply_field: feishu_message
+  reply_msg_type: interactive
+  text_trigger_data_source: database
+  excel_trigger_data_source: excel_upload
+  force_fresh_run: true
+  forbid_memory_result: true
+  forbid_previous_message_reuse: true
+
+config:
+  required:
+    - report_output_dir
+    - public_base_url
+  optional:
+    - db_dsn
+    - db_dsn_env
+    - report_output_dir
+    - public_base_url
+  example:
+    db_dsn_env: S14_DB_DSN
+    report_output_dir: /opt/openclaw/workspaces/ota-marketing-diagnosis/public/s14-reports
+    public_base_url: http://47.108.200.194:8088/s14-reports
+
+data_policy:
+  independence: true
+  controlled_source_only: true
+  supported_sources:
+    - database
+    - excel_upload
+  forbidden_input_fields:
+    - metrics
+    - business_fields
+    - json_payload
+    - manual_diagnosis_input
+    - upstream_skill_output
+
+artifacts:
+  report_file_name: report.html
+  report_type: html
+  url_policy: "Return public_base_url/report.html. Do not start HTTP servers from the Skill."
+
+safety:
+  dry_run_default: true
+  approval_required: false
+  forbidden_actions:
+    - price_write
+    - inventory_write
+    - promotion_write
+    - review_reply_publish
