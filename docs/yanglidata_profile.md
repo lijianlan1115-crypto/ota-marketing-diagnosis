@@ -1,28 +1,32 @@
-# Yangli CSV Export Profile
+# Yangli Database Export Profile
 
-This document records the database export shape used to build the first CSV bundle loader.
+This document records what the real database export looks like. The export is a schema and field reference only. It is not a product input and should not become a customer-facing workflow.
 
-Supported CSV inputs:
+Use this profile to design:
 
-- `jy01_hotel_statistics_daily_*`: mapped to `hotel_daily`; only rows where `dimension_type` and `dimension_name` are total operating metrics are used first.
-- `rs01_room_revenue_daily_*`: fallback daily operating source; only `charge_subject=房费` rows are aggregated by `business_date`.
-- `meituan_ota_business_metrics_*` and `ctrip_ota_business_metrics_*`: tall metric rows are pivoted into `ota_funnel` rows.
-- `meituan_ota_goods_price_mapping_*` and `ctrip_ota_goods_price_mapping_*`: mapped to `products`.
-- `meituan_ota_review_detail_*` and `ctrip_ota_review_detail_*`: mapped to `reviews`.
+- database table profiles
+- field aliases
+- aggregation rules
+- missing-field diagnostics
+- report evidence fields
 
-Ignored for now:
+Reference tables:
 
-- price task tables
-- mapping sync queue
-- activity product detail
-- promotion activity
-- nearby event
-- review ranking
+- `jy01_hotel_statistics_daily`: historical daily operating metrics. Use total operating rows as the primary day-level operating source.
+- `rs01_room_revenue_daily`: room-fee detail. Use `charge_subject=房费` for day-level room-night and room-revenue reconciliation.
+- `jd01_booking_detail`: booking and arrival detail. Useful for future real-time or hourly funnel modules.
+- `jd04_inhouse_extension`: in-house / extension detail. Useful for future real-time occupancy modules.
+- `kf11_room_status_snapshot`: room status snapshot. Useful for denominator and maintenance-room logic in real-time occupancy.
+- `meituan_ota_business_metrics` and `ctrip_ota_business_metrics`: OTA funnel metrics in tall metric format.
+- `meituan_ota_goods_price_mapping` and `ctrip_ota_goods_price_mapping`: OTA product and price mapping.
+- `meituan_ota_review_overview` and `ctrip_ota_review_overview`: review summary.
+- `meituan_ota_review_detail` and `ctrip_ota_review_detail`: public review detail.
+- `meituan_ota_promotion_activity` and `ctrip_ota_promotion_activity`: promotion activity.
+- `meituan_ota_activity_product_detail` and `ctrip_ota_activity_product_detail`: activity products.
+- `meituan_ota_nearby_event`: nearby event opportunity reference.
 
-They are kept out of the MVP report until dedicated promotion and event modules are added.
+Product boundary:
 
-Run:
-
-```bash
-ota-marketing-diagnosis diagnose-csv --path yanglidata.zip --output reports
-```
+- Formal user input remains Excel upload or configured temporary database access.
+- Database export CSV / zip files are not formal runtime input.
+- The report tool must not write prices, approvals, live actions, or price-task rows.
