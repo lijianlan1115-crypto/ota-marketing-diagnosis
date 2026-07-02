@@ -3,7 +3,16 @@ import json
 
 
 def build_markdown(result):
-    lines = ["# OTA Marketing Report", "", "## Metrics"]
+    lines = ["# OTA Marketing Report", ""]
+    lines.append(f"- final_score: {result.get('final_score', 'missing')}")
+    lines.append(f"- risk_level: {result.get('risk_level', 'missing')}")
+    lines.append(f"- status: {result.get('status', 'missing')}")
+    lines.append("")
+    lines.append("## Module Scores")
+    for item in result.get("module_scores") or []:
+        lines.append(f"- {item.get('module_id')} {item.get('module_name')}: {item.get('score')}/{item.get('weight')} ({item.get('rate')})")
+    lines.append("")
+    lines.append("## Metrics")
     for name, payload in (result.get("metrics") or {}).items():
         lines.append(f"### {name}")
         if isinstance(payload, dict):
@@ -18,8 +27,8 @@ def build_markdown(result):
     for index, item in enumerate(result.get("actions") or [], 1):
         lines.append(f"{index}. {item}")
     lines.append("")
-    lines.append("## Boundary")
-    lines.append("This tool only creates marketing reports. It does not write prices or approvals.")
+    lines.append("## Data Quality")
+    lines.append(json.dumps(result.get("data_quality") or {}, ensure_ascii=False, indent=2))
     return "\n".join(lines)
 
 
