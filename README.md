@@ -9,6 +9,7 @@
 - 标准化字段
 - 用代码计算指标
 - 生成 `report.json`、`report.md` 和完整 `report.html`
+- 以 `skills/s14-operation-diagnosis` 形式挂载到 OpenClaw
 
 数据库导出的 CSV/zip 只作为字段画像和开发参考，不作为正式产品入口，也不作为 CLI 运行入口。
 
@@ -24,6 +25,41 @@ MySQL 读取需要安装：
 ```bash
 pip install pymysql
 ```
+
+## OpenClaw 挂载
+
+推荐把本仓库作为独立 workspace 放到服务器：
+
+```bash
+cd /opt/openclaw/workspaces
+git clone https://github.com/TAI-YE-1/ota-marketing-diagnosis.git
+cd ota-marketing-diagnosis
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+配置环境变量：
+
+```bash
+export S14_DB_DSN='mysql+pymysql://openclaw_user:YOUR_URL_ENCODED_PASSWORD@127.0.0.1:3306/hotel_puyue?charset=utf8mb4'
+export S14_REPORT_OUTPUT_DIR='/opt/openclaw/workspaces/ota-marketing-diagnosis/public/s14-reports'
+export S14_PUBLIC_BASE_URL='http://47.108.200.194:8088/s14-reports'
+```
+
+OpenClaw 应识别：
+
+```text
+skills/s14-operation-diagnosis/openclaw.skill.yaml
+```
+
+如果走飞书入口包装脚本，可调用：
+
+```bash
+python scripts/s14_feishu_entry.py --text 'S14诊断' --format card
+```
+
+返回值优先使用 `feishu_card`，失败时 fallback 到 `feishu_message`。
 
 ## 生成样例 Excel
 
@@ -136,6 +172,7 @@ report.html
 
 ```bash
 python -m unittest discover tests
+python scripts/s14_feishu_entry.py --text 'S14诊断' --format card
 ```
 
 ## 后续计划
