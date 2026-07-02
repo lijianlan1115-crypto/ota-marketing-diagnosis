@@ -74,6 +74,7 @@ NUMBER_FIELDS = {
 BOOL_FIELDS = {"is_hour_room", "is_group_buy", "is_negative"}
 DATE_FIELDS = {"business_date", "review_date"}
 MASK_FIELDS = {"contact", "order_id", "room_no", "guest_name"}
+META_SECTIONS = {"__source_diagnostics__"}
 
 
 def section_for_sheet(name: str) -> str | None:
@@ -137,6 +138,7 @@ def _canonical_key(section: str, key: str) -> str:
 def normalize_section(section: str, rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
+    source_tables: set[str] = set()
     for row in rows or []:
         item: dict[str, Any] = {}
         for raw_key, value in row.items():
@@ -144,7 +146,11 @@ def normalize_section(section: str, rows: list[dict[str, Any]]) -> tuple[list[di
             if not key:
                 continue
             seen.add(key)
-            if key in MASK_FIELDS:
+            if key == "source_table" or key == "__source_table":
+                if value:
+                    source_tables.add(str(value))
+                item["source_table"] = value
+            elif key in MASK_FIELDS:
                 item[key] = "***" if value not in (None, "") else ""
             elif key in NUMBER_FIELDS:
                 item[key] = _number(value)
@@ -157,7 +163,7 @@ def normalize_section(section: str, rows: list[dict[str, Any]]) -> tuple[list[di
         if any(v not in (None, "") for v in item.values()):
             out.append(item)
     missing = sorted(REQUIRED.get(section, set()) - seen)
-    return out, {"section": section, "row_count": len(out), "missing_fields": missing, "status": "ok" if not missing else "data_gap"}
+    return out, {"section": section, "row_count": len(out), "missing_fields": missing, "source_tables": sorted(source_tables), "seen_fields": sorted(seen), "status": "ok" if not missing else "data_gap"}
 
 
 def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
@@ -167,5 +173,7 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         rows, diag = normalize_section(section, raw.get(section, []))
         sections[section] = rows
         diagnostics[section] = diag
+    source_diagnostics = raw.get("__source_diagnostics__") or []
     missing = {k: v["missing_fields"] for k, v in diagnostics.items() if v["missing_fields"]}
-    return {"status": "ok" if not missing else "partial", "sections": sections, "diagnostics": diagnostics, "missing_fields": missing}
+    empty_sections = {k: v["row_count"] for k, v in diagnostics.items() if v["row_count"] == 0}
+    return {"status": "ok" if not missing and not empty_sections else "partial", "sections": sections, "diagnostics": diagnostics, "source_diagnostics": source_diagnostics, "missing_fields": missing, "empty_sections": empty_sections}
