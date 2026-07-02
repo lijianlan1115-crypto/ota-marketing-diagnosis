@@ -6,6 +6,6 @@ setup(
     description="Independent third-party OTA marketing diagnosis tool",
     packages=find_packages(),
     python_requires=">=3.11",
-    install_requires=["openpyxl>=3.1.0"],
+    install_requires=["openpyxl>=3.1.0", "pymysql>=1.1.0"],
     entry_points={"console_scripts": ["ota-marketing-diagnosis=marketing_diagnosis.main:main"]},
 )
