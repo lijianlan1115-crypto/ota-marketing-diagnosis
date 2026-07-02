@@ -5,6 +5,7 @@
 它不属于 `hotel--ota-ai` 主项目。第一版聚焦：
 
 - 读取 Excel
+- 读取数据库导出的 CSV 文件夹或 zip
 - 读取临时 SQLite / MySQL 配置
 - 标准化字段
 - 用代码计算指标
@@ -51,6 +52,22 @@ Excel 支持以下 sheet：
 | `reviews` | 公开评论与口碑 |
 | `competitors` | 竞品价格、排名、活动标签 |
 
+## 数据库 CSV 导出诊断
+
+```bash
+ota-marketing-diagnosis diagnose-csv --path yanglidata.zip --output reports
+```
+
+`--path` 可以是 CSV 文件夹，也可以是数据库导出的 zip。当前已支持这些导出表的自动识别：
+
+- `jy01_hotel_statistics_daily`
+- `rs01_room_revenue_daily`
+- `meituan_ota_business_metrics` / `ctrip_ota_business_metrics`
+- `meituan_ota_goods_price_mapping` / `ctrip_ota_goods_price_mapping`
+- `meituan_ota_review_detail` / `ctrip_ota_review_detail`
+
+其中 `jy01` 用作历史日经营主表；没有 `jy01` 时，会用 `rs01` 里 `charge_subject=房费` 的行按日聚合补经营数据。
+
 ## 临时数据库诊断
 
 ```bash
@@ -72,6 +89,16 @@ report.json
 report.md
 ```
 
+报告包含：
+
+- final_score
+- risk_level
+- M01-M08 module_scores
+- metrics
+- notes
+- actions
+- data_quality
+
 ## 测试
 
 ```bash
@@ -80,4 +107,4 @@ python -m unittest discover tests
 
 ## 后续计划
 
-- 从旧原型 `D:\hotel\s14-feishu-test\s14-feishu-test` 迁移更完整的字段映射和报告模板。
+- 从旧原型 `D:\hotel\s14-feishu-test\s14-feishu-test` 继续迁移更完整的 HTML 报告模板。
