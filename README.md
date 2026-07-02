@@ -8,7 +8,7 @@
 - 读取阿里服务器本机 MySQL 诊断库
 - 标准化字段
 - 用代码计算指标
-- 生成 `report.json` 和 `report.md`
+- 生成 `report.json`、`report.md` 和完整 `report.html`
 
 数据库导出的 CSV/zip 只作为字段画像和开发参考，不作为正式产品入口，也不作为 CLI 运行入口。
 
@@ -117,7 +117,10 @@ ota-marketing-diagnosis diagnose-config --config examples/sqlite_config.json --o
 ```text
 report.json
 report.md
+report.html
 ```
+
+`report.html` 是完整可打开报告，包含总览、M01-M08 评分、经营、OTA 漏斗、商品价格、口碑、竞品、动作建议和数据质量章节。
 
 报告包含：
 
@@ -137,4 +140,4 @@ python -m unittest discover tests
 
 ## 后续计划
 
-- 从旧原型 `D:\hotel\s14-feishu-test\s14-feishu-test` 继续迁移更完整的 HTML 报告模板。
+- 继续吸收旧原型 HTML 报告的更细布局和图表样式。
