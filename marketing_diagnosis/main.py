@@ -4,6 +4,7 @@ import argparse
 import json
 
 from marketing_diagnosis.data import normalize_dataset
+from marketing_diagnosis.csv_loader import load_csv_export_dataset
 from marketing_diagnosis.excel_loader import load_excel_dataset
 from marketing_diagnosis.db_loader import load_database_dataset
 from marketing_diagnosis.reporting import write_reports
@@ -27,6 +28,11 @@ def command_config(args):
     print(json.dumps(_run(raw_dataset, args.output), ensure_ascii=False, indent=2))
 
 
+def command_csv(args):
+    raw_dataset = load_csv_export_dataset(args.path)
+    print(json.dumps(_run(raw_dataset, args.output), ensure_ascii=False, indent=2))
+
+
 def build_parser():
     parser = argparse.ArgumentParser(description="Independent OTA marketing report tool")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -38,6 +44,10 @@ def build_parser():
     p.add_argument("--config", required=True)
     p.add_argument("--output", required=True)
     p.set_defaults(func=command_config)
+    p = sub.add_parser("diagnose-csv")
+    p.add_argument("--path", required=True, help="CSV export directory or zip file")
+    p.add_argument("--output", required=True)
+    p.set_defaults(func=command_csv)
     return parser
 
 
