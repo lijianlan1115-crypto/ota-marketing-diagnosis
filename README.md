@@ -5,6 +5,7 @@
 它不属于 `hotel--ota-ai` 主项目。第一版聚焦：
 
 - 读取 Excel
+- 读取临时 SQLite / MySQL 配置
 - 标准化字段
 - 用代码计算指标
 - 生成 `report.json` 和 `report.md`
@@ -38,6 +39,14 @@ Excel 支持以下 sheet：
 | `reviews` | 公开评论与口碑 |
 | `competitors` | 竞品价格、排名、活动标签 |
 
+## 临时数据库诊断
+
+```bash
+ota-marketing-diagnosis diagnose-config --config examples/sqlite_config.json --output reports
+```
+
+配置文件指定临时库类型、表名映射和读取行数。第一版支持 SQLite，也预留 MySQL 读取能力。
+
 ## 项目边界
 
 本项目只生成营销诊断报告，不做权限体系、调价写入、审批或线上执行。
@@ -59,6 +68,5 @@ python -m unittest discover tests
 
 ## 后续计划
 
-- 补充临时数据库输入命令。
-- 补充样例 Excel。
-- 从旧原型 `D:\hotel\s14-feishu-test\s14-feishu-test` 迁移更完整的数据库读取和报告模板。
+- 补充样例 Excel 生成脚本。
+- 从旧原型 `D:\hotel\s14-feishu-test\s14-feishu-test` 迁移更完整的字段映射和报告模板。
