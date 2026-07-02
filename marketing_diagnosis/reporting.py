@@ -9,9 +9,17 @@ def build_markdown(result):
         if isinstance(payload, dict):
             for key, value in payload.items():
                 lines.append(f"- {key}: {value}")
-    lines.append("## Suggestions")
-    for item in result.get("items") or []:
-        lines.append(f"- {item.get('title')}: {item.get('suggestion')}")
+    lines.append("")
+    lines.append("## Notes")
+    for item in result.get("notes") or []:
+        lines.append(f"- [{item.get('level')}] {item.get('title')}: {item.get('suggestion')}")
+    lines.append("")
+    lines.append("## Actions")
+    for index, item in enumerate(result.get("actions") or [], 1):
+        lines.append(f"{index}. {item}")
+    lines.append("")
+    lines.append("## Boundary")
+    lines.append("This tool only creates marketing reports. It does not write prices or approvals.")
     return "\n".join(lines)
 
 
