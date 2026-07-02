@@ -1,1 +1,2 @@
-VALUE = 1
+def hello():
+    return 1
