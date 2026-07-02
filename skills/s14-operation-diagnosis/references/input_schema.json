@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "S14 OpenClaw diagnosis input",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "data_source_mode": {"type": "string", "enum": ["database", "excel_upload"], "default": "database"},
+    "input_excel_path": {"type": ["string", "null"]},
+    "hotel_id": {"type": "string", "default": "puyue"},
+    "hotel_name": {"type": ["string", "null"]},
+    "platform": {"type": "string", "enum": ["meituan", "ctrip", "multi"], "default": "multi"},
+    "period_start": {"type": ["string", "null"]},
+    "period_end": {"type": ["string", "null"]},
+    "output_dir": {"type": ["string", "null"]},
+    "public_base_url": {"type": ["string", "null"]},
+    "dry_run": {"type": "boolean", "default": true}
+  },
+  "not": {
+    "anyOf": [
+      {"required": ["metrics"]},
+      {"required": ["business_fields"]},
+      {"required": ["json_payload"]},
+      {"required": ["manual_diagnosis_input"]},
+      {"required": ["upstream_skill_output"]}
+    ]
+  }
+}
