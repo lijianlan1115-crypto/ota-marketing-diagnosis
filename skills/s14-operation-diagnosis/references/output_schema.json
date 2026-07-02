@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "S14 OpenClaw diagnosis output",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["status", "skill_id", "final_score", "risk_level", "module_scores", "report_file_path", "report_url", "feishu_message", "feishu_card", "dry_run"],
+  "properties": {
+    "status": {"type": "string", "enum": ["ok", "partial", "failed"]},
+    "skill_id": {"type": "string", "const": "s14-operation-diagnosis"},
+    "final_score": {"type": "number"},
+    "risk_level": {"type": "string", "enum": ["low", "medium", "high"]},
+    "module_scores": {"type": "array"},
+    "report_file_path": {"type": "string"},
+    "report_url": {"type": "string"},
+    "feishu_message": {"type": "string"},
+    "feishu_card": {"type": "object"},
+    "dry_run": {"type": "boolean"}
+  }
+}
