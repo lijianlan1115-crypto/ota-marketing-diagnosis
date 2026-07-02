@@ -10,7 +10,7 @@
 - 用代码计算指标
 - 生成 `report.json` 和 `report.md`
 
-数据库导出的 CSV/zip 只作为开发校验和字段画像参考，不作为正式产品入口。
+数据库导出的 CSV/zip 只作为字段画像和开发参考，不作为正式产品入口，也不作为 CLI 运行入口。
 
 ## 快速开始
 
@@ -61,23 +61,22 @@ ota-marketing-diagnosis diagnose-config --config examples/sqlite_config.json --o
 
 配置文件指定临时库类型、表名映射和读取行数。第一版支持 SQLite，也预留 MySQL 读取能力。
 
-## 开发校验：数据库 CSV 导出
+## 数据库画像参考
 
-```bash
-ota-marketing-diagnosis diagnose-csv --path yanglidata.zip --output reports
-```
+`yanglidata.zip` 这类数据库导出文件只用于确认真实表结构、真实字段名、空值情况和字段口径。它的结论会沉淀到数据库 profile、字段映射和聚合规则里，不会要求最终用户上传数据库导出包。
 
-`diagnose-csv` 只用于开发期校验字段映射是否贴近真实数据库导出。正式产品应使用 Excel 上传或临时数据库配置。
-
-当前参考的导出表包括：
+当前参考表包括：
 
 - `jy01_hotel_statistics_daily`
 - `rs01_room_revenue_daily`
+- `jd01_booking_detail`
+- `jd04_inhouse_extension`
+- `kf11_room_status_snapshot`
 - `meituan_ota_business_metrics` / `ctrip_ota_business_metrics`
 - `meituan_ota_goods_price_mapping` / `ctrip_ota_goods_price_mapping`
 - `meituan_ota_review_detail` / `ctrip_ota_review_detail`
-
-其中 `jy01` 用作历史日经营主表；没有 `jy01` 时，会用 `rs01` 里 `charge_subject=房费` 的行按日聚合补经营数据。
+- `meituan_ota_promotion_activity` / `ctrip_ota_promotion_activity`
+- `meituan_ota_nearby_event`
 
 ## 项目边界
 
