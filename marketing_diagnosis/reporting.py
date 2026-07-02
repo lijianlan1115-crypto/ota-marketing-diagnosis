@@ -140,7 +140,7 @@ def _risk_zh(risk):
 
 def _status_class(rate_or_risk):
     if isinstance(rate_or_risk, str):
-        return {"high": "bad", "medium": "warn", "low": "good"}.get(rate_or_risk.lower(), "neutral")
+        return {"high": "bad", "medium": "warn", "low": "good", "data_gap": "neutral", "partial": "warn", "ok": "good"}.get(rate_or_risk.lower(), "neutral")
     value = _num(rate_or_risk)
     if value is None:
         return "neutral"
@@ -151,7 +151,9 @@ def _status_class(rate_or_risk):
     return "bad"
 
 
-def _status_text(rate):
+def _status_text(rate, status="ok"):
+    if status == "data_gap":
+        return "数据缺口"
     value = _num(rate)
     if value is None:
         return "缺失"
@@ -178,7 +180,7 @@ def build_markdown(result):
     lines.append("")
     lines.append("## Module Scores")
     for item in result.get("module_scores") or []:
-        lines.append(f"- {item.get('module_id')} {item.get('module_name')}: {item.get('score')}/{item.get('weight')} ({item.get('rate')})")
+        lines.append(f"- {item.get('module_id')} {item.get('module_name')}: {item.get('score')}/{item.get('weight')} ({item.get('rate')}) status={item.get('status')}")
     lines.append("")
     lines.append("## Notes")
     for item in result.get("notes") or []:
@@ -210,29 +212,36 @@ def _module_card(module):
     score = _num(module.get("score")) or 0
     weight = _num(module.get("weight")) or 0
     rate = _num(module.get("rate"))
-    if rate is None and weight:
+    status = module.get("status") or "ok"
+    if rate is None and weight and status != "data_gap":
         rate = score / weight
-    rate = max(0, min(1, rate if rate is not None else 0))
-    pct = int(round(rate * 100))
-    klass = _status_class(rate)
+    rate_for_bar = max(0, min(1, rate if rate is not None else 0))
+    pct = int(round(rate_for_bar * 100))
+    klass = _status_class(status if status == "data_gap" else rate_for_bar)
     reasons = module.get("reasons") or []
     reason_html = "".join(f"<span class='reason'>{_esc(reason)}</span>" for reason in reasons[:8])
     if not reason_html:
         reason_html = "<span class='reason'>系统评分</span>"
-    analysis = _module_analysis(module_id, label, rate)
-    color = {"good": "var(--green)", "warn": "var(--amber)", "bad": "var(--red)"}.get(klass, "var(--blue)")
+    source_fields = module.get("source_fields") or []
+    if source_fields:
+        reason_html += "".join(f"<span class='reason'>source: {_esc(field)}</span>" for field in source_fields[:5])
+    analysis = _module_analysis(module_id, label, rate_for_bar, status)
+    color = {"good": "var(--green)", "warn": "var(--amber)", "bad": "var(--red)", "neutral": "#475467"}.get(klass, "var(--blue)")
+    score_text = "数据缺口" if status == "data_gap" else f"{pct}%"
     return f"""<div class='module-card'>
   <div class='module-card-header'>
     <div><div class='mod-id'>{_esc(module_id)} <span style='font-size:11px;color:var(--muted);font-weight:400'>数据: {_esc(source)}</span></div><div class='mod-name'>{_esc(label)}</div></div>
-    <div class='module-card-score'><span class='big-score' style='color:{color}'>{pct}%</span><span class='of'> / {_esc(score)}/{_esc(weight)}</span></div>
+    <div class='module-card-score'><span class='big-score' style='color:{color}'>{_esc(score_text)}</span><span class='of'> / {_esc(score)}/{_esc(weight)}</span></div>
   </div>
   <div class='module-card-bar'><div class='bar-track'><div class='bar-fill {klass}' style='width:{pct}%'></div></div></div>
-  <div class='module-card-body'><span class='status {klass}'>{_esc(_status_text(rate))}</span>{reason_html}</div>
+  <div class='module-card-body'><span class='status {klass}'>{_esc(_status_text(rate, status))}</span>{reason_html}</div>
   <div class='module-card-analysis'>{analysis}</div>
 </div>"""
 
 
-def _module_analysis(module_id, label, rate):
+def _module_analysis(module_id, label, rate, status="ok"):
+    if status == "data_gap":
+        return f"⚪ <strong>{_esc(label)}</strong> 当前为数据缺口。系统没有使用默认值冒充真实结论；请先接入对应表或字段后再评分。"
     pct = int(round(rate * 100))
     if rate < 0.45:
         prefix = "🔴"
@@ -264,7 +273,24 @@ def _table(headers, rows, class_name="data-table"):
     return f"<table class='{class_name}'><thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody></table>"
 
 
-def _metric_rows(metrics):
+def _source_rows(data_quality):
+    rows = []
+    for source in data_quality.get("source_diagnostics") or []:
+        for key, diag in (source.get("tables") or {}).items():
+            rows.append([
+                key,
+                diag.get("table"),
+                diag.get("rows"),
+                f"<span class='status {_status_class(diag.get('status'))}'>{_esc(diag.get('status'))}</span>",
+                diag.get("where") or "—",
+                ", ".join((diag.get("fields_sample") or [])[:12]) or diag.get("aggregation") or "—",
+            ])
+    if not rows:
+        rows.append(["无", "无 source_diagnostics", 0, "<span class='status bad'>missing</span>", "—", "当前报告无法证明数据来自哪张表"])
+    return rows
+
+
+def _metric_rows(metrics, data_quality=None):
     operating = metrics.get("operating") or {}
     funnel = metrics.get("ota_funnel") or {}
     reputation = metrics.get("reputation") or {}
@@ -339,6 +365,7 @@ def build_html(result):
     data_quality_json = json.dumps(data_quality, ensure_ascii=False, indent=2)
     metric_analysis = "当前关键指标已汇总展示。若部分指标为未获取，应优先检查字段映射和对应数据表是否存在有效记录。"
     missing_analysis = f"当前缺失字段数为 {missing_count}。缺失字段不等于经营差，但会降低评分可信度，相关模块采用保守估计。"
+    source_analysis = "本节用于核验报告是否真的查到数据库。若表状态为 empty/error，相关报告值不能当作真实经营结论。"
     return f"""<!doctype html>
 <html lang='zh-CN'>
 <head>
@@ -357,6 +384,7 @@ def build_html(result):
   <div class='layout'>
     <nav class='sidebar dashboard-only'>
       <a href='#overview'>顶部总览卡片</a>
+      <a href='#source'>数据来源核验</a>
       <a href='#trend'>月度趋势图</a>
       <a href='#modules'>模块诊断</a>
       <a href='#metrics'>经营指标</a>
@@ -376,20 +404,24 @@ def build_html(result):
             {_kpi('数据来源', result.get('platform') or 'multi', result.get('data_source') or 'database')}
           </div>
           <div class='cap-alert'><b>封顶/校准规则</b><span><ul>{cap_html}</ul></span><span class='status warn'>按规则校准</span></div>
-          {_analysis('综合诊断分析', [f'<strong>综合诊断结论</strong>：酒店当前处于<strong>{_esc(_risk_zh(risk))}</strong>状态，综合得分 {round(final_score):.0f}/100。', f'数据可信度 {credibility}%，当前缺失字段 {missing_count} 个。', '核心短板请优先查看 M01-M08 模块卡片中的红色或黄色模块。'])}
+          {_analysis('综合诊断分析', [f'<strong>综合诊断结论</strong>：酒店当前处于<strong>{_esc(_risk_zh(risk))}</strong>状态，综合得分 {round(final_score):.0f}/100。', f'数据可信度 {credibility}%，当前缺失字段 {missing_count} 个。', '核心短板请优先查看 M01-M08 模块卡片中的红色、黄色或数据缺口模块。'])}
         </div>
+      </section>
+      <section id='source'>
+        <div class='section-head'><div><h2>数据来源核验</h2><p>展示实际查询的数据库表、行数、过滤条件和字段样本。</p></div></div>
+        <div class='section-body'>{_table(['逻辑名','真实表','行数','状态','过滤条件','字段样本/聚合口径'], _source_rows(data_quality))}{_analysis('数据接口核验', [source_analysis])}</div>
       </section>
       <section id='trend'>
         <div class='section-head'><div><h2>月度趋势图</h2><p>趋势图区域；当前 MVP 先输出关键趋势占位，后续接入 jy03 月度数据。</p></div></div>
         <div class='section-body'><div class='two-col'><div class='subpanel'><h3>RevPAR / ADR 趋势</h3><div class='subpanel-content'>暂无 jy03 月度趋势数据；接入后在此绘制 SVG 趋势线。</div></div><div class='subpanel'><h3>趋势解读</h3><div class='subpanel-content'>当前报告先以历史日经营和 OTA 漏斗作为诊断依据。</div></div></div></div>
       </section>
       <section id='modules'>
-        <div class='section-head'><div><h2>模块诊断详情</h2><p>8 个诊断模块独立评估，每个模块包含得分、评分依据、AI 分析。</p></div></div>
+        <div class='section-head'><div><h2>模块诊断详情</h2><p>8 个诊断模块独立评估；数据没接上的模块显示为数据缺口，不使用默认值冒充结论。</p></div></div>
         <div class='section-body'><div class='module-cards'>{module_cards}</div></div>
       </section>
       <section id='metrics'>
         <div class='section-head'><div><h2>经营指标</h2><p>关键经营数据一览</p></div></div>
-        <div class='section-body'>{_table(['指标','当前值','口径','数据来源','状态'], _metric_rows(metrics))}{_analysis('指标解读', [metric_analysis])}</div>
+        <div class='section-body'>{_table(['指标','当前值','口径','数据来源','状态'], _metric_rows(metrics, data_quality))}{_analysis('指标解读', [metric_analysis])}</div>
       </section>
       <section id='funnel'>
         <div class='section-head'><div><h2>流量与转化漏斗</h2><p>曝光、浏览、支付订单、支付转化。</p></div></div>
