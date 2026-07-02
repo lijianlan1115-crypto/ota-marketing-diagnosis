@@ -2,10 +2,9 @@
 
 独立的第三方 OTA 营销诊断工具。
 
-它不属于 `hotel--ota-ai` 主项目，不接入飞书鉴权、调价、审批、live 执行或价格任务表。第一版聚焦：
+它不属于 `hotel--ota-ai` 主项目。第一版聚焦：
 
 - 读取 Excel
-- 读取临时 SQLite / MySQL 数据库
 - 标准化字段
 - 用代码计算指标
 - 生成 `report.json` 和 `report.md`
@@ -14,20 +13,22 @@
 
 ```bash
 python -m venv .venv
-# Windows PowerShell:
-# .\.venv\Scripts\Activate.ps1
 pip install -e .
 ```
 
-### Excel 诊断
+## Excel 诊断
 
 ```bash
-python -m marketing_diagnosis.cli diagnose-excel \
-  --excel examples/sample_data.xlsx \
-  --output reports
+ota-marketing-diagnosis diagnose-excel --excel examples/sample_data.xlsx --output reports
 ```
 
-Excel 支持以下 sheet，英文名优先，也兼容常见中文 sheet 名：
+也可以直接运行模块：
+
+```bash
+python -m marketing_diagnosis.main diagnose-excel --excel examples/sample_data.xlsx --output reports
+```
+
+Excel 支持以下 sheet：
 
 | 标准 sheet | 说明 |
 |---|---|
@@ -37,50 +38,27 @@ Excel 支持以下 sheet，英文名优先，也兼容常见中文 sheet 名：
 | `reviews` | 公开评论与口碑 |
 | `competitors` | 竞品价格、排名、活动标签 |
 
-### 数据库诊断
+## 项目边界
 
-```bash
-python -m marketing_diagnosis.cli diagnose-db \
-  --config examples/db_config.example.json \
-  --output reports
-```
+本项目只生成营销诊断报告，不做权限体系、调价写入、审批或线上执行。
 
-第一版支持 SQLite，MySQL 为可选能力，需要安装 `pymysql`。
-
-## 设计边界
-
-本项目只做营销诊断：
-
-- 不做飞书鉴权
-- 不做 admin / owner / operator 权限
-- 不做调价写入
-- 不做审批
-- 不做 live 执行
-- 不读取主项目 SQLite 授权库
-- 不复用主项目 OpenClaw 路由
-
-公开 OTA 评论正文默认不脱敏，因为营销审核需要上下文。手机号、身份证、订单号、房号、客人姓名等敏感字段会脱敏。
+公开 OTA 评论正文默认不脱敏，因为营销审核需要上下文。联系方式、订单号、房号、客人姓名等敏感字段会脱敏。
 
 ## 报告输出
-
-每次诊断输出：
 
 ```text
 report.json
 report.md
 ```
 
-报告结构：
-
-1. 酒店经营概览
-2. OTA 流量漏斗诊断
-3. 商品价格梯度诊断
-4. 口碑评论诊断
-5. 竞品对比诊断
-6. 营销动作建议
-
 ## 测试
 
 ```bash
 python -m unittest discover tests
 ```
+
+## 后续计划
+
+- 补充临时数据库输入命令。
+- 补充样例 Excel。
+- 从旧原型 `D:\hotel\s14-feishu-test\s14-feishu-test` 迁移更完整的数据库读取和报告模板。
