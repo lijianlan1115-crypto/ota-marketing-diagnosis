@@ -5,11 +5,12 @@
 它不属于 `hotel--ota-ai` 主项目。第一版聚焦：
 
 - 读取 Excel
-- 读取数据库导出的 CSV 文件夹或 zip
 - 读取临时 SQLite / MySQL 配置
 - 标准化字段
 - 用代码计算指标
 - 生成 `report.json` 和 `report.md`
+
+数据库导出的 CSV/zip 只作为开发校验和字段画像参考，不作为正式产品入口。
 
 ## 快速开始
 
@@ -52,13 +53,23 @@ Excel 支持以下 sheet：
 | `reviews` | 公开评论与口碑 |
 | `competitors` | 竞品价格、排名、活动标签 |
 
-## 数据库 CSV 导出诊断
+## 临时数据库诊断
+
+```bash
+ota-marketing-diagnosis diagnose-config --config examples/sqlite_config.json --output reports
+```
+
+配置文件指定临时库类型、表名映射和读取行数。第一版支持 SQLite，也预留 MySQL 读取能力。
+
+## 开发校验：数据库 CSV 导出
 
 ```bash
 ota-marketing-diagnosis diagnose-csv --path yanglidata.zip --output reports
 ```
 
-`--path` 可以是 CSV 文件夹，也可以是数据库导出的 zip。当前已支持这些导出表的自动识别：
+`diagnose-csv` 只用于开发期校验字段映射是否贴近真实数据库导出。正式产品应使用 Excel 上传或临时数据库配置。
+
+当前参考的导出表包括：
 
 - `jy01_hotel_statistics_daily`
 - `rs01_room_revenue_daily`
@@ -67,14 +78,6 @@ ota-marketing-diagnosis diagnose-csv --path yanglidata.zip --output reports
 - `meituan_ota_review_detail` / `ctrip_ota_review_detail`
 
 其中 `jy01` 用作历史日经营主表；没有 `jy01` 时，会用 `rs01` 里 `charge_subject=房费` 的行按日聚合补经营数据。
-
-## 临时数据库诊断
-
-```bash
-ota-marketing-diagnosis diagnose-config --config examples/sqlite_config.json --output reports
-```
-
-配置文件指定临时库类型、表名映射和读取行数。第一版支持 SQLite，也预留 MySQL 读取能力。
 
 ## 项目边界
 
