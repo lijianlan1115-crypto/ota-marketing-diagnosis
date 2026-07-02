@@ -41,6 +41,7 @@ def _sqlite_dataset(config: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     tables = config.get("tables") or {}
     limit = int(config.get("limit") or 5000)
     dataset: dict[str, list[dict[str, Any]]] = {}
+    source_diagnostics = {"kind": "sqlite", "path": str(db_path), "tables": {}}
     with closing(sqlite3.connect(str(db_path))) as conn:
         conn.row_factory = sqlite3.Row
         for section in SECTIONS:
@@ -49,6 +50,8 @@ def _sqlite_dataset(config: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
                 continue
             rows = conn.execute(f"SELECT * FROM {_safe_identifier(str(table))} LIMIT ?", (limit,)).fetchall()
             dataset[section] = [dict(row) for row in rows]
+            source_diagnostics["tables"][section] = {"table": table, "rows": len(rows), "status": "ok" if rows else "empty"}
+    dataset["__source_diagnostics__"] = [source_diagnostics]
     return dataset
 
 
@@ -63,6 +66,15 @@ def _mysql_params(dsn: str) -> dict[str, Any]:
         "database": (parsed.path or "/").lstrip("/"),
         "charset": query.get("charset", ["utf8mb4"])[0],
     }
+
+
+def _masked_dsn(dsn: str) -> str:
+    parsed = urlparse(dsn)
+    user = unquote(parsed.username or "")
+    host = parsed.hostname or "localhost"
+    port = parsed.port or 3306
+    database = (parsed.path or "/").lstrip("/")
+    return f"mysql+pymysql://{user}:***@{host}:{port}/{database}"
 
 
 def _connect_mysql(dsn: str):
@@ -86,16 +98,18 @@ def _connect_mysql(dsn: str):
     )
 
 
-def _fetch(cursor, table: str, limit: int, where: str | None = None) -> list[dict[str, Any]]:
+def _fetch(cursor, table: str, limit: int, where: str | None = None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     sql = f"SELECT * FROM {_safe_identifier(table)}"
     if where:
         sql += f" WHERE {where}"
     sql += " LIMIT %s"
     try:
         cursor.execute(sql, (limit,))
-        return [dict(row) for row in cursor.fetchall()]
-    except Exception:
-        return []
+        rows = [dict(row) for row in cursor.fetchall()]
+        fields = sorted({key for row in rows[:20] for key in row.keys()})
+        return rows, {"table": table, "where": where, "rows": len(rows), "fields_sample": fields, "status": "ok" if rows else "empty"}
+    except Exception as exc:
+        return [], {"table": table, "where": where, "rows": 0, "fields_sample": [], "status": "error", "error": str(exc)}
 
 
 def _float(value: Any) -> float | None:
@@ -137,7 +151,7 @@ def _pivot_funnel(rows: list[dict[str, Any]], platform: str) -> list[dict[str, A
     for row in rows:
         period = str(row.get("stats_period_type") or "")
         day = str(row.get("business_date") or "")[:10]
-        item = grouped.setdefault((period, day), {"platform": platform, "business_date": day, "period_type": period})
+        item = grouped.setdefault((period, day), {"platform": platform, "business_date": day, "period_type": period, "source_table": row.get("__source_table")})
         target = metric_map.get(str(row.get("metric_name") or "").strip())
         if not target:
             continue
@@ -154,7 +168,7 @@ def _pivot_funnel(rows: list[dict[str, Any]], platform: str) -> list[dict[str, A
     return list(grouped.values())
 
 
-def _rs01_daily(cursor, table: str) -> list[dict[str, Any]]:
+def _rs01_daily(cursor, table: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     sql = (
         f"SELECT DATE(business_date) AS business_date, SUM(room_nights) AS room_nights, "
         f"SUM(room_fee) AS room_revenue, 'rs01_room_revenue_daily' AS source_table "
@@ -162,9 +176,10 @@ def _rs01_daily(cursor, table: str) -> list[dict[str, Any]]:
     )
     try:
         cursor.execute(sql)
-        return [dict(row) for row in cursor.fetchall()]
-    except Exception:
-        return []
+        rows = [dict(row) for row in cursor.fetchall()]
+        return rows, {"table": table, "where": "charge_subject='房费'", "rows": len(rows), "aggregation": "sum(room_nights), sum(room_fee) by business_date", "status": "ok" if rows else "empty"}
+    except Exception as exc:
+        return [], {"table": table, "where": "charge_subject='房费'", "rows": 0, "aggregation": "sum by business_date", "status": "error", "error": str(exc)}
 
 
 def _products(rows: list[dict[str, Any]], platform: str) -> list[dict[str, Any]]:
@@ -173,6 +188,7 @@ def _products(rows: list[dict[str, Any]], platform: str) -> list[dict[str, Any]]
         is_group = str(row.get("is_super_deal") or "").lower() in {"1", "true", "yes"}
         out.append({
             "platform": platform,
+            "source_table": row.get("__source_table"),
             "room_type_name": row.get("room_type_name") or row.get("source_room_type_name"),
             "product_name": row.get("ota_product_name") or row.get("source_product_name"),
             "product_type": "group_buy" if is_group else row.get("rate_plan_name"),
@@ -187,6 +203,7 @@ def _products(rows: list[dict[str, Any]], platform: str) -> list[dict[str, Any]]
 def _reviews(rows: list[dict[str, Any]], platform: str) -> list[dict[str, Any]]:
     return [{
         "platform": platform,
+        "source_table": row.get("__source_table"),
         "review_date": str(row.get("review_time") or row.get("stay_date") or "")[:10],
         "rating": row.get("review_score"),
         "review_text": row.get("review_content"),
@@ -195,22 +212,53 @@ def _reviews(rows: list[dict[str, Any]], platform: str) -> list[dict[str, Any]]:
     } for row in rows]
 
 
+def _tag_rows(rows: list[dict[str, Any]], table: str) -> list[dict[str, Any]]:
+    for row in rows:
+        row["__source_table"] = table
+    return rows
+
+
 def load_mysql_dsn_dataset(dsn: str, limit: int = 5000, tables: dict[str, str] | None = None) -> dict[str, list[dict[str, Any]]]:
     table_map = {**DEFAULT_MYSQL_TABLES, **(tables or {})}
     dataset: dict[str, list[dict[str, Any]]] = {section: [] for section in SECTIONS}
+    diagnostics: dict[str, Any] = {"kind": "mysql", "dsn": _masked_dsn(dsn), "profile": "puyue_mysql_reference", "tables": {}, "transformations": []}
     with _connect_mysql(dsn) as conn:
         with conn.cursor() as cursor:
-            jy01 = _fetch(cursor, table_map["jy01"], limit, "dimension_type='总营业指标' AND dimension_name='总营业指标'")
+            jy01, diag = _fetch(cursor, table_map["jy01"], limit, "dimension_type='总营业指标' AND dimension_name='总营业指标'")
+            diagnostics["tables"]["jy01"] = diag
             if jy01:
-                dataset["hotel_daily"].extend(jy01)
+                dataset["hotel_daily"].extend(_tag_rows(jy01, table_map["jy01"]))
+                diagnostics["transformations"].append({"section": "hotel_daily", "source": table_map["jy01"], "rows": len(jy01), "rule": "total operating rows"})
             else:
-                dataset["hotel_daily"].extend(_rs01_daily(cursor, table_map["rs01"]))
-            dataset["ota_funnel"].extend(_pivot_funnel(_fetch(cursor, table_map["meituan_funnel"], limit), "meituan"))
-            dataset["ota_funnel"].extend(_pivot_funnel(_fetch(cursor, table_map["ctrip_funnel"], limit), "ctrip"))
-            dataset["products"].extend(_products(_fetch(cursor, table_map["meituan_products"], limit), "meituan"))
-            dataset["products"].extend(_products(_fetch(cursor, table_map["ctrip_products"], limit), "ctrip"))
-            dataset["reviews"].extend(_reviews(_fetch(cursor, table_map["meituan_reviews"], limit), "meituan"))
-            dataset["reviews"].extend(_reviews(_fetch(cursor, table_map["ctrip_reviews"], limit), "ctrip"))
+                rs01_rows, rs01_diag = _rs01_daily(cursor, table_map["rs01"])
+                diagnostics["tables"]["rs01_fallback"] = rs01_diag
+                dataset["hotel_daily"].extend(rs01_rows)
+                diagnostics["transformations"].append({"section": "hotel_daily", "source": table_map["rs01"], "rows": len(rs01_rows), "rule": "fallback, charge_subject=房费 daily aggregation"})
+
+            meituan_funnel, diag = _fetch(cursor, table_map["meituan_funnel"], limit)
+            diagnostics["tables"]["meituan_funnel"] = diag
+            ctrip_funnel, diag = _fetch(cursor, table_map["ctrip_funnel"], limit)
+            diagnostics["tables"]["ctrip_funnel"] = diag
+            dataset["ota_funnel"].extend(_pivot_funnel(_tag_rows(meituan_funnel, table_map["meituan_funnel"]), "meituan"))
+            dataset["ota_funnel"].extend(_pivot_funnel(_tag_rows(ctrip_funnel, table_map["ctrip_funnel"]), "ctrip"))
+            diagnostics["transformations"].append({"section": "ota_funnel", "source": [table_map["meituan_funnel"], table_map["ctrip_funnel"]], "rows": len(dataset["ota_funnel"]), "rule": "pivot metric_name tall table"})
+
+            meituan_products, diag = _fetch(cursor, table_map["meituan_products"], limit)
+            diagnostics["tables"]["meituan_products"] = diag
+            ctrip_products, diag = _fetch(cursor, table_map["ctrip_products"], limit)
+            diagnostics["tables"]["ctrip_products"] = diag
+            dataset["products"].extend(_products(_tag_rows(meituan_products, table_map["meituan_products"]), "meituan"))
+            dataset["products"].extend(_products(_tag_rows(ctrip_products, table_map["ctrip_products"]), "ctrip"))
+            diagnostics["transformations"].append({"section": "products", "source": [table_map["meituan_products"], table_map["ctrip_products"]], "rows": len(dataset["products"]), "rule": "map OTA product price fields"})
+
+            meituan_reviews, diag = _fetch(cursor, table_map["meituan_reviews"], limit)
+            diagnostics["tables"]["meituan_reviews"] = diag
+            ctrip_reviews, diag = _fetch(cursor, table_map["ctrip_reviews"], limit)
+            diagnostics["tables"]["ctrip_reviews"] = diag
+            dataset["reviews"].extend(_reviews(_tag_rows(meituan_reviews, table_map["meituan_reviews"]), "meituan"))
+            dataset["reviews"].extend(_reviews(_tag_rows(ctrip_reviews, table_map["ctrip_reviews"]), "ctrip"))
+            diagnostics["transformations"].append({"section": "reviews", "source": [table_map["meituan_reviews"], table_map["ctrip_reviews"]], "rows": len(dataset["reviews"]), "rule": "map public review detail"})
+    dataset["__source_diagnostics__"] = [diagnostics]
     return dataset
 
 
@@ -223,14 +271,17 @@ def _mysql_dataset(config: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     if config.get("profile") in {"puyue_mysql_reference", "puyue_mysql"} or not tables:
         return load_mysql_dsn_dataset(str(dsn), limit=limit, tables=tables)
     dataset: dict[str, list[dict[str, Any]]] = {}
+    source_diagnostics = {"kind": "mysql", "dsn": _masked_dsn(str(dsn)), "profile": "custom_tables", "tables": {}}
     with _connect_mysql(str(dsn)) as conn:
         with conn.cursor() as cursor:
             for section in SECTIONS:
                 table = tables.get(section)
                 if not table:
                     continue
-                cursor.execute(f"SELECT * FROM {_safe_identifier(str(table))} LIMIT %s", (limit,))
-                dataset[section] = [dict(row) for row in cursor.fetchall()]
+                rows, diag = _fetch(cursor, str(table), limit)
+                dataset[section] = rows
+                source_diagnostics["tables"][section] = diag
+    dataset["__source_diagnostics__"] = [source_diagnostics]
     return dataset
 
 
