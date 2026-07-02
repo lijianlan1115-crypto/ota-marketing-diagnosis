@@ -17,6 +17,18 @@ python -m venv .venv
 pip install -e .
 ```
 
+## 生成样例 Excel
+
+```bash
+python scripts/create_sample_excel.py
+```
+
+会生成：
+
+```text
+examples/sample_data.xlsx
+```
+
 ## Excel 诊断
 
 ```bash
@@ -68,5 +80,4 @@ python -m unittest discover tests
 
 ## 后续计划
 
-- 补充样例 Excel 生成脚本。
 - 从旧原型 `D:\hotel\s14-feishu-test\s14-feishu-test` 迁移更完整的字段映射和报告模板。
