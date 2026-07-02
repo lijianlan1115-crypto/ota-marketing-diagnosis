@@ -5,7 +5,7 @@
 它不属于 `hotel--ota-ai` 主项目。第一版聚焦：
 
 - 读取 Excel
-- 读取临时 SQLite / MySQL 配置
+- 读取阿里服务器本机 MySQL 诊断库
 - 标准化字段
 - 用代码计算指标
 - 生成 `report.json` 和 `report.md`
@@ -17,6 +17,12 @@
 ```bash
 python -m venv .venv
 pip install -e .
+```
+
+MySQL 读取需要安装：
+
+```bash
+pip install pymysql
 ```
 
 ## 生成样例 Excel
@@ -53,13 +59,35 @@ Excel 支持以下 sheet：
 | `reviews` | 公开评论与口碑 |
 | `competitors` | 竞品价格、排名、活动标签 |
 
-## 临时数据库诊断
+## 阿里服务器本机 MySQL 诊断
+
+在服务器上设置 DSN：
+
+```bash
+export S14_DB_DSN='mysql+pymysql://openclaw_user:YOUR_URL_ENCODED_PASSWORD@127.0.0.1:3306/hotel_puyue?charset=utf8mb4'
+```
+
+运行：
+
+```bash
+ota-marketing-diagnosis diagnose-db --dsn-env S14_DB_DSN --output reports
+```
+
+也可以直接传 DSN，但不建议把密码写进 shell 历史：
+
+```bash
+ota-marketing-diagnosis diagnose-db --dsn 'mysql+pymysql://user:password@127.0.0.1:3306/hotel_puyue?charset=utf8mb4' --output reports
+```
+
+`diagnose-db` 会按内置 `puyue_mysql_reference` profile 读取真实表并聚合成报告数据。
+
+## 配置文件诊断
 
 ```bash
 ota-marketing-diagnosis diagnose-config --config examples/sqlite_config.json --output reports
 ```
 
-配置文件指定临时库类型、表名映射和读取行数。第一版支持 SQLite，也预留 MySQL 读取能力。
+配置文件适合开发调试或替代数据库，不是主要生产入口。
 
 ## 数据库画像参考
 
