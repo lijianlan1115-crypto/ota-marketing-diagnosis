@@ -6,48 +6,54 @@ from typing import Any
 SECTIONS = ["hotel_daily", "ota_funnel", "products", "reviews", "competitors"]
 
 SHEET_NAMES = {
-    "hotel_daily": {"hotel_daily", "daily", "酒店日报", "每日经营", "经营日报"},
-    "ota_funnel": {"ota_funnel", "funnel", "OTA漏斗", "流量漏斗"},
-    "products": {"products", "商品", "商品价格"},
-    "reviews": {"reviews", "review", "评论", "口碑"},
+    "hotel_daily": {"hotel_daily", "daily", "酒店日报", "每日经营", "经营日报", "jy01", "rs01"},
+    "ota_funnel": {"ota_funnel", "funnel", "OTA漏斗", "流量漏斗", "ota_business_metrics"},
+    "products": {"products", "商品", "商品价格", "goods_price_mapping"},
+    "reviews": {"reviews", "review", "评论", "口碑", "review_detail"},
     "competitors": {"competitors", "competition", "竞品", "竞品数据"},
 }
 
 FIELD_MAP = {
     "hotel_daily": {
-        "日期": "business_date", "营业日期": "business_date", "date": "business_date",
-        "总房量": "room_count", "房间数": "room_count",
-        "间夜": "room_nights", "售出间夜": "room_nights",
-        "收入": "room_revenue", "房费收入": "room_revenue", "room_fee": "room_revenue",
-        "出租率": "occupancy_rate", "入住率": "occupancy_rate", "平均房价": "adr",
+        "日期": "business_date", "营业日期": "business_date", "date": "business_date", "data_date": "business_date",
+        "总房量": "room_count", "房间数": "room_count", "available_room_nights": "room_count",
+        "间夜": "room_nights", "售出间夜": "room_nights", "sold_room_nights": "room_nights", "sold_rooms": "room_nights",
+        "收入": "room_revenue", "房费收入": "room_revenue", "room_fee": "room_revenue", "revenue": "room_revenue",
+        "出租率": "occupancy_rate", "入住率": "occupancy_rate", "occupancy": "occupancy_rate",
+        "平均房价": "adr", "room_daily_price": "adr", "rack_rate": "adr",
     },
     "ota_funnel": {
-        "日期": "business_date", "平台": "platform", "渠道": "platform",
-        "曝光": "exposure", "曝光人数": "exposure",
-        "浏览": "views", "浏览人数": "views", "访客": "visitors",
-        "支付订单": "paid_orders", "订单数": "paid_orders",
-        "支付转化率": "payment_conversion_rate", "转化率": "payment_conversion_rate",
-        "同行平均转化率": "peer_avg_conversion_rate", "商圈平均转化率": "peer_avg_conversion_rate",
-        "排名": "peer_rank", "商圈排名": "peer_rank",
+        "日期": "business_date", "平台": "platform", "渠道": "platform", "channel_source": "platform", "source_platform": "platform",
+        "曝光": "exposure", "曝光人数": "exposure", "曝光量": "exposure", "peer_exposure": "peer_exposure",
+        "浏览": "views", "浏览人数": "views", "访客": "visitors", "UV": "visitors", "peer_views": "peer_views",
+        "支付订单": "paid_orders", "订单数": "paid_orders", "支付订单数": "paid_orders", "orders": "paid_orders",
+        "支付转化率": "payment_conversion_rate", "转化率": "payment_conversion_rate", "浏览-支付转化率": "payment_conversion_rate",
+        "同行平均转化率": "peer_avg_conversion_rate", "商圈平均转化率": "peer_avg_conversion_rate", "peer_payment_conversion_rate": "peer_avg_conversion_rate",
+        "排名": "peer_rank", "商圈排名": "peer_rank", "competitor_rank": "peer_rank",
     },
     "products": {
-        "平台": "platform", "渠道": "platform", "房型": "room_type_name",
-        "商品名": "product_name", "商品名称": "product_name",
-        "商品类型": "product_type", "挂牌价": "listed_price", "门市价": "listed_price",
+        "平台": "platform", "渠道": "platform", "channel_source": "platform", "source_platform": "platform",
+        "房型": "room_type_name", "source_room_type_name": "room_type_name",
+        "商品名": "product_name", "商品名称": "product_name", "ota_product_name": "product_name", "source_product_name": "product_name",
+        "商品类型": "product_type", "rate_plan_name": "product_type",
+        "挂牌价": "listed_price", "门市价": "listed_price", "ota_sale_price": "listed_price", "current_sale_price": "listed_price",
         "活动价": "activity_price", "团购价": "activity_price",
-        "到手价": "final_price", "售卖价": "final_price",
+        "到手价": "final_price", "售卖价": "final_price", "target_sale_price": "final_price",
         "是否钟点房": "is_hour_room", "钟点房": "is_hour_room",
-        "是否团购": "is_group_buy", "团购": "is_group_buy",
+        "是否团购": "is_group_buy", "团购": "is_group_buy", "is_super_deal": "is_group_buy",
     },
     "reviews": {
-        "平台": "platform", "渠道": "platform", "评论日期": "review_date", "日期": "review_date",
-        "评分": "rating", "星级": "rating", "评论": "review_text", "评论内容": "review_text",
-        "评价内容": "review_text", "是否差评": "is_negative", "差评": "is_negative", "关键词": "keywords",
+        "平台": "platform", "渠道": "platform", "channel_source": "platform",
+        "评论日期": "review_date", "日期": "review_date", "review_time": "review_date", "stay_date": "review_date",
+        "评分": "rating", "星级": "rating", "review_score": "rating", "review_score_max": "rating",
+        "评论": "review_text", "评论内容": "review_text", "评价内容": "review_text", "review_content": "review_text",
+        "是否差评": "is_negative", "差评": "is_negative", "is_negative_review": "is_negative",
+        "关键词": "keywords", "rank_item_name": "keywords",
     },
     "competitors": {
         "日期": "business_date", "竞品": "competitor_name", "竞品名称": "competitor_name",
-        "房型": "room_type_name", "价格": "price", "售卖价": "price",
-        "排名": "rank", "距离": "distance", "活动标签": "promotion_tag",
+        "房型": "room_type_name", "价格": "price", "售卖价": "price", "peer_average": "price",
+        "排名": "rank", "competitor_rank": "rank", "距离": "distance", "活动标签": "promotion_tag",
     },
 }
 
@@ -61,7 +67,7 @@ REQUIRED = {
 
 NUMBER_FIELDS = {
     "room_count", "room_nights", "room_revenue", "adr", "revpar", "occupancy_rate",
-    "exposure", "views", "visitors", "paid_orders", "payment_conversion_rate", "peer_avg_conversion_rate",
+    "exposure", "peer_exposure", "views", "peer_views", "visitors", "paid_orders", "payment_conversion_rate", "peer_avg_conversion_rate",
     "peer_rank", "listed_price", "activity_price", "final_price", "rating", "price", "rank",
 }
 
