@@ -1,0 +1,6 @@
+{
+  "kind": "mysql+pymysql",
+  "dsn_env": "S14_DB_DSN",
+  "profile": "puyue_mysql_reference",
+  "limit": 5000
+}
