@@ -1,0 +1,78 @@
+version: 1
+skill_id: s14-operation-diagnosis
+language: zh-CN
+
+intent_triggers:
+  - name: s14_diagnosis
+    priority: 100
+    phrases:
+      - S14诊断
+      - S14 诊断
+      - OTA诊断
+      - OTA全面诊断
+      - 运营诊断
+      - 生成诊断报告
+      - 生成OTA诊断报告
+      - 酒店OTA诊断
+      - 酒店 OTA 诊断
+    default_inputs:
+      data_source_mode: database
+      platform: multi
+      period_days: 30
+
+  - name: meituan_diagnosis
+    priority: 95
+    phrases:
+      - 美团诊断
+      - 美团OTA诊断
+      - 美团运营诊断
+    default_inputs:
+      data_source_mode: database
+      platform: meituan
+      period_days: 30
+
+  - name: ctrip_diagnosis
+    priority: 95
+    phrases:
+      - 携程诊断
+      - 携程OTA诊断
+      - 携程运营诊断
+    default_inputs:
+      data_source_mode: database
+      platform: ctrip
+      period_days: 30
+
+  - name: multi_channel_diagnosis
+    priority: 90
+    phrases:
+      - 多渠道诊断
+      - 全渠道诊断
+      - 多渠道OTA诊断
+      - 全渠道OTA诊断
+    default_inputs:
+      data_source_mode: database
+      platform: multi
+      period_days: 30
+
+parameter_extractors:
+  period_days:
+    example: 最近30天
+    type: integer
+    min: 1
+    max: 366
+  platform:
+    mapping:
+      美团: meituan
+      携程: ctrip
+      飞猪: fliggy
+      多渠道: multi
+      全渠道: multi
+  hotel_id:
+    mapping:
+      puyue: puyue
+      璞悦: puyue
+      璞悦酒店: puyue
+
+safety:
+  report_only: true
+  dry_run: true
