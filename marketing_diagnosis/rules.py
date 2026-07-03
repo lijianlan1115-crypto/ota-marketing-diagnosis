@@ -11,6 +11,7 @@ from marketing_diagnosis.metrics_core import (
     promotion_metrics,
     reputation_metrics,
 )
+from marketing_diagnosis.metrics_enrichment import enrich_metrics
 from marketing_diagnosis.optimization_check import build_optimization_checks
 from marketing_diagnosis.rule_catalog import MODULE_CONFIG, MODULE_NAME, MODULE_WEIGHT, RULE_CATALOG
 
@@ -250,6 +251,7 @@ def process(data):
         "source_diagnostics": data.get("source_diagnostics") or [],
     }
     metrics = {"operating": operating, "ota_funnel": funnel, "price_ladder": price, "promotion": promotion, "reputation": reputation, "nearby_events": events, "competitors": competitors}
+    data_time_context = enrich_metrics(metrics, sections)
     module_scores = score_modules(metrics, data_quality)
     score_before_cap = round(sum(item["score"] for item in module_scores), 2)
     notes, actions, data_gap_modules = _notes_and_actions(metrics, module_scores, data_quality)
@@ -264,6 +266,7 @@ def process(data):
         "module_scores": module_scores,
         "rule_hits": build_rule_hits(module_scores),
         "data_quality": data_quality,
+        "data_time_context": data_time_context,
         "metrics": metrics,
         "notes": notes,
         "actions": actions,
