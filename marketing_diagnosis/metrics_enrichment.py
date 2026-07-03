@@ -9,7 +9,7 @@ def _num(value: Any) -> float | None:
     try:
         if value in (None, ""):
             return None
-        number = float(value)
+        number = float(str(value).replace(",", ""))
         return None if number != number else number
     except (TypeError, ValueError):
         return None
@@ -34,7 +34,7 @@ def _date_text(value: Any) -> str | None:
 
 def _parse_date(value: Any) -> dt.date | None:
     text = _date_text(value)
-    if not text or text in {"0000-00-00", "unknown"}:
+    if not text or text in {"0000-00-00", "unknown", "累计", "快照"}:
         return None
     for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"):
         try:
@@ -52,18 +52,31 @@ def _row_date(row: dict[str, Any], keys: tuple[str, ...]) -> str | None:
     return None
 
 
-def _period(rows: list[dict[str, Any]], keys: tuple[str, ...], grain: str, label: str, fallback: dict[str, Any] | None = None) -> dict[str, Any]:
+def _period(rows: list[dict[str, Any]], keys: tuple[str, ...], grain: str, label: str) -> dict[str, Any]:
     dates = sorted({d for row in rows for d in [_row_date(row, keys)] if d})
-    fallback = fallback or {}
     return {
         "label": label,
         "grain": grain,
-        "start": dates[0] if dates else fallback.get("start"),
-        "end": dates[-1] if dates else fallback.get("end"),
+        "start": dates[0] if dates else None,
+        "end": dates[-1] if dates else None,
         "row_count": len(rows),
         "date_fields": list(keys),
         "has_explicit_date": bool(dates),
         "note": _period_note(grain, bool(dates)),
+    }
+
+
+def _snapshot_period(rows: list[dict[str, Any]], keys: tuple[str, ...], label: str, cumulative: bool = False) -> dict[str, Any]:
+    dates = sorted({d for row in rows for d in [_row_date(row, keys)] if d})
+    return {
+        "label": label,
+        "grain": "snapshot",
+        "start": "累计" if cumulative else (dates[0] if dates else None),
+        "end": dates[-1] if dates else ("快照" if cumulative else None),
+        "row_count": len(rows),
+        "date_fields": list(keys),
+        "has_explicit_date": bool(dates),
+        "note": "累计快照口径，不代表报告请求周期" if cumulative else _period_note("snapshot", bool(dates)),
     }
 
 
@@ -79,19 +92,56 @@ def _period_note(grain: str, has_date: bool) -> str:
     return "按可用字段聚合"
 
 
+def _exposure_value(row: dict[str, Any]) -> tuple[float | None, float | None, float | None, str]:
+    exposure = _num(row.get("exposure"))
+    exposure_people = (
+        _num(row.get("exposure_people"))
+        or _num(row.get("exposure_users"))
+        or _num(row.get("exposure_uv"))
+        or _num(row.get("曝光人数"))
+    )
+    if exposure is not None:
+        return exposure, exposure_people, exposure, "exposure"
+    if exposure_people is not None:
+        return None, exposure_people, exposure_people, "exposure_people_fallback"
+    return None, None, None, "missing"
+
+
 def _aggregate_funnel(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    exposure = sum(_num(row.get("exposure")) or 0 for row in rows)
-    views = sum(_num(row.get("views")) or _num(row.get("visitors")) or 0 for row in rows)
-    paid_orders = sum(_num(row.get("paid_orders")) or 0 for row in rows)
-    sales_revenue = sum(_num(row.get("sales_revenue")) or 0 for row in rows)
-    sold_room_nights = sum(_num(row.get("sold_room_nights")) or 0 for row in rows)
+    exposure = 0.0
+    exposure_people = 0.0
+    effective_exposure = 0.0
+    exposure_seen = exposure_people_seen = effective_seen = False
+    source_counter: dict[str, int] = defaultdict(int)
+    views = paid_orders = sales_revenue = sold_room_nights = 0.0
+    for row in rows:
+        exp, people, effective, source = _exposure_value(row)
+        source_counter[source] += 1
+        if exp is not None:
+            exposure += exp
+            exposure_seen = True
+        if people is not None:
+            exposure_people += people
+            exposure_people_seen = True
+        if effective is not None:
+            effective_exposure += effective
+            effective_seen = True
+        views += _num(row.get("views")) or _num(row.get("visitors")) or 0.0
+        paid_orders += _num(row.get("paid_orders")) or 0.0
+        sales_revenue += _num(row.get("sales_revenue")) or 0.0
+        sold_room_nights += _num(row.get("sold_room_nights")) or 0.0
+    main_source = "exposure_people_fallback" if source_counter.get("exposure_people_fallback") and not exposure_seen else "exposure" if exposure_seen else "missing"
     return {
-        "exposure": _round(exposure) if exposure else None,
+        "exposure": _round(exposure) if exposure_seen else None,
+        "exposure_people": _round(exposure_people) if exposure_people_seen else None,
+        "effective_exposure": _round(effective_exposure) if effective_seen else None,
+        "exposure_used_source": main_source,
+        "exposure_note": "曝光量缺失时，暂用曝光人数作为曝光口径计算一转。" if main_source == "exposure_people_fallback" else "优先使用曝光量；曝光人数仅作为辅助展示。",
         "views": _round(views) if views else None,
         "paid_orders": _round(paid_orders) if paid_orders else None,
         "sales_revenue": _round(sales_revenue) if sales_revenue else None,
         "sold_room_nights": _round(sold_room_nights) if sold_room_nights else None,
-        "exposure_to_view_rate": _round(_safe_div(views, exposure), 4),
+        "exposure_to_view_rate": _round(_safe_div(views, effective_exposure if effective_seen else None), 4),
         "payment_conversion_rate": _round(_safe_div(paid_orders, views), 4),
         "avg_order_value": _round(_safe_div(sales_revenue, paid_orders)),
         "revenue_per_view": _round(_safe_div(sales_revenue, views), 4),
@@ -110,7 +160,12 @@ def _enrich_funnel(metrics: dict[str, Any], rows: list[dict[str, Any]]) -> None:
     funnel = metrics.get("ota_funnel") or {}
     if not isinstance(funnel, dict):
         return
-    funnel["data_period"] = _period(rows, ("business_date", "snapshot_time"), "daily", "OTA流量漏斗")
+    recomputed = _aggregate_funnel(rows)
+    for key, value in recomputed.items():
+        if value is not None or key in {"exposure_used_source", "exposure_note"}:
+            funnel[key] = value
+    period = _period(rows, ("business_date", "snapshot_time"), "daily", "OTA流量漏斗")
+    funnel["data_period"] = period
     period_types: dict[str, int] = defaultdict(int)
     for row in rows:
         period_types[str(row.get("period_type") or "未标注")] += 1
@@ -127,7 +182,22 @@ def _enrich_funnel(metrics: dict[str, Any], rows: list[dict[str, Any]]) -> None:
             day_items.append({"label": label, "business_date": day, **_aggregate_funnel(day_rows), "by_platform": _funnel_by_platform(day_rows)})
         funnel["latest_business_date"] = latest
         funnel["previous_business_date"] = previous
+    else:
+        funnel["latest_business_date"] = None
+        funnel["previous_business_date"] = None
     funnel["latest_previous_comparison"] = day_items
+    by_platform = _funnel_by_platform(rows)
+    total_orders = sum(_num(item.get("paid_orders")) or 0 for item in by_platform)
+    total_revenue = sum(_num(item.get("sales_revenue")) or 0 for item in by_platform)
+    total_effective = sum(_num(item.get("effective_exposure")) or 0 for item in by_platform)
+    total_views = sum(_num(item.get("views")) or 0 for item in by_platform)
+    for item in by_platform:
+        item["exposure_share"] = _round(_safe_div(_num(item.get("effective_exposure")), total_effective), 4)
+        item["view_share"] = _round(_safe_div(_num(item.get("views")), total_views), 4)
+        item["order_share"] = _round(_safe_div(_num(item.get("paid_orders")), total_orders), 4)
+        item["revenue_share"] = _round(_safe_div(_num(item.get("sales_revenue")), total_revenue), 4)
+    if by_platform:
+        funnel["by_platform"] = by_platform
 
 
 def _review_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -153,22 +223,59 @@ def _review_by_platform(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{"platform": platform, **_review_summary(items)} for platform, items in sorted(groups.items())]
 
 
+def _overview_snapshot(overview_rows: list[dict[str, Any]], base_rep: dict[str, Any]) -> dict[str, Any]:
+    period = _snapshot_period(overview_rows, ("snapshot_time", "business_date"), "口碑概览", cumulative=True)
+    if overview_rows:
+        by_platform = base_rep.get("by_platform") or []
+        return {
+            **period,
+            "review_count": base_rep.get("review_count"),
+            "rating_avg": base_rep.get("rating_avg"),
+            "negative_review_count": base_rep.get("negative_review_count"),
+            "negative_review_rate": base_rep.get("negative_review_rate"),
+            "unreplied_review_count": base_rep.get("unreplied_review_count"),
+            "by_platform": by_platform,
+            "source_note": "来自平台评价概览，通常是累计快照，不代表近30天或近90天明细。",
+        }
+    return {
+        **period,
+        "review_count": None,
+        "rating_avg": None,
+        "negative_review_count": None,
+        "negative_review_rate": None,
+        "unreplied_review_count": None,
+        "by_platform": [],
+        "source_note": "未接入评价概览。",
+    }
+
+
+def _date_window_summary(dated: list[tuple[dict[str, Any], dt.date]], days: int) -> dict[str, Any]:
+    if not dated:
+        return {"start": None, "end": None, "review_count": 0, "by_platform": []}
+    latest = max(day for _, day in dated)
+    start = latest - dt.timedelta(days=days - 1)
+    rows = [row for row, day in dated if day >= start]
+    return {"start": start.isoformat(), "end": latest.isoformat(), **_review_summary(rows), "by_platform": _review_by_platform(rows), "source_note": f"来自已采评论明细的近{days}天窗口。"}
+
+
 def _enrich_reputation(metrics: dict[str, Any], rows: list[dict[str, Any]], overview_rows: list[dict[str, Any]]) -> None:
     rep = metrics.get("reputation") or {}
     if not isinstance(rep, dict):
         return
-    rep["data_period"] = _period(rows or overview_rows, ("review_date", "snapshot_time", "business_date"), "snapshot", "口碑评价")
+    rep["overview_snapshot"] = _overview_snapshot(overview_rows, rep)
+    rep["data_period"] = rep["overview_snapshot"]
     dated = [(row, _parse_date(row.get("review_date") or row.get("stay_date"))) for row in rows]
     dated = [(row, day) for row, day in dated if day]
     if dated:
-        latest = max(day for _, day in dated)
-        start = latest - dt.timedelta(days=90)
-        recent = [row for row, day in dated if day >= start]
-        rep["recent_90d"] = {"start": start.isoformat(), "end": latest.isoformat(), **_review_summary(recent), "by_platform": _review_by_platform(recent)}
-        rep["detail_all"] = {"start": min(day for _, day in dated).isoformat(), "end": latest.isoformat(), **_review_summary([row for row, _ in dated]), "by_platform": _review_by_platform([row for row, _ in dated])}
+        all_rows = [row for row, _ in dated]
+        rep["detail_all"] = {"start": min(day for _, day in dated).isoformat(), "end": max(day for _, day in dated).isoformat(), **_review_summary(all_rows), "by_platform": _review_by_platform(all_rows), "source_note": "来自已采评论明细，不等同于累计概览。"}
     else:
-        rep["recent_90d"] = {"start": None, "end": None, "review_count": 0, "by_platform": []}
-        rep["detail_all"] = {"start": None, "end": None, "review_count": 0, "by_platform": []}
+        rep["detail_all"] = {"start": None, "end": None, "review_count": 0, "by_platform": [], "source_note": "未接入评论明细或明细缺少日期。"}
+    rep["recent_30d"] = _date_window_summary(dated, 30)
+    rep["recent_90d"] = _date_window_summary(dated, 90)
+    overview_count = _num(rep.get("overview_snapshot", {}).get("review_count")) or 0
+    detail_count = _num(rep.get("detail_all", {}).get("review_count")) or 0
+    rep["coverage_note"] = "评论明细覆盖少于概览累计数，近30天/近90天只代表已采明细。" if overview_count and detail_count and detail_count < overview_count else "评论明细和概览口径需分开看。"
 
 
 def _event_suggestions(rows: list[dict[str, Any]]) -> list[str]:
@@ -193,22 +300,11 @@ def _enrich_events(metrics: dict[str, Any], rows: list[dict[str, Any]]) -> None:
     if not isinstance(events, dict):
         return
     events["data_period"] = _period(rows, ("event_start_date", "event_end_date", "snapshot_time"), "event", "周边活动")
-    events["ai_context"] = {
-        "suggestions": _event_suggestions(rows),
-        "event_names": [row.get("event_name") for row in rows[:20] if row.get("event_name")],
-    }
+    events["ai_context"] = {"suggestions": _event_suggestions(rows), "event_names": [row.get("event_name") for row in rows[:20] if row.get("event_name")]}
 
 
 def build_time_context(metrics: dict[str, Any]) -> list[dict[str, Any]]:
-    mapping = [
-        ("PMS经营", "operating"),
-        ("OTA流量漏斗", "ota_funnel"),
-        ("价格房型", "price_ladder"),
-        ("推广活动", "promotion"),
-        ("口碑评价", "reputation"),
-        ("周边活动", "nearby_events"),
-        ("竞品价格", "competitors"),
-    ]
+    mapping = [("PMS经营", "operating"), ("OTA流量漏斗", "ota_funnel"), ("价格房型", "price_ladder"), ("推广活动", "promotion"), ("口碑评价", "reputation"), ("周边活动", "nearby_events"), ("竞品价格", "competitors")]
     out = []
     for label, key in mapping:
         item = metrics.get(key) or {}
@@ -224,14 +320,7 @@ def enrich_metrics(metrics: dict[str, Any], sections: dict[str, list[dict[str, A
     if not metrics:
         return []
     if metrics.get("operating"):
-        metrics["operating"]["data_period"] = {
-            "label": "PMS经营",
-            "grain": "daily",
-            "start": metrics["operating"].get("period_start"),
-            "end": metrics["operating"].get("period_end"),
-            "row_count": metrics["operating"].get("history_days"),
-            "note": "所选周期内PMS日粒度聚合；月度趋势单独使用jy03月粒度。",
-        }
+        metrics["operating"]["data_period"] = {"label": "PMS经营", "grain": "daily", "start": metrics["operating"].get("period_start"), "end": metrics["operating"].get("period_end"), "row_count": metrics["operating"].get("history_days"), "note": "所选周期内PMS日粒度聚合；月度趋势单独使用月粒度。"}
     if metrics.get("price_ladder"):
         metrics["price_ladder"]["data_period"] = _period(sections.get("products", []), ("business_date", "snapshot_time"), "snapshot", "价格房型")
     if metrics.get("promotion"):
