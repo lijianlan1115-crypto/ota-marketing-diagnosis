@@ -11,7 +11,7 @@ from typing import Any
 from marketing_diagnosis.data import normalize_dataset
 from marketing_diagnosis.excel_loader import load_excel_dataset
 from marketing_diagnosis.db_loader import load_database_dataset, load_mysql_dsn_dataset
-from marketing_diagnosis.reporting import write_reports
+from marketing_diagnosis.reporting_v2 import write_reports
 from marketing_diagnosis.rules import process
 
 DEFAULT_REPORT_ROOT = Path("/var/lib/ota-marketing-diagnosis/reports")
