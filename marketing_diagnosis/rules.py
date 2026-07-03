@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from marketing_diagnosis.ai_analysis import build_ai_analysis
+from marketing_diagnosis.cap_engine import apply_score_caps
 from marketing_diagnosis.metrics_core import (
     competitor_metrics,
     funnel_metrics,
@@ -8,25 +11,16 @@ from marketing_diagnosis.metrics_core import (
     promotion_metrics,
     reputation_metrics,
 )
-
-
-MODULES = [
-    ("M01", "operating_result", 16),
-    ("M02", "traffic_exposure", 12),
-    ("M03", "conversion_path", 14),
-    ("M04", "price_inventory", 12),
-    ("M05", "promotion_efficiency", 10),
-    ("M06", "content_entry", 10),
-    ("M07", "reputation_trust", 16),
-    ("M08", "execution_data_quality", 10),
-]
+from marketing_diagnosis.optimization_check import build_optimization_checks
+from marketing_diagnosis.rule_catalog import MODULE_CONFIG, MODULE_NAME, MODULE_WEIGHT, RULE_CATALOG
 
 
 def _clamp(value, low=0.0, high=1.0):
     return max(low, min(high, float(value)))
 
 
-def _module_score(module_id, module_name, weight, rate, reasons, status="ok", source_fields=None):
+def _module_score(module_id, rate, reasons, status="ok", source_fields=None, rule_ids=None):
+    weight = MODULE_WEIGHT[module_id]
     if rate is None:
         score = 0.0
         clean_rate = None
@@ -35,13 +29,14 @@ def _module_score(module_id, module_name, weight, rate, reasons, status="ok", so
         score = round(weight * clean_rate, 2)
     return {
         "module_id": module_id,
-        "module_name": module_name,
+        "module_name": MODULE_NAME[module_id],
         "weight": weight,
         "score": score,
         "rate": round(clean_rate, 4) if clean_rate is not None else None,
         "status": status,
         "reasons": reasons,
         "source_fields": source_fields or [],
+        "rule_ids": rule_ids or [],
     }
 
 
@@ -53,6 +48,35 @@ def _risk(score):
     return "low"
 
 
+def _missing_count(data_quality):
+    return sum(len(v or []) for v in (data_quality.get("missing_fields") or {}).values())
+
+
+def _rule_lookup():
+    return {item["rule_id"]: item for item in RULE_CATALOG}
+
+
+def build_rule_hits(module_scores):
+    rules = _rule_lookup()
+    hits = []
+    for module in module_scores:
+        for rule_id in module.get("rule_ids") or []:
+            rule = rules.get(rule_id, {"rule_id": rule_id, "name": rule_id, "logic": ""})
+            hits.append({
+                "rule_id": rule_id,
+                "module_id": module.get("module_id"),
+                "module_name": module.get("module_name"),
+                "rule_name": rule.get("name"),
+                "field": rule.get("field"),
+                "logic": rule.get("logic"),
+                "status": module.get("status"),
+                "score": module.get("score"),
+                "weight": module.get("weight"),
+                "reasons": module.get("reasons") or [],
+            })
+    return hits
+
+
 def score_modules(metrics, data_quality):
     op = metrics["operating"]
     funnel = metrics["ota_funnel"]
@@ -60,115 +84,121 @@ def score_modules(metrics, data_quality):
     promo = metrics["promotion"]
     rep = metrics["reputation"]
     events = metrics["nearby_events"]
-    missing_count = sum(len(v or []) for v in (data_quality.get("missing_fields") or {}).values())
+    competitors = metrics["competitors"]
+    missing_count = _missing_count(data_quality)
     empty_sections = data_quality.get("empty_sections") or {}
 
     occ = op.get("occupancy_rate")
     revpar = op.get("revpar")
+    adr = op.get("adr")
     conv = funnel.get("payment_conversion_rate")
     peer_conv = funnel.get("peer_avg_conversion_rate")
-    neg = rep.get("negative_review_rate")
-    rating = rep.get("rating_avg")
-    jump_count = len(price.get("price_jump_risks") or [])
-    product_count = price.get("product_count") or 0
-    review_count = rep.get("review_count") or 0
     exposure = funnel.get("exposure")
     views = funnel.get("views")
+    paid_orders = funnel.get("paid_orders")
+    sales_revenue = funnel.get("sales_revenue")
+    neg = rep.get("negative_review_rate")
+    rating = rep.get("rating_avg")
+    review_count = rep.get("review_count") or 0
+    jump_count = len(price.get("price_jump_risks") or [])
+    product_count = price.get("product_count") or 0
     active_promo = promo.get("active_activity_count") or 0
     promo_products = promo.get("activity_product_count") or 0
     keywords = rep.get("keywords") or []
+    gap = competitors.get("own_min_price_vs_competitor_avg_gap")
 
     scores = []
-    if occ is None:
-        scores.append(_module_score("M01", "operating_result", 16, None, ["data_gap: occupancy_rate missing"], "data_gap", ["jy01.occupancy_rate or room_count+room_nights"]))
+
+    if occ is None and revpar is None:
+        scores.append(_module_score("M01", None, ["经营底盘缺少出租率/RevPAR，无法评分"], "data_gap", ["hotel_daily.room_count", "hotel_daily.room_nights", "hotel_monthly.revpar"], ["R-M01-01", "R-M01-02"]))
     else:
-        occ_rate = 0.95 if occ >= 0.85 else 0.82 if occ >= 0.75 else 0.65 if occ >= 0.6 else 0.45
+        occ_rate = 0.45 if occ is None else 0.95 if occ >= 0.85 else 0.82 if occ >= 0.75 else 0.65 if occ >= 0.6 else 0.45
         if revpar is not None:
-            occ_rate = min(0.98, occ_rate + (0.08 if revpar >= 120 else 0.03 if revpar >= 90 else -0.05))
-        scores.append(_module_score("M01", "operating_result", 16, occ_rate, ["period occupancy and RevPAR from PMS jy01/jy03"], "ok", ["hotel_daily.room_count", "hotel_daily.room_nights", "hotel_daily.room_revenue", "hotel_monthly.revpar"]))
+            occ_rate = min(0.98, occ_rate + (0.10 if revpar >= 140 else 0.05 if revpar >= 100 else -0.08 if revpar < 80 else 0))
+        reasons = [f"出租率={occ}", f"ADR={adr}", f"RevPAR={revpar}"]
+        scores.append(_module_score("M01", occ_rate, reasons, "ok", ["hotel_daily.room_count", "hotel_daily.room_nights", "hotel_daily.room_revenue", "hotel_monthly.revpar"], ["R-M01-01", "R-M01-02", "R-M01-03"]))
 
     if views is None and exposure is None:
-        scores.append(_module_score("M02", "traffic_exposure", 12, None, ["data_gap: exposure/views missing"], "data_gap", ["ota_business_metrics.曝光量", "ota_business_metrics.浏览人数"]))
+        scores.append(_module_score("M02", None, ["OTA曝光/浏览缺失，无法判断流量入口"], "data_gap", ["ota_business_metrics.exposure", "ota_business_metrics.views"], ["R-M02-01", "R-M02-02"]))
     else:
-        traffic_rate = 0.9 if (exposure or 0) >= 2000 or (views or 0) >= 300 else 0.75 if (exposure or 0) >= 800 or (views or 0) >= 100 else 0.55
-        scores.append(_module_score("M02", "traffic_exposure", 12, traffic_rate, ["exposure and views from OTA business metrics"], "ok", ["ota_funnel.exposure", "ota_funnel.views", "ota_funnel.peer_rank"]))
+        exposure_to_view = funnel.get("exposure_to_view_rate")
+        traffic_rate = 0.55
+        if (exposure or 0) >= 2000 or (views or 0) >= 300:
+            traffic_rate = 0.9
+        elif (exposure or 0) >= 800 or (views or 0) >= 100:
+            traffic_rate = 0.75
+        if exposure_to_view is not None and exposure_to_view < 0.08:
+            traffic_rate = min(traffic_rate, 0.62)
+        scores.append(_module_score("M02", traffic_rate, [f"曝光={exposure}", f"浏览={views}", f"曝光浏览转化={exposure_to_view}"], "ok", ["ota_funnel.exposure", "ota_funnel.views", "ota_funnel.exposure_to_view_rate"], ["R-M02-01", "R-M02-02", "R-M02-03"]))
 
     if conv is None:
-        scores.append(_module_score("M03", "conversion_path", 14, None, ["data_gap: payment_conversion_rate missing"], "data_gap", ["ota_business_metrics.支付转化率", "ota_business_metrics.浏览-支付转化率"]))
+        scores.append(_module_score("M03", None, ["支付转化率缺失，无法判断二转"], "data_gap", ["ota_business_metrics.payment_conversion_rate", "paid_orders"], ["R-M03-01", "R-M03-02"]))
     else:
         if peer_conv:
             conversion_rate = 0.9 if conv >= peer_conv else 0.65 if conv >= peer_conv * 0.75 else 0.35
         else:
             conversion_rate = 0.9 if conv >= 0.08 else 0.65 if conv >= 0.04 else 0.35
-        scores.append(_module_score("M03", "conversion_path", 14, conversion_rate, ["payment conversion from OTA business metrics"], "ok", ["ota_funnel.payment_conversion_rate", "ota_funnel.peer_avg_conversion_rate"]))
+        if paid_orders is not None and paid_orders < 5:
+            conversion_rate = min(conversion_rate, 0.58)
+        scores.append(_module_score("M03", conversion_rate, [f"支付订单={paid_orders}", f"销售额={sales_revenue}", f"二转={conv}", f"同行均值={peer_conv}"], "ok", ["ota_funnel.payment_conversion_rate", "ota_funnel.paid_orders", "ota_funnel.sales_revenue"], ["R-M03-01", "R-M03-02", "R-M03-03"]))
 
     if not product_count:
-        scores.append(_module_score("M04", "price_inventory", 12, None, ["data_gap: products missing"], "data_gap", ["ota_goods_price_mapping"]))
+        scores.append(_module_score("M04", None, ["商品/价格映射缺失，无法判断价格房型"], "data_gap", ["ota_goods_price_mapping"], ["R-M04-01", "R-M04-02"]))
     else:
         price_rate = 0.84 if not jump_count else 0.6
         if price.get("room_type_count") and price.get("room_type_count") >= 8:
             price_rate = min(0.92, price_rate + 0.06)
-        scores.append(_module_score("M04", "price_inventory", 12, price_rate, ["product ladder from OTA goods price mapping latest snapshot"], "ok", ["products.listed_price", "products.final_price", "products.room_type_name"]))
+        if gap is not None and gap > 30:
+            price_rate = min(price_rate, 0.68)
+        reasons = [f"商品数={product_count}", f"房型数={price.get('room_type_count')}", f"价格跨度={price.get('price_span')}", f"竞品价差={gap}"]
+        scores.append(_module_score("M04", price_rate, reasons, "ok", ["products.listed_price", "products.final_price", "competitors.price"], ["R-M04-01", "R-M04-02", "R-M04-03"]))
 
     if promo.get("status") == "data_gap":
-        scores.append(_module_score("M05", "promotion_efficiency", 10, None, ["data_gap: promotion activity tables empty"], "data_gap", ["ota_promotion_activity", "ota_activity_product_detail"]))
+        scores.append(_module_score("M05", None, ["推广活动和推广ROI字段均缺失"], "data_gap", ["ota_promotion_activity", "promo_cost", "promo_roi"], ["R-M05-01", "R-M05-02"]))
     else:
         promo_rate = 0.55
         if active_promo >= 5:
             promo_rate += 0.12
         if promo_products >= 30:
             promo_rate += 0.08
-        if promo.get("has_cost_roi_fields"):
-            promo_rate = max(promo_rate, 0.8)
-        scores.append(_module_score("M05", "promotion_efficiency", 10, promo_rate, ["promotion activity coverage wired; ROI/cost fields still missing"], "partial", ["ota_promotion_activity.activity_status", "ota_activity_product_detail.remaining_inventory", "promo_cost/promo_roi missing"]))
+        status = "ok" if promo.get("has_cost_roi_fields") else "partial"
+        if not promo.get("has_cost_roi_fields"):
+            promo_rate = min(promo_rate, 0.68)
+        scores.append(_module_score("M05", promo_rate, [f"活动数={promo.get('activity_count')}", f"活动商品数={promo_products}", "推广花费/ROI字段未完整接入"], status, ["ota_promotion_activity", "ota_activity_product_detail", "promo_cost", "promo_roi"], ["R-M05-01", "R-M05-02"]))
 
     if not product_count:
-        scores.append(_module_score("M06", "content_entry", 10, None, ["data_gap: product/page content missing"], "data_gap", ["goods_price_mapping", "review_ranking", "page_collection"]))
+        scores.append(_module_score("M06", None, ["页面/商品基础字段缺失"], "data_gap", ["page_images", "page_video", "products"], ["R-M06-01", "R-M06-02"]))
     else:
-        content_rate = 0.58
+        content_rate = 0.55
         if keywords:
             content_rate += 0.12
         if active_promo:
             content_rate += 0.05
         if events.get("upcoming_60d_count"):
             content_rate += 0.03
-        scores.append(_module_score("M06", "content_entry", 10, content_rate, ["product names, review keyword rankings and activity tags available; image/video page fields still missing"], "partial", ["products.product_name", "review_rankings.rank_item_name", "page image/video fields missing"]))
+        scores.append(_module_score("M06", content_rate, ["商品名/房型/评价关键词已接入", "图片/视频/入口标签仍需结构化采集"], "partial", ["products.product_name", "review_rankings.rank_item_name", "page image/video/tag fields"], ["R-M06-01", "R-M06-02"]))
 
     if rating is None and not review_count:
-        scores.append(_module_score("M07", "reputation_trust", 16, None, ["data_gap: review score/detail/overview missing"], "data_gap", ["ota_review_detail.review_score", "ota_review_overview.review_score"]))
+        scores.append(_module_score("M07", None, ["评价分和评价概览缺失"], "data_gap", ["ota_review_detail", "ota_review_overview"], ["R-M07-01", "R-M07-02"]))
     else:
-        if rating is None:
-            rep_rate = 0.5
-        else:
-            rep_rate = 0.92 if rating >= 4.7 and (neg is None or neg <= 0.03) else 0.72 if rating >= 4.4 else 0.45
+        rep_rate = 0.5 if rating is None else 0.92 if rating >= 4.7 and (neg is None or neg <= 0.03) else 0.72 if rating >= 4.4 else 0.45
         if review_count < 10:
-            rep_rate = min(rep_rate, 0.7)
-        scores.append(_module_score("M07", "reputation_trust", 16, rep_rate, ["rating/count from review overview; detail reviews used for samples"], "ok", ["reviews.rating", "review_overviews.review_score", "review_rankings.rank_item_name"]))
+            rep_rate = min(rep_rate, 0.65)
+        scores.append(_module_score("M07", rep_rate, [f"评分={rating}", f"评价数={review_count}", f"差评率={neg}", f"未回复={rep.get('unreplied_review_count')}"], "ok", ["reviews.rating", "review_overviews.review_score", "review_overviews.unreplied"], ["R-M07-01", "R-M07-02"]))
 
     quality_rate = 0.92 if missing_count == 0 and not empty_sections else 0.72 if missing_count <= 3 else 0.45
-    scores.append(_module_score("M08", "execution_data_quality", 10, quality_rate, [f"missing_fields={missing_count}", f"empty_sections={list(empty_sections.keys())}"], "ok" if missing_count == 0 and not empty_sections else "partial", ["normalization diagnostics", "source diagnostics"]))
+    scores.append(_module_score("M08", quality_rate, [f"缺失字段数={missing_count}", f"空模块={list(empty_sections.keys())}"], "ok" if missing_count == 0 and not empty_sections else "partial", ["normalization diagnostics", "source diagnostics"], ["R-M08-01", "R-M08-02"]))
     return scores
 
 
-def process(data):
-    sections = data.get("sections") or {}
-    operating = operating_metrics(sections.get("hotel_daily", []), sections.get("hotel_monthly", []))
-    funnel = funnel_metrics(sections.get("ota_funnel", []))
-    price = price_ladder_metrics(sections.get("products", []))
-    promotion = promotion_metrics(sections.get("promotions", []), sections.get("promotion_products", []))
-    reputation = reputation_metrics(sections.get("reviews", []), sections.get("review_overviews", []), sections.get("review_rankings", []))
-    events = nearby_event_metrics(sections.get("nearby_events", []))
-    competitors = competitor_metrics(sections.get("competitors", []), own_min_price=price.get("min_price") if price.get("status") == "ok" else None)
-    data_quality = {
-        "status": data.get("status"),
-        "missing_fields": data.get("missing_fields") or {},
-        "empty_sections": data.get("empty_sections") or {},
-        "diagnostics": data.get("diagnostics") or {},
-        "source_diagnostics": data.get("source_diagnostics") or [],
-    }
-    metrics = {"operating": operating, "ota_funnel": funnel, "price_ladder": price, "promotion": promotion, "reputation": reputation, "nearby_events": events, "competitors": competitors}
-    module_scores = score_modules(metrics, data_quality)
-    final_score = round(sum(item["score"] for item in module_scores), 2)
+def _notes_and_actions(metrics, module_scores, data_quality):
+    operating = metrics["operating"]
+    funnel = metrics["ota_funnel"]
+    price = metrics["price_ladder"]
+    promotion = metrics["promotion"]
+    reputation = metrics["reputation"]
+    events = metrics["nearby_events"]
+    competitors = metrics["competitors"]
     notes = []
     actions = []
     conv = funnel.get("payment_conversion_rate")
@@ -200,6 +230,46 @@ def process(data):
     if not notes:
         notes.append({"level": "低", "title": "当前未触发明显高风险规则", "evidence": "已接入数据未触发高风险规则", "suggestion": "继续补充连续数据，重点观察趋势而不是单次结果。"})
         actions.append("继续补齐连续数据，再做环比、同比和竞对对比。")
-    result = {"status": "ok" if data.get("status") == "ok" and not data_gap_modules else "partial", "type": "ota_marketing", "boundary": "report_only", "final_score": final_score, "risk_level": _risk(final_score), "module_scores": module_scores, "data_quality": data_quality, "metrics": metrics, "notes": notes, "actions": actions}
+    return notes, actions, data_gap_modules
+
+
+def process(data):
+    sections = data.get("sections") or {}
+    operating = operating_metrics(sections.get("hotel_daily", []), sections.get("hotel_monthly", []))
+    funnel = funnel_metrics(sections.get("ota_funnel", []))
+    price = price_ladder_metrics(sections.get("products", []))
+    promotion = promotion_metrics(sections.get("promotions", []), sections.get("promotion_products", []))
+    reputation = reputation_metrics(sections.get("reviews", []), sections.get("review_overviews", []), sections.get("review_rankings", []))
+    events = nearby_event_metrics(sections.get("nearby_events", []))
+    competitors = competitor_metrics(sections.get("competitors", []), own_min_price=price.get("min_price") if price.get("status") == "ok" else None)
+    data_quality = {
+        "status": data.get("status"),
+        "missing_fields": data.get("missing_fields") or {},
+        "empty_sections": data.get("empty_sections") or {},
+        "diagnostics": data.get("diagnostics") or {},
+        "source_diagnostics": data.get("source_diagnostics") or [],
+    }
+    metrics = {"operating": operating, "ota_funnel": funnel, "price_ladder": price, "promotion": promotion, "reputation": reputation, "nearby_events": events, "competitors": competitors}
+    module_scores = score_modules(metrics, data_quality)
+    score_before_cap = round(sum(item["score"] for item in module_scores), 2)
+    notes, actions, data_gap_modules = _notes_and_actions(metrics, module_scores, data_quality)
+    result = {
+        "status": "ok" if data.get("status") == "ok" and not data_gap_modules else "partial",
+        "type": "ota_marketing",
+        "boundary": "report_only",
+        "score_before_cap": score_before_cap,
+        "final_score": score_before_cap,
+        "risk_level": _risk(score_before_cap),
+        "module_config": MODULE_CONFIG,
+        "module_scores": module_scores,
+        "rule_hits": build_rule_hits(module_scores),
+        "data_quality": data_quality,
+        "metrics": metrics,
+        "notes": notes,
+        "actions": actions,
+    }
+    result = apply_score_caps(result)
+    result["risk_level"] = _risk(result["final_score"])
+    result["optimization_checks"] = build_optimization_checks(result)
     result["ai_analysis"] = build_ai_analysis(result)
     return result
