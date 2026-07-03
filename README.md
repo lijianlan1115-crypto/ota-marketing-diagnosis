@@ -2,28 +2,54 @@
 
 独立的第三方 OTA 营销诊断工具。
 
-它不属于 `hotel--ota-ai` 主项目。第一版聚焦：
+它不属于 `hotel--ota-ai` 主项目。当前只保留最小可运行链路：
 
 - 读取 Excel
 - 读取阿里服务器本机 MySQL 诊断库
 - 标准化字段
 - 用代码计算指标
 - 生成 `report.json`、`report.md` 和完整 `report.html`
-- 以 `skills/s14-operation-diagnosis` 形式挂载到 OpenClaw
+- 通过 `skills/s14-operation-diagnosis` 挂载到 OpenClaw
 
 数据库导出的 CSV/zip 只作为字段画像和开发参考，不作为正式产品入口，也不作为 CLI 运行入口。
+
+## 当前保留的核心文件
+
+```text
+ota-marketing-diagnosis/
+  marketing_diagnosis/
+    main.py
+    db_loader.py
+    data.py
+    metrics_core.py
+    rules.py
+    reporting.py
+    excel_loader.py
+
+  skills/
+    s14-operation-diagnosis/
+      openclaw.skill.yaml
+      runtime/
+        __init__.py
+        feishu_adapter.py
+
+  scripts/
+    s14_feishu_entry.py
+    create_sample_excel.py
+
+  README.md
+  requirements.txt
+  setup.py
+```
+
+已删除未接入运行链路的触发词配置、schema 文档、runtime 命令文档、重复 router、SQLite 示例配置等脚手架文件。
 
 ## 快速开始
 
 ```bash
 python -m venv .venv
+source .venv/bin/activate
 pip install -e .
-```
-
-MySQL 读取需要安装：
-
-```bash
-pip install pymysql
 ```
 
 ## OpenClaw 挂载
@@ -53,7 +79,7 @@ OpenClaw 应识别：
 skills/s14-operation-diagnosis/openclaw.skill.yaml
 ```
 
-如果走飞书入口包装脚本，可调用：
+如果先走飞书入口包装脚本，可调用：
 
 ```bash
 python scripts/s14_feishu_entry.py --text 'S14诊断' --format card
@@ -115,15 +141,7 @@ ota-marketing-diagnosis diagnose-db --dsn-env S14_DB_DSN --output reports
 ota-marketing-diagnosis diagnose-db --dsn 'mysql+pymysql://user:password@127.0.0.1:3306/hotel_puyue?charset=utf8mb4' --output reports
 ```
 
-`diagnose-db` 会按内置 `puyue_mysql_reference` profile 读取真实表并聚合成报告数据。
-
-## 配置文件诊断
-
-```bash
-ota-marketing-diagnosis diagnose-config --config examples/sqlite_config.json --output reports
-```
-
-配置文件适合开发调试或替代数据库，不是主要生产入口。
+`diagnose-db` 会按内置 `puyue_mysql_reference` profile 读取真实表并聚合成报告数据。报告里的“数据来源核验”章节会展示实际查到的表、行数、过滤条件和字段样本。
 
 ## 数据库画像参考
 
@@ -156,7 +174,7 @@ report.md
 report.html
 ```
 
-`report.html` 是完整可打开报告，包含总览、M01-M08 评分、经营、OTA 漏斗、商品价格、口碑、竞品、动作建议和数据质量章节。
+`report.html` 是完整可打开报告，包含总览、数据来源核验、M01-M08 评分、经营、OTA 漏斗、商品价格、口碑、竞品、动作建议和数据质量章节。
 
 报告包含：
 
@@ -177,4 +195,5 @@ python scripts/s14_feishu_entry.py --text 'S14诊断' --format card
 
 ## 后续计划
 
-- 继续吸收旧原型 HTML 报告的更细布局和图表样式。
+- 在服务器真实 OpenClaw 环境跑一次挂载验证。
+- 根据 `report.json` 里的 `source_diagnostics` 修正字段映射。
