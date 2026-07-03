@@ -174,32 +174,32 @@ def process(data):
     conv = funnel.get("payment_conversion_rate")
     peer = funnel.get("peer_avg_conversion_rate")
     if conv is not None and peer is not None and conv < peer * 0.75:
-        notes.append({"level": "high", "title": "conversion below peers", "evidence": f"conversion={conv:.4f}, peer={peer:.4f}", "suggestion": "Improve content, tags, review placement, and product ladder."})
-        actions.append("Improve OTA content page first.")
+        notes.append({"level": "高", "title": "浏览到支付转化低于同行", "evidence": f"本店转化率={conv:.4f}，同行均值={peer:.4f}", "suggestion": "优先检查页面包装、房型卖点、价格梯度、评论露出和退改政策。"})
+        actions.append("先优化 OTA 页面包装与价格梯度，再观察支付转化率是否回升。")
     jump_count = len(price.get("price_jump_risks") or [])
     if jump_count:
-        notes.append({"level": "medium", "title": "product ladder jump risk", "evidence": f"risk_products={jump_count}", "suggestion": "Review group-buy, hourly, and full-day products together."})
-        actions.append("Make the product price ladder clearer.")
+        notes.append({"level": "中", "title": "价格梯度存在跳水风险", "evidence": f"风险商品数={jump_count}", "suggestion": "把团购、钟点房、全日房、活动价放在同一张价格表里复核。"})
+        actions.append("整理全渠道价格梯度，避免引流价、活动价和远期价互相打架。")
     if promotion.get("status") == "partial" and not promotion.get("has_cost_roi_fields"):
-        notes.append({"level": "medium", "title": "promotion ROI cannot be verified", "evidence": "activity tables exist, but cost/click/order ROI fields are missing", "suggestion": "Add promotion cost, clicks, promotion orders, promotion revenue and ROI fields."})
-        actions.append("Complete promotion ROI data collection before judging ad efficiency.")
+        notes.append({"level": "中", "title": "推广 ROI 暂时无法核验", "evidence": "已有活动覆盖数据，但缺少推广花费、点击、推广订单、推广收入和 ROI 字段", "suggestion": "补齐推广 ROI 字段后再判断推广通/全域通是否值得加码。"})
+        actions.append("补齐推广花费、点击、推广订单、推广收入和 ROI 字段，再做投放复盘。")
     neg_rate = reputation.get("negative_review_rate")
     if neg_rate is not None and neg_rate > 0.05:
-        notes.append({"level": "medium", "title": "negative review rate is high", "evidence": f"negative_rate={neg_rate:.4f}", "suggestion": "Fix repeated service and facility issues."})
+        notes.append({"level": "中", "title": "差评率偏高", "evidence": f"差评率={neg_rate:.4f}", "suggestion": "提取高频差评关键词，分别落到服务、设施、卫生、隔音和页面预期管理。"})
     if events.get("upcoming_60d_count"):
-        notes.append({"level": "low", "title": "nearby demand events available", "evidence": f"upcoming_60d={events.get('upcoming_60d_count')}", "suggestion": "Use nearby event calendar for demand forecast and package planning."})
+        notes.append({"level": "低", "title": "存在可利用的周边需求事件", "evidence": f"未来60天周边活动数={events.get('upcoming_60d_count')}", "suggestion": "把周边活动用于需求判断、远期价格铺设和套餐设计。"})
     gap = competitors.get("own_min_price_vs_competitor_avg_gap")
     if gap is not None and gap > 30:
-        notes.append({"level": "medium", "title": "entry price above competitor average", "evidence": f"gap={gap:.2f}", "suggestion": "Optimize entry product before broad discounting."})
+        notes.append({"level": "中", "title": "本店引流价高于竞对均价", "evidence": f"价差={gap:.2f}", "suggestion": "先优化入口产品和低价日历，不要直接做全量降价。"})
     if operating.get("occupancy_rate") is not None and operating["occupancy_rate"] < 0.65:
-        notes.append({"level": "medium", "title": "occupancy is low", "evidence": f"occupancy={operating['occupancy_rate']:.4f}", "suggestion": "Use funnel data to locate exposure or conversion issues."})
+        notes.append({"level": "中", "title": "出租率偏低", "evidence": f"出租率={operating['occupancy_rate']:.4f}", "suggestion": "按订单量=流量×转化拆解，先判断是曝光不足还是二转偏弱。"})
     data_gap_modules = [item["module_id"] for item in module_scores if item.get("status") == "data_gap"]
     if data_gap_modules:
-        notes.append({"level": "medium", "title": "some modules are data gaps", "evidence": f"modules={','.join(data_gap_modules)}", "suggestion": "Do not treat data-gap module scores as real operating conclusions. Wire the corresponding tables or fields first."})
-        actions.append("Check report data quality and source diagnostics before using the conclusion externally.")
+        notes.append({"level": "中", "title": "部分模块仍是数据缺口", "evidence": f"缺口模块={','.join(data_gap_modules)}", "suggestion": "不要把数据缺口当作真实经营结论，先补齐对应表和字段后再复算。"})
+        actions.append("先检查数据质量和字段映射，再把报告用于外部汇报或经营决策。")
     if not notes:
-        notes.append({"level": "low", "title": "no major risk found", "evidence": "No high-risk rule was triggered from available real data.", "suggestion": "Add more continuous data for trend analysis."})
-        actions.append("Add more data before making major decisions.")
+        notes.append({"level": "低", "title": "当前未触发明显高风险规则", "evidence": "已接入数据未触发高风险规则", "suggestion": "继续补充连续数据，重点观察趋势而不是单次结果。"})
+        actions.append("继续补齐连续数据，再做环比、同比和竞对对比。")
     result = {"status": "ok" if data.get("status") == "ok" and not data_gap_modules else "partial", "type": "ota_marketing", "boundary": "report_only", "final_score": final_score, "risk_level": _risk(final_score), "module_scores": module_scores, "data_quality": data_quality, "metrics": metrics, "notes": notes, "actions": actions}
     result["ai_analysis"] = build_ai_analysis(result)
     return result
