@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 
 CSS = """
-:root{--bg:#f5f7fb;--panel:#fff;--ink:#182230;--muted:#667085;--line:#d9dee8;--soft:#eef2f7;--blue:#2563eb;--green:#168a4a;--amber:#b7791f;--red:#c2413a;--shadow:0 12px 34px rgba(16,24,40,.08);--radius:14px}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at top left,#eaf1ff 0,#f5f7fb 34%,#f7f8fb 100%);color:var(--ink);font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;font-size:14px;line-height:1.52}.top{position:sticky;top:0;background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(12px);z-index:20}.top-inner{max-width:1480px;margin:0 auto;padding:16px 24px;display:flex;justify-content:space-between;gap:16px;align-items:center}.top h1{margin:0;font-size:24px}.meta{color:var(--muted);font-size:13px;margin-top:4px}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.selectbox{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;background:#f8fafc;padding:7px 11px}.selectbox label{font-weight:800;color:#475467}.selectbox select{height:30px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}.btn{height:36px;border:1px solid #182230;background:#182230;color:#fff;border-radius:10px;padding:0 14px;font-weight:800;cursor:pointer}.layout{max-width:1480px;margin:0 auto;padding:22px 24px 56px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px}.side{position:sticky;top:88px;align-self:start;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}.side a{display:block;padding:11px 15px;border-bottom:1px solid var(--soft);text-decoration:none;color:#344054;font-weight:800;font-size:13px}.side a:hover{background:#eef4ff;color:var(--blue)}main{display:grid;gap:20px}.card{background:rgba(255,255,255,.98);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}.head{padding:17px 20px;border-bottom:1px solid var(--soft);display:flex;justify-content:space-between;gap:12px;background:linear-gradient(180deg,#fff,#fbfcff)}.head h2{margin:0;font-size:18px}.head p{margin:6px 0 0;color:var(--muted);font-size:13px}.body{padding:20px}.badge{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:900;white-space:nowrap}.good{color:var(--green);background:#e8f5ee}.warn{color:var(--amber);background:#fff4dc}.bad{color:var(--red);background:#fdebea}.info{color:var(--blue);background:#eaf1ff}.neutral{color:#475467;background:#eef1f5}.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}.kpi,.mini{border:1px solid var(--line);border-radius:12px;padding:14px;background:linear-gradient(180deg,#fff,#fbfcfe)}.kpi label,.mini label{display:block;color:var(--muted);font-size:12px;font-weight:900}.kpi strong{display:block;margin-top:8px;font-size:29px;line-height:1}.kpi span{display:block;margin-top:8px;color:var(--muted);font-size:13px}.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;margin-bottom:14px}.panel h3{margin:0;padding:12px 14px;border-bottom:1px solid var(--soft);background:#fafbfc;font-size:15px}.panel .pbody{padding:14px}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px 11px;border-bottom:1px solid var(--soft);text-align:left;vertical-align:top}.table th{background:#f8fafc;color:#475467;font-size:12px;font-weight:900}.analysis{margin-top:16px;border:1px solid #c7d2fe;border-left:4px solid #6366f1;border-radius:12px;background:#eef2ff;overflow:hidden}.analysis summary{cursor:pointer;padding:11px 14px;font-weight:900;color:#4338ca;display:flex;gap:8px;align-items:center}.analysis .txt{padding:0 16px 14px;color:#312e81}.analysis p{margin:8px 0}.source-block{margin:0 0 18px}.source-title{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:16px;font-weight:900}.source-grid,.channel-grid,.quad-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.module,.chan,.quad{border:1px solid var(--line);border-radius:13px;background:#fff;overflow:hidden}.module-top{padding:14px 16px 8px;display:flex;justify-content:space-between;gap:10px}.mid{font-size:12px;font-weight:900;color:var(--muted)}.mname{font-size:16px;font-weight:900;margin-top:2px}.score{font-size:26px;font-weight:900}.bar{height:8px;background:#e9edf3;border-radius:999px;overflow:hidden;margin:0 16px 10px}.fill{height:100%;background:var(--blue)}.fill.good{background:var(--green)}.fill.warn{background:var(--amber)}.fill.bad{background:var(--red)}.module-body{padding:0 16px 14px;color:#475467}.tag{display:inline-block;margin:3px 4px 0 0;padding:2px 8px;background:#f2f5f9;border-radius:6px;font-size:12px}.chan,.quad{padding:14px}.chan h3,.quad h3{margin:0 0 10px;font-size:16px}.mini-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.mini strong{display:block;margin-top:4px;font-size:18px}.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:stretch}.flow-step{border:1px solid var(--line);border-radius:10px;background:#fbfcfe;padding:12px}.flow-step label{display:block;color:var(--muted);font-size:12px;font-weight:900}.flow-step strong{display:block;margin-top:6px;font-size:22px}.flow-step span{display:block;margin-top:4px;color:var(--muted);font-size:12px}.callout{border:1px solid #f0cd7a;background:#fff8e6;border-radius:12px;padding:12px 14px;margin-top:12px;color:#7a4d08}.pill-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.matrix-note{font-size:12px;color:var(--muted);margin-top:8px}.hidden{display:none!important}@media(max-width:980px){.layout{grid-template-columns:1fr;padding:14px}.side{position:static;display:grid;grid-template-columns:repeat(2,1fr)}.grid4,.two,.source-grid,.channel-grid,.mini-grid,.flow,.quad-grid{grid-template-columns:1fr}.top-inner{display:block}.actions{margin-top:10px}}@media print{.top,.side{display:none}.layout{display:block;padding:0}.card{box-shadow:none;border:0;background:#fff}.analysis{break-inside:avoid}}
+:root{--bg:#f5f7fb;--ink:#182230;--muted:#667085;--line:#d9dee8;--soft:#eef2f7;--blue:#2563eb;--green:#168a4a;--amber:#b7791f;--red:#c2413a;--shadow:0 12px 34px rgba(16,24,40,.08);--radius:14px}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at top left,#eaf1ff 0,#f5f7fb 34%,#f7f8fb 100%);color:var(--ink);font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;font-size:14px;line-height:1.52}.top{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}.top-inner{max-width:1480px;margin:0 auto;padding:16px 24px;display:flex;justify-content:space-between;gap:16px;align-items:center}.top h1{margin:0;font-size:24px}.meta{color:var(--muted);font-size:13px;margin-top:4px}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.selectbox{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;background:#f8fafc;padding:7px 11px}.selectbox label{font-weight:800;color:#475467}.selectbox select{height:30px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}.btn{height:36px;border:1px solid #182230;background:#182230;color:#fff;border-radius:10px;padding:0 14px;font-weight:800;cursor:pointer}.layout{max-width:1480px;margin:0 auto;padding:22px 24px 56px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px}.side{position:sticky;top:88px;align-self:start;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}.side a{display:block;padding:11px 15px;border-bottom:1px solid var(--soft);text-decoration:none;color:#344054;font-weight:800;font-size:13px}.side a:hover{background:#eef4ff;color:var(--blue)}main{display:grid;gap:20px}.card{background:rgba(255,255,255,.98);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}.head{padding:17px 20px;border-bottom:1px solid var(--soft);display:flex;justify-content:space-between;gap:12px;background:linear-gradient(180deg,#fff,#fbfcff)}.head h2{margin:0;font-size:18px}.head p{margin:6px 0 0;color:var(--muted);font-size:13px}.body{padding:20px}.badge{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:900;white-space:nowrap}.good{color:var(--green);background:#e8f5ee}.warn{color:var(--amber);background:#fff4dc}.bad{color:var(--red);background:#fdebea}.info{color:var(--blue);background:#eaf1ff}.neutral{color:#475467;background:#eef1f5}.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}.kpi,.mini{border:1px solid var(--line);border-radius:12px;padding:14px;background:linear-gradient(180deg,#fff,#fbfcfe)}.kpi label,.mini label{display:block;color:var(--muted);font-size:12px;font-weight:900}.kpi strong{display:block;margin-top:8px;font-size:29px;line-height:1}.kpi span{display:block;margin-top:8px;color:var(--muted);font-size:13px}.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;margin-bottom:14px}.panel h3{margin:0;padding:12px 14px;border-bottom:1px solid var(--soft);background:#fafbfc;font-size:15px}.panel .pbody{padding:14px}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px 11px;border-bottom:1px solid var(--soft);text-align:left;vertical-align:top}.table th{background:#f8fafc;color:#475467;font-size:12px;font-weight:900}.analysis{margin-top:16px;border:1px solid #c7d2fe;border-left:4px solid #6366f1;border-radius:12px;background:#eef2ff;overflow:hidden}.analysis summary{cursor:pointer;padding:11px 14px;font-weight:900;color:#4338ca;display:flex;gap:8px;align-items:center}.analysis .txt{padding:0 16px 14px;color:#312e81}.analysis p{margin:8px 0}.source-block{margin:0 0 18px}.source-title{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:16px;font-weight:900}.source-grid,.channel-grid,.quad-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.module,.chan,.quad{border:1px solid var(--line);border-radius:13px;background:#fff;overflow:hidden}.module-top{padding:14px 16px 8px;display:flex;justify-content:space-between;gap:10px}.mid{font-size:12px;font-weight:900;color:var(--muted)}.mname{font-size:16px;font-weight:900;margin-top:2px}.score{font-size:26px;font-weight:900}.bar{height:8px;background:#e9edf3;border-radius:999px;overflow:hidden;margin:0 16px 10px}.fill{height:100%;background:var(--blue)}.fill.good{background:var(--green)}.fill.warn{background:var(--amber)}.fill.bad{background:var(--red)}.module-body{padding:0 16px 14px;color:#475467}.tag{display:inline-block;margin:3px 4px 0 0;padding:2px 8px;background:#f2f5f9;border-radius:6px;font-size:12px}.chan,.quad{padding:14px}.chan h3,.quad h3{margin:0 0 10px;font-size:16px}.mini-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.mini strong{display:block;margin-top:4px;font-size:18px}.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:stretch}.flow-step{border:1px solid var(--line);border-radius:10px;background:#fbfcfe;padding:12px}.flow-step label{display:block;color:var(--muted);font-size:12px;font-weight:900}.flow-step strong{display:block;margin-top:6px;font-size:22px}.flow-step span{display:block;margin-top:4px;color:var(--muted);font-size:12px}.callout{border:1px solid #f0cd7a;background:#fff8e6;border-radius:12px;padding:12px 14px;margin-top:12px;color:#7a4d08}.pill-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.matrix-note{font-size:12px;color:var(--muted);margin-top:8px}.hidden{display:none!important}@media(max-width:980px){.layout{grid-template-columns:1fr;padding:14px}.side{position:static;display:grid;grid-template-columns:repeat(2,1fr)}.grid4,.two,.source-grid,.channel-grid,.mini-grid,.flow,.quad-grid{grid-template-columns:1fr}.top-inner{display:block}.actions{margin-top:10px}}@media print{.top,.side{display:none}.layout{display:block;padding:0}.card{box-shadow:none;border:0;background:#fff}.analysis{break-inside:avoid}}
 """
 
 
@@ -355,60 +355,6 @@ def _reputation_blocks(metrics: dict[str, Any]) -> str:
     return "".join(panels) if panels else "暂无口碑数据。"
 
 
-def _module_map(ms: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    return {x.get("module_id"): x for x in ms or []}
-
-
-def _src_module(source: str, mid: str, metrics: dict[str, Any], ms: list[dict[str, Any]]) -> dict[str, Any]:
-    base = _module_map(ms).get(mid, {})
-    weight = _n(base.get("weight")) or 10
-    status = base.get("status") or "ok"
-    reasons, rate = [], None
-    if source == "pms":
-        op = metrics.get("operating") or {}
-        occ, revpar = _n(op.get("occupancy_rate")), _n(op.get("revpar"))
-        if mid == "M01":
-            rate = 0.9 if occ and occ >= 0.8 else 0.7 if occ and occ >= 0.65 else 0.45 if occ is not None else None
-            if revpar is not None:
-                rate = min(0.98, (rate or 0.5) + (0.08 if revpar >= 120 else 0.03 if revpar >= 90 else -0.04))
-            reasons = [f"出租率 {_pct(occ)}", f"RevPAR {_money(revpar)}", f"ADR {_money(op.get('adr'))}"]
-        else:
-            status, reasons = "data_gap", ["该模块不是 PMS 主口径"]
-    elif source in {"meituan", "ctrip"}:
-        item = next((x for x in _channel_items(metrics) if x.get("platform") == source), None) or {}
-        f, r = item.get("funnel") or {}, item.get("reputation") or {}
-        conv, rating, neg = _n(f.get("payment_conversion_rate")), _n(r.get("rating_avg")), _n(r.get("negative_review_rate"))
-        if mid == "M02":
-            rate = 0.9 if (_n(f.get("exposure")) or 0) >= 2000 or (_n(f.get("views")) or 0) >= 300 else 0.65 if (_n(f.get("views")) or 0) >= 100 else 0.45
-            reasons = [f"曝光 {_num(f.get('exposure'))}", f"浏览 {_num(f.get('views'))}", f"一转 {_pct(f.get('exposure_to_view_rate'))}"]
-        elif mid == "M03":
-            rate = 0.9 if conv and conv >= 0.08 else 0.65 if conv and conv >= 0.04 else 0.35 if conv is not None else None
-            reasons = [f"支付订单 {_num(f.get('paid_orders'))}", f"二转 {_pct(conv)}", f"销售额 {_money(f.get('sales_revenue'))}"]
-        elif mid == "M04":
-            count = _n(item.get("product_count")) or 0
-            rate = 0.85 if count >= 10 else 0.65 if count else None
-            reasons = [f"商品映射 {_num(count)} 条", f"最低价 {_money((item.get('price') or {}).get('min_price'))}"]
-        elif mid == "M05":
-            rows = _n(item.get("promotion_rows")) or 0
-            rate, status = (0.72 if rows else 0.45), "partial"
-            reasons = [f"活动/活动商品记录 {_num(rows)} 条", "ROI 成本字段仍需补齐"]
-        elif mid == "M06":
-            rate, status = (0.7 if item.get("product_count") else 0.5), "partial"
-            reasons = ["基于商品名、评价关键词和活动标签推断", "图片/视频字段仍需接入"]
-        elif mid == "M07":
-            rate = 0.9 if rating and rating >= 4.7 and (neg is None or neg <= 0.03) else 0.7 if rating and rating >= 4.4 else 0.45 if rating is not None else None
-            reasons = [f"评分 {_num(r.get('rating_avg'),2)}", f"评价数 {_num(r.get('review_count'))}", f"差评率 {_pct(r.get('negative_review_rate'))}"]
-        else:
-            status, reasons = "data_gap", ["该模块不是渠道主口径"]
-    else:
-        rate = _n(base.get("rate"))
-        status = base.get("status") or "ok"
-        reasons = base.get("reasons") or ["系统综合模块"]
-    score = round(weight * max(0, min(1, rate)), 2) if rate is not None else 0.0
-    name = {"M01":"经营收益","M02":"流量竞争","M03":"转化断点","M04":"价格房态","M05":"推广ROI","M06":"页面基础","M07":"口碑信任","M08":"执行复盘"}.get(mid, mid)
-    return {"module_id": mid, "module_name": name, "weight": weight, "score": score, "rate": rate, "status": status, "reasons": reasons}
-
-
 def _module_card(item: dict[str, Any]) -> str:
     rate = _n(item.get("rate"))
     pct = int(round(max(0, min(1, rate or 0)) * 100)) if rate is not None else 0
@@ -419,12 +365,8 @@ def _module_card(item: dict[str, Any]) -> str:
     return f"<div class='module'><div class='module-top'><div><div class='mid'>{_e(item.get('module_id'))}</div><div class='mname'>{_e(item.get('module_name'))}</div></div><div><span class='score'>{_e(title)}</span><span class='meta'> / {_num(item.get('score'),1)}/{_num(item.get('weight'),0)}</span></div></div><div class='bar'><div class='fill {klass}' style='width:{pct}%'></div></div><div class='module-body'><span class='badge {klass}'>{_e(status)}</span>{reasons}</div></div>"
 
 
-def _module_blocks(metrics: dict[str, Any], ms: list[dict[str, Any]]) -> str:
-    groups = [("pms", "PMS 经营底盘", ["M01"])]
-    for item in _channel_items(metrics):
-        groups.append((item["platform"], f"{_zh(item['platform'])} 渠道诊断", ["M02", "M03", "M04", "M05", "M06", "M07"]))
-    groups.append(("shared", "系统与数据质量", ["M08"]))
-    return "".join(f"<div class='source-block' data-module-source='{_e(src)}'><div class='source-title'>{_e(title)} <span class='badge neutral'>{_e(src)}</span></div><div class='source-grid'>{''.join(_module_card(_src_module(src, mid, metrics, ms)) for mid in mids)}</div></div>" for src, title, mids in groups)
+def _module_blocks(result: dict[str, Any]) -> str:
+    return "<div class='source-grid'>" + "".join(_module_card(item) for item in (result.get("module_scores") or [])) + "</div>"
 
 
 def _metric_rows(metrics: dict[str, Any]) -> list[list[Any]]:
@@ -435,6 +377,27 @@ def _metric_rows(metrics: dict[str, Any]) -> list[list[Any]]:
         cls = "neutral" if b == "未获取" else "info"
         rows.append([a, b, c, f"<span class='badge {cls}'>{'缺失' if b == '未获取' else '已获取'}</span>"])
     return rows
+
+
+def _rule_rows(result: dict[str, Any]) -> list[list[Any]]:
+    rows = []
+    for item in result.get("rule_hits") or []:
+        rows.append([item.get("rule_id"), item.get("module_id"), item.get("rule_name"), item.get("field"), item.get("logic"), f"{_num(item.get('score'),1)}/{_num(item.get('weight'),0)}", "；".join(item.get("reasons") or [])])
+    return rows or [["无", "无", "暂无规则命中", "无", "暂无", "无", "无"]]
+
+
+def _cap_rows(result: dict[str, Any]) -> list[list[Any]]:
+    rows = []
+    for item in result.get("cap_rules_triggered") or []:
+        rows.append([item.get("cap_id"), item.get("name"), item.get("cap_score"), item.get("severity"), item.get("evidence"), item.get("description")])
+    return rows or [["无", "未触发封顶", result.get("cap_score", 100), "低", "当前未命中封顶条件", "仍建议人工复核经营数据。"]]
+
+
+def _optimization_rows(result: dict[str, Any]) -> list[list[Any]]:
+    rows = []
+    for item in result.get("optimization_checks") or []:
+        rows.append([item.get("check_id"), item.get("name"), item.get("current_status"), item.get("logic"), "、".join(item.get("required_fields") or [])])
+    return rows or [["无", "暂无复盘规则", "待接入", "需要动作日志和前后指标", "action_log"]]
 
 
 def _missing_rows(dq: dict[str, Any]) -> list[list[Any]]:
@@ -456,7 +419,9 @@ def _task_rows(dq: dict[str, Any]) -> list[list[Any]]:
 
 
 def build_markdown(result: dict[str, Any]) -> str:
-    lines = ["# 酒店 OTA 全面诊断报告", "", f"- final_score: {result.get('final_score')}", f"- risk_level: {result.get('risk_level')}", f"- status: {result.get('status')}"]
+    lines = ["# 酒店 OTA 全面诊断报告", "", f"- score_before_cap: {result.get('score_before_cap')}", f"- final_score: {result.get('final_score')}", f"- cap_applied: {result.get('cap_applied')}", f"- risk_level: {result.get('risk_level')}", f"- status: {result.get('status')}"]
+    for item in result.get("cap_rules_triggered") or []:
+        lines.append(f"- CAP {item.get('cap_id')} {item.get('name')}: cap={item.get('cap_score')} evidence={item.get('evidence')}")
     for m in result.get("module_scores") or []:
         lines.append(f"- {m.get('module_id')} {m.get('module_name')}: {m.get('score')}/{m.get('weight')} status={m.get('status')}")
     return "\n".join(lines)
@@ -468,38 +433,36 @@ def build_html(result: dict[str, Any]) -> str:
     missing = _missing_count(dq)
     credibility = max(0, 100 - missing * 10)
     score = _n(result.get("final_score")) or 0
+    raw_score = _n(result.get("score_before_cap")) or score
+    cap_score = _n(result.get("cap_score")) or 100
     risk = str(result.get("risk_level") or "medium").lower()
     hotel = result.get("hotel_name") or result.get("hotel_id") or "酒店"
     platform = result.get("platform") or "multi"
     meta = f"{hotel}｜{_zh(platform)}｜{result.get('period_start')} 至 {result.get('period_end')}｜生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    cap = []
-    if missing > 3:
-        cap.append("C06 数据可信度封顶：关键字段缺失较多，部分判断按保守规则估计。")
-    if result.get("status") != "ok":
-        cap.append("当前报告为 partial，建议补齐缺失字段后复算。")
-    if not cap:
-        cap.append("未触发明显封顶规则；仍建议结合真实运营经验复核。")
-    cap_html = "".join(f"<li>{_e(x)}</li>" for x in cap)
     notes = result.get("notes") or []
     note_rows = [[f"<span class='badge {_cls(n.get('level'))}'>{_e(n.get('level'))}</span>", n.get("title"), n.get("evidence"), n.get("suggestion")] for n in notes] or [["<span class='badge neutral'>info</span>", "暂无结论", "暂无", "补充数据后重新诊断"]]
     actions = "".join(f"<li>{_e(x)}</li>" for x in result.get("actions") or []) or "<li>补齐数据后重新生成诊断。</li>"
+    cap_state = "已封顶" if result.get("cap_applied") else "未封顶"
     return f"""<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>酒店 OTA 全面诊断报告</title><style>{CSS}</style></head><body>
 <header class='top'><div class='top-inner'><div><h1>酒店 OTA 全面诊断报告</h1><div class='meta'>{_e(meta)}</div></div><div class='actions'><div class='selectbox'><label>选择板块</label><select id='channelSelector' onchange='switchBlock(this.value)'><option value='all'>全部</option><option value='pms'>PMS</option><option value='meituan'>美团</option><option value='ctrip'>携程</option><option value='shared'>系统/数据</option></select></div><button class='btn' onclick='window.print()'>导出报告</button></div></div></header>
-<div class='layout'><nav class='side'><a href='#overview'>顶部总览</a><a href='#trend'>月度趋势</a><a href='#revpar'>RevPAR拆解</a><a href='#contribution'>贡献矩阵</a><a href='#quadrant'>效率四象限</a><a href='#opportunity'>机会点测算</a><a href='#modules'>模块诊断</a><a href='#metrics'>经营指标</a><a href='#funnel'>流量漏斗</a><a href='#promotion'>推广效率</a><a href='#page'>页面入口</a><a href='#reputation'>口碑分析</a><a href='#channels'>分渠道指标</a><a href='#price'>价格竞品</a><a href='#missing'>补采提示</a><a href='#actions'>整改任务</a></nav><main>
-<section class='card' id='overview'><div class='head'><div><h2>诊断结果概览</h2><p>汇总 + PMS/渠道/系统分板块概览。</p></div><span class='badge {_cls(risk)}'>风险：{_e(_zh(risk))}</span></div><div class='body'><div class='grid4'>{_kpi('总分', f'{round(score):.0f}/100', f'原始分 {score:.1f}')}{_kpi('数据可信度', f'{credibility}%', '字段完整度')}{_kpi('风险等级', _zh(risk), '基于模块得分判定', _cls(risk))}{_kpi('数据来源', _zh(platform), _source_summary(dq))}</div><div class='callout'><b>封顶/校准规则</b><ul>{cap_html}</ul></div><h3>分板块概览</h3>{_overview_blocks(metrics, dq)}{_analysis(result, '综合诊断分析', 'overview', [f'综合诊断结论：酒店当前处于{_zh(risk)}状态，综合得分 {round(score):.0f}/100。', f'数据可信度 {credibility}%，当前缺失字段 {missing} 个。', '核心短板请优先查看 PMS、各 OTA 渠道和系统数据质量三个分组。'])}</div></section>
+<div class='layout'><nav class='side'><a href='#overview'>顶部总览</a><a href='#score-cap'>评分封顶</a><a href='#rules'>规则明细</a><a href='#trend'>月度趋势</a><a href='#revpar'>RevPAR拆解</a><a href='#contribution'>贡献矩阵</a><a href='#quadrant'>效率四象限</a><a href='#opportunity'>机会点测算</a><a href='#modules'>模块诊断</a><a href='#metrics'>经营指标</a><a href='#funnel'>流量漏斗</a><a href='#promotion'>推广效率</a><a href='#page'>页面入口</a><a href='#reputation'>口碑分析</a><a href='#channels'>分渠道指标</a><a href='#price'>价格竞品</a><a href='#optimization'>复盘校验</a><a href='#missing'>补采提示</a><a href='#actions'>整改任务</a></nav><main>
+<section class='card' id='overview'><div class='head'><div><h2>诊断结果概览</h2><p>汇总 + PMS/渠道/系统分板块概览。</p></div><span class='badge {_cls(risk)}'>风险：{_e(_zh(risk))}</span></div><div class='body'><div class='grid4'>{_kpi('最终总分', f'{score:.1f}/100', f'原始分 {raw_score:.1f}')}{_kpi('封顶状态', cap_state, f'封顶线 {cap_score:.1f}', 'warn' if result.get('cap_applied') else 'good')}{_kpi('数据可信度', f'{credibility}%', '字段完整度')}{_kpi('数据来源', _zh(platform), _source_summary(dq))}</div><h3>分板块概览</h3>{_overview_blocks(metrics, dq)}{_analysis(result, '综合诊断分析', 'overview', [f'综合诊断结论：酒店当前处于{_zh(risk)}状态，最终得分 {score:.1f}/100。', f'原始分 {raw_score:.1f}，封顶线 {cap_score:.1f}，缺失字段 {missing} 个。'])}</div></section>
+<section class='card' id='score-cap' data-module-source='shared'><div class='head'><div><h2>总分封顶说明</h2><p>防止基础项、口碑项或缺字段导致经营结论失真。</p></div><span class='badge {'warn' if result.get('cap_applied') else 'good'}'>{_e(cap_state)}</span></div><div class='body'>{_table(['规则ID','规则','封顶分','等级','证据','说明'], _cap_rows(result))}<div class='callout'>封顶不是扣分项，而是校准项：当经营结果、订单转化或字段完整度不足时，不允许总分虚高。</div>{_analysis(result, '封顶校准分析', 'cap', ['封顶规则用于防止报告失真。重点看是否由 RevPAR、订单/转化、推广ROI缺失或关键字段缺失触发。'])}</div></section>
+<section class='card' id='rules' data-module-source='shared'><div class='head'><div><h2>评分规则命中明细</h2><p>解释每个模块为什么得分、为什么扣分。</p></div></div><div class='body'>{_table(['规则ID','模块','规则名称','字段','逻辑','得分','证据'], _rule_rows(result))}{_analysis(result, '评分规则分析', 'rules', ['规则明细用于解释分数来源；低分模块应对应到字段、证据和整改动作。'])}</div></section>
 <section class='card' id='trend' data-module-source='pms'><div class='head'><div><h2>月度经营趋势</h2><p>PMS 经营趋势线 + 月度经营表。</p></div></div><div class='body'>{_trend(op.get('monthly_trend') or [])}</div></section>
 <section class='card' id='revpar' data-module-source='pms'><div class='head'><div><h2>RevPAR 拆解</h2><p>判断收益问题来自 ADR、出租率还是两者叠加。</p></div></div><div class='body'>{_revpar_decomposition(metrics)}{_analysis(result, 'RevPAR拆解分析', 'revpar', ['RevPAR = ADR × 出租率。先判断是价格问题、入住问题还是二者叠加，再回到渠道和产品结构排查。'])}</div></section>
 <section class='card' id='contribution'><div class='head'><div><h2>渠道贡献矩阵</h2><p>比较曝光、浏览、订单、销售额、客单价、转化率和评分。</p></div></div><div class='body'>{_contribution_matrix(metrics)}{_analysis(result, '渠道贡献分析', 'contribution', ['贡献矩阵用于判断主力渠道、弱渠道和高潜渠道；不要只按曝光量判断渠道价值。'])}</div></section>
 <section class='card' id='quadrant'><div class='head'><div><h2>渠道效率四象限</h2><p>按流量与转化拆成主力放大、加曝光、修转化、暂缓投放。</p></div></div><div class='body'>{_quadrant_blocks(metrics)}{_analysis(result, '四象限分析', 'quadrant', ['高流量低转化先修页面/价格/口碑；低流量高转化优先加曝光。'])}</div></section>
 <section class='card' id='opportunity'><div class='head'><div><h2>机会点测算</h2><p>基于流量 × 转化 × 客单价的保守测算，不作为承诺结果。</p></div></div><div class='body'>{_opportunity_estimates(metrics)}<div class='callout'>以上为运营测算：只用于判断先提曝光、先提一转、先提二转还是先提客单价，不代表已发生结果。</div>{_analysis(result, '机会点分析', 'opportunity', ['机会点测算必须标记为假设：以当前浏览、转化和客单价为基准，测算小幅提升空间。'])}</div></section>
-<section class='card' id='modules'><div class='head'><div><h2>模块诊断详情</h2><p>按 PMS、各 OTA 渠道、系统/数据质量拆分；右上角选择板块会同步过滤。</p></div></div><div class='body'>{_module_blocks(metrics, result.get('module_scores') or [])}{_analysis(result, '模块联动分析', 'modules', ['模块诊断已按 PMS、OTA 渠道和系统数据质量拆开；先处理低分渠道，再补齐 partial/data_gap 的数据字段。'])}</div></section>
-<section class='card' id='metrics' data-module-source='pms'><div class='head'><div><h2>经营指标</h2><p>PMS经营数据与派生指标。</p></div></div><div class='body'>{_table(['指标','当前值','口径','状态'], _metric_rows(metrics))}{_analysis(result, '指标解读', 'metrics', [f"RevPAR {_money(op.get('revpar'))} = ADR {_money(op.get('adr'))} × 出租率 {_pct(op.get('occupancy_rate'))}。", '出租率使用所选周期内总售出间夜 / 总可售房晚；如果日表缺少出租率字段，会用 room_nights 或 sold_rooms 除以 room_count 计算。'])}</div></section>
+<section class='card' id='modules'><div class='head'><div><h2>模块诊断详情</h2><p>新版8模块权重：经营20、流量15、转化15、价格15、推广10、页面10、口碑8、复盘7。</p></div></div><div class='body'>{_module_blocks(result)}{_analysis(result, '模块联动分析', 'modules', ['模块诊断已按收益、流量、转化、价格、推广、页面、口碑和数据质量拆开。'])}</div></section>
+<section class='card' id='metrics' data-module-source='pms'><div class='head'><div><h2>经营指标</h2><p>PMS经营数据与派生指标。</p></div></div><div class='body'>{_table(['指标','当前值','口径','状态'], _metric_rows(metrics))}{_analysis(result, '指标解读', 'metrics', [f"RevPAR {_money(op.get('revpar'))} = ADR {_money(op.get('adr'))} × 出租率 {_pct(op.get('occupancy_rate'))}。", '出租率使用所选周期内总售出间夜 / 总可售房晚。'])}</div></section>
 <section class='card' id='funnel'><div class='head'><div><h2>流量漏斗</h2><p>曝光 → 浏览 → 支付转化路径，按渠道展开。</p></div></div><div class='body'><div class='grid4'>{_kpi('曝光量', _num(funnel.get('exposure')), '列表页展示')}{_kpi('浏览量', _num(funnel.get('views')), '详情页访问')}{_kpi('支付订单', _num(funnel.get('paid_orders')), '支付结果')}{_kpi('支付转化率', _pct(funnel.get('payment_conversion_rate')), '浏览→支付')}</div><h3>分渠道路径</h3>{_flow_blocks(metrics)}{_analysis(result, '流量漏斗诊断', 'funnel', [f"曝光→浏览：{_pct(funnel.get('exposure_to_view_rate'))}。", f"浏览→支付：{_pct(funnel.get('payment_conversion_rate'))}。", '若曝光充足但支付不足，优先检查价格梯度、评论信任和退改政策。'])}</div></section>
 <section class='card' id='promotion'><div class='head'><div><h2>推广效率表</h2><p>推广金额、花费、ROI 和明细完整度；当前未接入成本/ROI字段时保留口径入口。</p></div></div><div class='body'>{_promotion_blocks(metrics)}{_analysis(result, '推广效率分析', 'promotion', ['当前只能判断活动覆盖，推广订单金额、推广花费和 ROI 仍未接入；因此不应得出投放效率好坏的结论。'])}</div></section>
 <section class='card' id='page'><div class='head'><div><h2>页面展示与入口基础</h2><p>图片、视频、卖点、入口标签。</p></div></div><div class='body'>{_page_blocks(metrics)}{_analysis(result, '页面入口分析', 'page', ['页面图片、视频、房型卖点和入口标签仍需结构化采集；当前只可依据商品/房型映射做弱判断。'])}</div></section>
 <section class='card' id='reputation'><div class='head'><div><h2>口碑分析</h2><p>平台评分、评价数量、差评和未回复评价。</p></div></div><div class='body'>{_reputation_blocks(metrics)}{_analysis(result, '口碑分析', 'reputation', ['口碑模块应按渠道分别看评分、评价规模、差评率和未回复数；评价规模过小时不能过度乐观。'])}</div></section>
 <section class='card' id='channels'><div class='head'><div><h2>分渠道得分与指标</h2><p>按渠道展开曝光、浏览、支付、销售额、占比、客单价、评分、差评率和建议。</p></div></div><div class='body'>{_channel_cards(metrics)}{_channel_table(metrics)}{_analysis(result, '分渠道诊断', 'channels', ['分渠道指标按平台拆开，重点比较曝光、浏览、支付订单、销售额、评分和差评率。'])}</div></section>
 <section class='card' id='price'><div class='head'><div><h2>价格与竞品</h2><p>全渠道汇总 + 按渠道拆分价格房型和竞品价差。</p></div></div><div class='body'>{_price_blocks(metrics)}<h3>价格梯度诊断表</h3>{_price_ladder_table(metrics)}{_analysis(result, '价格诊断解读', 'price', ['价格不是单点判断，需要同时看引流价、全日价、团购价、钟点房价、远期价和竞品均价，避免价格体系混乱。'])}</div></section>
+<section class='card' id='optimization' data-module-source='shared'><div class='head'><div><h2>整改效果校验入口</h2><p>预留诊断 → 整改 → 复盘闭环，后续接动作日志和前后指标。</p></div></div><div class='body'>{_table(['校验ID','规则','当前状态','判断逻辑','需要字段'], _optimization_rows(result))}{_analysis(result, '整改复盘分析', 'optimization', ['整改复盘需要动作日志和前后指标；分数提升但订单/RevPAR/收入没有提升，不能算有效优化。'])}</div></section>
 <section class='card' id='missing' data-module-source='shared'><div class='head'><div><h2>补采提示</h2><p>缺失字段、影响、采集方式。</p></div></div><div class='body'>{_table(['缺失字段','当前状态','处理建议','责任来源'], _missing_rows(dq))}{_analysis(result, '数据完整度分析', 'missing', [f'当前缺失字段数为 {missing}。缺失字段不等于经营差，但会降低评分可信度。'])}</div></section>
 <section class='card' id='actions'><div class='head'><div><h2>诊断结论与整改任务</h2><p>问题结论 + P0/P1/P2 整改任务表；只输出建议，不执行调价和审批。</p></div></div><div class='body'><h3>问题结论</h3>{_table(['等级','标题','证据','建议'], note_rows)}<h3>动作建议</h3><ol>{actions}</ol><h3>整改任务表</h3>{_table(['优先级','负责人','整改动作','复盘指标','周期'], _task_rows(dq))}{_analysis(result, '动作优先级分析', 'actions', ['先补数据和页面包装，再做主渠道流量曝光与二转优化，最后补推广 ROI 并复盘订单、营收和 RevPAR。'])}</div></section>
 </main></div><script>function switchBlock(v){{document.querySelectorAll('[data-source]').forEach(function(e){{e.classList.toggle('hidden',v!=='all'&&e.getAttribute('data-source')!==v);}});document.querySelectorAll('[data-source-row]').forEach(function(e){{e.classList.toggle('hidden',v!=='all'&&e.getAttribute('data-source-row')!==v);}});document.querySelectorAll('[data-module-source]').forEach(function(e){{e.classList.toggle('hidden',v!=='all'&&e.getAttribute('data-module-source')!==v);}});}}document.addEventListener('DOMContentLoaded',function(){{switchBlock(document.getElementById('channelSelector').value||'all');}});</script></body></html>"""
