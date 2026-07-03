@@ -39,4 +39,7 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         if exposure in (None, "") and people not in (None, ""):
             row.setdefault("exposure_people", people)
             row.setdefault("exposure_from_people_fallback", True)
+            for key in EXPOSURE_PEOPLE_KEYS:
+                if key != "exposure_people" and key in row:
+                    row.pop(key, None)
     return _base_normalize_dataset(copied)
