@@ -14,7 +14,7 @@ DEFAULT_REPORT_ROOT = Path("/var/lib/ota-marketing-diagnosis/reports")
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from marketing_diagnosis.data import normalize_dataset
+from marketing_diagnosis.data_v2 import normalize_dataset
 from marketing_diagnosis.db_loader import load_mysql_dsn_dataset
 from marketing_diagnosis.excel_loader import load_excel_dataset
 from marketing_diagnosis.reporting_v2 import write_reports
