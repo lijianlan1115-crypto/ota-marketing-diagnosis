@@ -17,7 +17,7 @@ if str(REPO_ROOT) not in sys.path:
 from marketing_diagnosis.data import normalize_dataset
 from marketing_diagnosis.db_loader import load_mysql_dsn_dataset
 from marketing_diagnosis.excel_loader import load_excel_dataset
-from marketing_diagnosis.reporting import write_reports
+from marketing_diagnosis.reporting_v2 import write_reports
 from marketing_diagnosis.rules import process
 
 from .feishu_adapter import build_feishu_card_reply, build_feishu_reply
