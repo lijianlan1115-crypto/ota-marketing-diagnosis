@@ -3,6 +3,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 from marketing_diagnosis.data import normalize_dataset
 from marketing_diagnosis.excel_loader import load_excel_dataset
@@ -10,22 +14,54 @@ from marketing_diagnosis.db_loader import load_database_dataset, load_mysql_dsn_
 from marketing_diagnosis.reporting import write_reports
 from marketing_diagnosis.rules import process
 
+DEFAULT_REPORT_ROOT = Path("/var/lib/ota-marketing-diagnosis/reports")
 
-def _run(raw_dataset, output):
+
+def _safe_segment(value: Any, fallback: str) -> str:
+    text = str(value or fallback).strip().lower()
+    text = re.sub(r"[^a-z0-9._-]+", "-", text)
+    return text.strip("-._") or fallback
+
+
+def _report_dir(output_root: str, hotel_id: str, platform: str, period_start: str, period_end: str) -> Path:
+    run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+    period = f"{_safe_segment(period_start, 'start')}_{_safe_segment(period_end, 'end')}"
+    return Path(output_root) / _safe_segment(hotel_id, "hotel") / _safe_segment(platform, "multi") / period / run_id
+
+
+def _period(args) -> tuple[str, str]:
+    end = args.period_end or str(datetime.now().date())
+    start = args.period_start or str(datetime.now().date() - timedelta(days=29))
+    return start, end
+
+
+def _run(raw_dataset, args):
     normalized = normalize_dataset(raw_dataset)
     result = process(normalized)
-    paths = write_reports(result, output)
-    return {"status": result.get("status"), **paths, "data_quality": result.get("data_quality")}
+    period_start, period_end = _period(args)
+    report_dir = _report_dir(args.output, args.hotel_id, args.platform, period_start, period_end)
+    paths = write_reports(result, report_dir)
+    return {
+        "status": result.get("status"),
+        "run_id": report_dir.name,
+        "hotel_id": args.hotel_id,
+        "platform": args.platform,
+        "period_start": period_start,
+        "period_end": period_end,
+        "report_dir": str(report_dir),
+        **paths,
+        "data_quality": result.get("data_quality"),
+    }
 
 
 def command_excel(args):
     raw_dataset = load_excel_dataset(args.excel)
-    print(json.dumps(_run(raw_dataset, args.output), ensure_ascii=False, indent=2))
+    print(json.dumps(_run(raw_dataset, args), ensure_ascii=False, indent=2))
 
 
 def command_config(args):
     raw_dataset = load_database_dataset(args.config)
-    print(json.dumps(_run(raw_dataset, args.output), ensure_ascii=False, indent=2))
+    print(json.dumps(_run(raw_dataset, args), ensure_ascii=False, indent=2))
 
 
 def command_db(args):
@@ -33,7 +69,15 @@ def command_db(args):
     if not dsn:
         raise SystemExit(f"missing DSN: pass --dsn or set {args.dsn_env}")
     raw_dataset = load_mysql_dsn_dataset(dsn, limit=args.limit)
-    print(json.dumps(_run(raw_dataset, args.output), ensure_ascii=False, indent=2))
+    print(json.dumps(_run(raw_dataset, args), ensure_ascii=False, indent=2))
+
+
+def _add_common_args(parser):
+    parser.add_argument("--output", default=os.environ.get("S14_REPORT_OUTPUT_DIR") or str(DEFAULT_REPORT_ROOT), help="Report root directory. Each run writes to hotel/platform/period/run_id under this root.")
+    parser.add_argument("--hotel-id", default="puyue")
+    parser.add_argument("--platform", default="multi")
+    parser.add_argument("--period-start", default="")
+    parser.add_argument("--period-end", default="")
 
 
 def build_parser():
@@ -41,17 +85,17 @@ def build_parser():
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("diagnose-excel")
     p.add_argument("--excel", required=True)
-    p.add_argument("--output", required=True)
+    _add_common_args(p)
     p.set_defaults(func=command_excel)
     p = sub.add_parser("diagnose-config")
     p.add_argument("--config", required=True)
-    p.add_argument("--output", required=True)
+    _add_common_args(p)
     p.set_defaults(func=command_config)
     p = sub.add_parser("diagnose-db")
     p.add_argument("--dsn", required=False)
     p.add_argument("--dsn-env", default="S14_DB_DSN")
     p.add_argument("--limit", type=int, default=5000)
-    p.add_argument("--output", required=True)
+    _add_common_args(p)
     p.set_defaults(func=command_db)
     return parser
 
