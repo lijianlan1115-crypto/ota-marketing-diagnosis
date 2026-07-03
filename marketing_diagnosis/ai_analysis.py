@@ -7,15 +7,38 @@ import subprocess
 import urllib.request
 from typing import Any
 
+REFERENCE_FRAMEWORK = {
+    "source": "Xhotel门店数字运营首月诊断方案抽象框架",
+    "report_structure": ["门店运营管理数据分析", "门店运营管理现状反馈", "门店运营管理提升实施方案"],
+    "diagnosis_chain": [
+        "PMS经营底盘：近6个月/近30天出租率、营收、ADR、RevPAR，判断收益问题来自入住率、房价还是结构。",
+        "渠道结构：会员、协议、其他、OTA、散客占比，判断是否过度依赖OTA、是否需要补会员和私域。",
+        "核心渠道订单：按渠道看订单数、订单金额、销售额，识别绝对贡献渠道和增长空间。",
+        "OTA漏斗：曝光、浏览、一转、二转、支付订单、销售额；优先定位是曝光不足、一转弱还是二转低。",
+        "竞对参照：和商圈竞对比较曝光、浏览、转化、订单、均价和总额，不只看自身环比。",
+        "HOS/平台健康：关注HOS得分、预定间夜排名、营业额排名、完整订单占比、确认率、商品可订率等平台质量项。",
+        "推广效率：推广通/全域通/广告曝光要看曝光、点击、点击率、转化、预订单、预定间夜、预定金额，不能只有活动覆盖。",
+        "口碑信任：分平台看评分、评论量、差评率、未回复，差评关键词要转化为页面卖点和服务整改动作。",
+        "价格房型：看主渠道外网展示、核心竞对价格日历、远期价格铺设、引流价、团购价、钟点房、活动价一致性。",
+    ],
+    "first_stage_problem_taxonomy": ["补充广告曝光", "二转转化低", "远期价格铺设不合理", "产品包装不足"],
+    "action_logic": [
+        "订单量 = 流量 × 转化率；流量拆自然流量和广告流量，转化率重点看二转。",
+        "第一阶段先聚焦主渠道，尤其是美团：后台活动优化 + 推广通/全域通 + 页面包装 + 二转优化。",
+        "转化率提升目标可用10%-15%作为试跑期目标，但只能在报告中标记为运营目标，不当作已发生结果。",
+        "先补数据和页面包装，再做渠道投放，再复盘订单/营收/RevPAR变化。",
+    ],
+}
+
 SECTION_PROMPTS = {
-    "overview": "总览分析：先给一句经营判断，再说明最高风险来源。必须引用综合分、风险等级、核心经营指标，不要空泛表扬。",
-    "metrics": "经营指标分析：围绕 RevPAR、ADR、出租率、收入拆解。判断是价格问题、入住问题还是收益结构问题。",
-    "funnel": "流量漏斗分析：按曝光→浏览→支付订单→销售额分析路径断点。必须指出是流量不足、点击不足还是下单转化不足。",
-    "modules": "模块联动分析：把 M01-M08 按 PMS、渠道、价格、推广、口碑、数据质量分组解释，不要只复述分数。",
-    "channels": "分渠道分析：分别评价 PMS、每个 OTA 渠道。比较曝光、浏览、支付、销售额、评分、差评率，给每个渠道一条动作建议。",
-    "price": "价格分析：看最低价、最高价、价格跨度、团购/钟点房/活动价。说明是否价格梯度混乱或引流价不足。",
-    "missing": "数据完整度分析：说明缺失字段会影响哪些结论，按优先级给补采建议。不要把缺字段说成经营差。",
-    "actions": "动作优先级分析：输出 3-5 条可执行动作，按先数据、再页面/价格、再推广/口碑排序。",
+    "overview": "总览分析：先用一句话判断门店处于经营底盘问题、渠道流量问题、转化问题、价格房型问题还是数据缺口问题。必须引用综合分、风险等级、RevPAR/ADR/出租率/核心渠道结果，不要空泛表扬。",
+    "metrics": "经营指标分析：按 PMS 经营底盘拆 RevPAR、ADR、出租率、收入。判断收益短板来自入住率不足、房价不足、房型结构还是渠道结构。参考6个月/30天趋势，不要只看单日。",
+    "funnel": "流量漏斗分析：按曝光→浏览→一转→二转/支付订单→销售额定位断点。必须明确是曝光不足、一转弱、二转低还是订单金额弱，并给对应动作。",
+    "modules": "模块联动分析：按 PMS、OTA渠道、价格房型、推广、口碑、系统数据质量分组解释。参考 Xhotel 框架中的‘产品包装、流量曝光、二转问题、远期价格铺设’四类问题，不要只复述分数。",
+    "channels": "分渠道分析：分别评价 PMS、每个 OTA 渠道。比较曝光、浏览、支付、销售额、评分、差评率、商品/活动覆盖。要指出主渠道、短板渠道和优先动作。",
+    "price": "价格分析：看最低价、最高价、价格跨度、团购/钟点房/活动价、远期价格铺设和竞对价格承受力。必须说明是否存在引流价不足、价格梯度混乱或远期价铺设不合理。",
+    "missing": "数据完整度分析：说明缺失字段会影响哪些结论，按优先级给补采建议。特别区分推广ROI缺失、页面内容缺失、竞对数据缺失、携程数据为空。不要把缺字段说成经营差。",
+    "actions": "动作优先级分析：输出3-5条可执行动作。按‘先补数据/页面包装→主渠道流量曝光→二转优化→远期价格铺设→推广复盘’排序，并给可验证指标。",
 }
 
 
@@ -77,14 +100,16 @@ def _compact_result(result: dict[str, Any]) -> dict[str, Any]:
 def _schema_hint() -> str:
     return (
         "你必须只返回 JSON，不要 Markdown。字段必须为：overview, metrics, funnel, modules, channels, price, missing, actions。"
-        "每个字段是中文字符串数组，每条 1-2 句话。必须基于输入数据，不允许编造不存在的字段、金额、订单、渠道、活动或结论。"
-        "优先使用具体数字和对比关系，避免空话，例如不要写‘持续优化’，要写‘优先补齐推广 ROI 字段后再判断投放效率’。"
+        "每个字段是中文字符串数组，每条1-2句话。必须基于输入数据，不允许编造不存在的字段、金额、订单、渠道、活动或结论。"
+        "输出要像酒店运营顾问，不像通用AI：必须围绕订单量=流量×转化、PMS经营底盘、OTA漏斗、竞对、HOS、推广ROI、口碑、价格房型和页面包装。"
+        "如使用10%-15%转化提升目标，只能表述为试跑目标或建议，不得表述为已实现。"
     )
 
 
 def _payload(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "instruction": _schema_hint(),
+        "reference_framework": REFERENCE_FRAMEWORK,
         "section_prompts": SECTION_PROMPTS,
         "report": _compact_result(result),
     }
@@ -118,7 +143,7 @@ def _from_openai_compatible(payload: dict[str, Any], timeout: int) -> dict[str, 
         "model": model,
         "temperature": float(os.environ.get("S14_AI_TEMPERATURE", "0.2")),
         "messages": [
-            {"role": "system", "content": "你是酒店 OTA 经营诊断专家，擅长 PMS、OTA 漏斗、价格、活动推广、口碑和数据质量诊断。" + _schema_hint()},
+            {"role": "system", "content": "你是酒店 OTA 经营诊断专家，擅长 PMS、OTA 漏斗、竞对、HOS、价格房型、推广通/全域通、口碑和数据质量诊断。" + _schema_hint()},
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
         ],
     }
@@ -159,31 +184,31 @@ def _fallback(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "source": "rule_based_fallback_no_ai_config",
         "overview": [
-            f"综合评分 {result.get('final_score')}/100，风险等级 {result.get('risk_level')}。先看 PMS 经营收益、OTA 转化断点和口碑信任三个核心层。",
-            f"当前周期 RevPAR {_money(op.get('revpar'))}，ADR {_money(op.get('adr'))}，出租率 {_pct(op.get('occupancy_rate'))}；如果 RevPAR 弱，应拆成价格和入住两条线排查。",
+            f"综合评分 {result.get('final_score')}/100，风险等级 {result.get('risk_level')}。按首月诊断框架，先看 PMS 经营底盘，再看主渠道流量、二转、价格房型和口碑。",
+            f"当前周期 RevPAR {_money(op.get('revpar'))}，ADR {_money(op.get('adr'))}，出租率 {_pct(op.get('occupancy_rate'))}；如果 RevPAR 弱，应拆成价格、入住率和渠道结构三条线排查。",
         ],
         "metrics": [
             f"经营指标按所选周期聚合，出租率为总售出间夜除以总可售房晚；当前出租率 {_pct(op.get('occupancy_rate'))}。",
             f"门店收入 {_money(op.get('room_revenue'))}，RevPAR {_money(op.get('revpar'))}，ADR {_money(op.get('adr'))}；三者要一起看，不能只看房价。",
         ],
         "funnel": [
-            f"曝光 {_plain(funnel.get('exposure'))}，浏览 {_plain(funnel.get('views'))}，支付订单 {_plain(funnel.get('paid_orders'))}，销售额 {_money(funnel.get('sales_revenue'))}。",
-            f"曝光到浏览转化率 {_pct(funnel.get('exposure_to_view_rate'))}，浏览到支付转化率 {_pct(funnel.get('payment_conversion_rate'))}；如果浏览充足但支付弱，优先检查价格梯度、评价和取消政策。",
+            f"订单量=流量×转化。当前曝光 {_plain(funnel.get('exposure'))}，浏览 {_plain(funnel.get('views'))}，支付订单 {_plain(funnel.get('paid_orders'))}，销售额 {_money(funnel.get('sales_revenue'))}。",
+            f"曝光到浏览转化率 {_pct(funnel.get('exposure_to_view_rate'))}，浏览到支付转化率 {_pct(funnel.get('payment_conversion_rate'))}；如果浏览充足但支付弱，优先处理二转、价格梯度、评价和取消政策。",
         ],
         "modules": [
             "模块诊断已拆为 PMS、各 OTA 渠道和系统/数据质量层：PMS 看经营收益，渠道看流量/转化/口碑/商品，系统层看数据完整度和执行闭环。",
-            "data_gap 或 partial 模块不能当作真实经营差，只能说明当前数据不足或字段口径不完整。",
+            "参考首月诊断框架，优先归类为补充广告曝光、二转转化低、远期价格铺设不合理、产品包装不足四类问题。",
         ],
         "channels": channel_lines,
         "price": [
-            f"商品数 {_plain(price.get('product_count'))}，最低价 {_money(price.get('min_price'))}，最高价 {_money(price.get('max_price'))}；需要检查引流价、全日价、团购价和钟点房价是否混乱。",
-            f"活动数 {_plain(promo.get('activity_count'))}，活动覆盖已接入，但推广成本、点击、推广订单、推广收入和 ROI 仍未完整接入。",
+            f"商品数 {_plain(price.get('product_count'))}，最低价 {_money(price.get('min_price'))}，最高价 {_money(price.get('max_price'))}；需要检查引流价、全日价、团购价、钟点房价和远期价铺设是否混乱。",
+            f"活动数 {_plain(promo.get('activity_count'))}，活动覆盖已接入，但推广成本、点击、推广订单、推广收入和 ROI 仍未完整接入，暂不能判断推广通/全域通投放效率。",
         ],
-        "missing": ["补采提示只展示影响结论可信度的关键字段；缺字段不是经营差，但会让模块分数偏保守。"],
+        "missing": ["补采提示只展示影响结论可信度的关键字段；缺字段不是经营差，但会让模块分数偏保守，尤其影响推广ROI、竞对和页面包装判断。"],
         "actions": [
             f"平台评分 {_plain(rep.get('rating_avg'))}，差评率 {_pct(rep.get('negative_review_rate'))}；先把高频差评关键词转成页面卖点和服务整改清单。",
             f"未来 60 天周边活动数 {_plain(events.get('upcoming_60d_count'))}，可作为需求判断辅助，但不能替代订单和价格数据。",
-            "优先级建议：先补齐推广 ROI 和页面内容字段，再处理渠道低转化，再做活动/价格策略。",
+            "优先级建议：先补齐推广 ROI 和页面内容字段，再做主渠道流量曝光和二转优化，最后复盘订单、营收和 RevPAR。",
         ],
     }
 
