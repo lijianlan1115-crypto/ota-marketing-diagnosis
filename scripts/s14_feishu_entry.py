@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import os
 import sys
@@ -62,11 +61,8 @@ def _print(payload: Any) -> int:
 def _load_skill_class():
     sys.path.insert(0, str(ROOT))
     sys.path.insert(0, str(SKILL_ROOT))
-    spec = importlib.util.spec_from_file_location("s14_skill_runtime", SKILL_ROOT / "runtime" / "__init__.py", submodule_search_locations=[str(SKILL_ROOT / "runtime")])
-    module = importlib.util.module_from_spec(spec)
-    assert spec and spec.loader
-    spec.loader.exec_module(module)
-    return module.S14OperationDiagnosis
+    from runtime import S14OperationDiagnosis
+    return S14OperationDiagnosis
 
 
 def _config() -> dict[str, Any]:
