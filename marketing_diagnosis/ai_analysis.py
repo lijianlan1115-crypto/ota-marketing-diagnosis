@@ -8,50 +8,48 @@ import urllib.request
 from typing import Any
 
 AI_FIELDS = [
-    "overview", "metrics", "funnel", "modules", "channels", "price",
-    "promotion", "page", "reputation", "revpar", "contribution",
-    "quadrant", "opportunity", "cap", "rules", "optimization",
-    "missing", "actions",
+    "overview", "time_context", "metrics", "funnel", "modules", "channels", "price",
+    "promotion", "page", "reputation", "nearby_events", "revpar", "contribution",
+    "quadrant", "opportunity", "cap", "rules", "optimization", "missing",
+    "action_plan", "actions",
 ]
 
 REFERENCE_FRAMEWORK = {
     "source": "Xhotel门店数字运营首月诊断方案抽象框架",
     "report_structure": ["门店运营管理数据分析", "门店运营管理现状反馈", "门店运营管理提升实施方案"],
     "diagnosis_chain": [
+        "先确认时间口径：PMS日粒度、月度趋势、OTA漏斗日粒度/周期汇总、价格活动快照、口碑概览/近90天评论、周边活动事件日期不能混用。",
         "PMS经营底盘：出租率、营收、ADR、RevPAR，判断收益问题来自入住率、房价还是结构。",
-        "评分规则：8个主模块、41类评分规则、总分封顶和整改效果校验要分层输出。",
         "封顶规则：RevPAR低、收入下滑、订单和转化双弱、推广ROI缺失、关键字段缺失时，总分不能虚高。",
-        "渠道贡献矩阵：按曝光占比、浏览占比、订单占比、销售额占比、客单价、二转和评分判断主力渠道与短板渠道。",
-        "渠道效率四象限：高流量高转化放大，低流量高转化加曝光，高流量低转化修页面/价格/口碑，低流量低转化先补基础。",
-        "OTA漏斗：曝光、浏览、一转、二转、支付订单、销售额；优先定位是曝光不足、一转弱还是二转低。",
-        "推广效率：推广订单金额、推广花费、ROI、活动覆盖和明细完整度要分开，不得用活动覆盖替代ROI。",
-        "页面入口：图片、视频、房型卖点、入口标签会影响一转和二转；没有字段时必须标记待采集。",
-        "口碑信任：分平台看评分、评论量、差评率、未回复，评价量小不能只因评分高就判断稳定。",
-        "价格房型：看最低价、最高价、价格跨度、团购、钟点房、远期价格铺设和竞对价差。",
-        "机会点测算：只能作为流量×转化×客单价的试算，不得表述为承诺结果或已发生结果。",
-        "整改校验：分数提升必须结合订单、RevPAR和收入变化判断，不能只看报告分数。",
+        "OTA漏斗：周期汇总要同时看最新日和上一日，避免只拿昨天或单日波动下结论。",
+        "口碑信任：分平台看全部/概览与近90天评论，评价量小不能只因评分高就判断稳定。",
+        "周边活动：活动只作为需求辅助信号，用于远期价格、库存、套餐和页面卖点，不可替代订单与出租率。",
+        "整改动作：动作应基于当前数据和缺口动态生成，包含优先级、负责人、周期和复盘指标，不能只是固定模板。",
     ],
 }
 
 SECTION_PROMPTS = {
-    "overview": "总览分析：判断是经营底盘、渠道流量、转化、价格房型还是数据缺口问题，必须引用综合分、风险等级、RevPAR/ADR/出租率/核心渠道结果。",
+    "overview": "总览分析：判断是经营底盘、渠道流量、转化、价格房型还是数据缺口问题，必须引用最终分、封顶情况、RevPAR/ADR/出租率/核心渠道结果。",
+    "time_context": "时间口径分析：说明每个模块实际数据开始/结束日期、日粒度/月粒度/快照口径。指出哪些模块不能直接横向对比。",
     "metrics": "经营指标分析：拆 RevPAR、ADR、出租率、收入，判断收益短板来自入住率不足、房价不足、房型结构还是渠道结构。",
     "revpar": "RevPAR拆解分析：围绕 RevPAR=ADR×出租率，判断是价格问题、入住问题还是两者叠加，并给优先排查方向。",
     "contribution": "渠道贡献矩阵分析：比较曝光占比、浏览占比、订单占比、销售额占比、客单价、二转、评分，指出主渠道、补充渠道和待补数据渠道。",
     "quadrant": "渠道效率四象限分析：按流量和转化把渠道分成主力放大、加曝光、修转化、暂缓投放，并说明动作优先级。",
     "opportunity": "机会点测算分析：基于当前曝光、浏览、转化、客单价做保守测算，必须声明是测算，不是承诺。",
-    "funnel": "流量漏斗分析：按曝光→浏览→一转→二转/支付订单→销售额定位断点，明确是曝光不足、一转弱、二转低还是订单金额弱。",
+    "funnel": "流量漏斗分析：同时看周期汇总、最新日、上一日和分渠道；明确是曝光不足、一转弱、二转低还是订单金额弱。",
     "modules": "模块联动分析：按 PMS、OTA渠道、价格房型、推广、页面、口碑、系统数据质量分组解释，不要只复述分数。",
     "channels": "分渠道分析：分别评价每个 OTA 渠道，比较曝光、浏览、支付、销售额、评分、差评率、商品/活动覆盖。",
     "price": "价格分析：看最低价、最高价、价格跨度、团购/钟点房/活动价、远期价格铺设和竞对价格承受力。",
-    "promotion": "推广效率分析：必须区分活动覆盖和投放效率。没有推广订单金额、推广花费、ROI时，只能说ROI无法判断，不能说推广效果好或差。",
-    "page": "页面展示与入口分析：围绕图片质量、视频状态、房型卖点、入口标签判断页面基础。字段未知时必须明确待采集。",
-    "reputation": "口碑分析：按渠道看评分、总评价、好评、差评、未回复。评价数量过少时，不能只因评分高就判定口碑稳。",
+    "promotion": "推广效率分析：必须区分活动覆盖和投放效率。没有推广订单金额、推广花费、ROI时，只能说ROI无法判断。",
+    "page": "页面展示与入口分析：围绕图片质量、视频状态、房型卖点、入口标签判断页面基础。字段未知时明确待采集。",
+    "reputation": "口碑分析：按渠道看全部/概览和近90天评论，评价数量过少时不能只因评分高就判定口碑稳。",
+    "nearby_events": "周边活动分析：结合活动名称、开始时间、倒计时、距离，给出远期价格、库存、套餐、页面卖点和投放节奏建议。不得把活动当作确定需求。",
     "cap": "封顶校准分析：解释原始分、封顶线、最终分和触发规则。封顶是防失真校准，不是普通扣分。",
     "rules": "评分规则分析：说明哪些规则命中、哪些模块低分、证据字段是什么，避免只展示一个总分。",
-    "optimization": "整改复盘分析：说明后续要如何用动作日志、整改前后订单/收入/RevPAR校验是否真正有效。",
+    "optimization": "整改复盘分析：说明后续如何用动作日志、整改前后订单/收入/RevPAR校验是否真正有效。",
     "missing": "数据完整度分析：说明缺失字段会影响哪些结论，按优先级给补采建议，不要把缺字段说成经营差。",
-    "actions": "动作优先级分析：输出3-5条可执行动作，按先补数据/页面包装→主渠道流量曝光→二转优化→远期价格铺设→推广复盘排序。",
+    "action_plan": "动态整改动作：基于当前报告生成3-6条动作，每条包含优先级、责任角色、动作、复盘指标和周期。避免固定模板。",
+    "actions": "动作优先级分析：按先补数据/页面包装→主渠道流量曝光→二转优化→远期价格铺设→推广复盘排序。",
 }
 
 
@@ -93,6 +91,7 @@ def _compact_result(result: dict[str, Any]) -> dict[str, Any]:
         "platform": result.get("platform"),
         "period_start": result.get("period_start"),
         "period_end": result.get("period_end"),
+        "data_time_context": result.get("data_time_context"),
         "metrics": {
             "operating": metrics.get("operating"),
             "ota_funnel": metrics.get("ota_funnel"),
@@ -121,7 +120,8 @@ def _schema_hint() -> str:
     return (
         f"你必须只返回 JSON，不要 Markdown。字段必须为：{fields}。"
         "每个字段是中文字符串数组，每条1-2句话。必须基于输入数据，不允许编造不存在的字段、金额、订单、渠道、活动或结论。"
-        "输出要像酒店运营顾问，不像通用AI；必须围绕订单量=流量×转化、PMS经营底盘、OTA漏斗、渠道贡献、四象限、封顶校准、推广ROI、页面包装、口碑、价格房型。"
+        "动态整改动作可以写成：P0｜OTA运营｜动作｜复盘指标｜周期。"
+        "输出要像酒店运营顾问，不像通用AI；必须围绕时间口径、订单量=流量×转化、PMS经营底盘、OTA漏斗、封顶校准、周边活动、口碑、推广ROI和页面包装。"
     )
 
 
@@ -150,7 +150,7 @@ def _from_openai_compatible(payload: dict[str, Any], timeout: int) -> dict[str, 
         "model": model,
         "temperature": float(os.environ.get("S14_AI_TEMPERATURE", "0.2")),
         "messages": [
-            {"role": "system", "content": "你是酒店 OTA 经营诊断专家，擅长 PMS、OTA 漏斗、竞对、HOS、价格房型、推广通/全域通、页面包装、口碑和数据质量诊断。" + _schema_hint()},
+            {"role": "system", "content": "你是酒店 OTA 经营诊断专家，擅长 PMS、OTA 漏斗、竞对、价格房型、推广、页面包装、口碑、周边活动和数据质量诊断。" + _schema_hint()},
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
         ],
     }
@@ -180,16 +180,19 @@ def _fallback(result: dict[str, Any]) -> dict[str, Any]:
         platform = item.get("platform")
         channel_lines.append(f"{platform}：曝光 {_plain(item.get('exposure'))}，浏览 {_plain(item.get('views'))}，支付订单 {_plain(item.get('paid_orders'))}，销售额 {_money(item.get('sales_revenue'))}，浏览支付转化率 {_pct(item.get('payment_conversion_rate'))}。")
     if not channel_lines:
-        channel_lines.append("当前分渠道漏斗数据不足，无法判断各 OTA 渠道差异；需要补齐平台维度的曝光、浏览、支付订单和销售额。")
-    cap_lines = []
-    for item in result.get("cap_rules_triggered") or []:
-        cap_lines.append(f"触发{item.get('cap_id')}：{item.get('name')}，封顶{item.get('cap_score')}分，证据：{item.get('evidence')}。")
-    if not cap_lines:
-        cap_lines.append("当前未触发强封顶规则，但仍需要人工复核经营指标和字段完整度。")
+        channel_lines.append("当前分渠道漏斗数据不足，需要补齐平台维度曝光、浏览、支付订单和销售额。")
+    cap_lines = [f"触发{item.get('cap_id')}：{item.get('name')}，封顶{item.get('cap_score')}分，证据：{item.get('evidence')}。" for item in result.get("cap_rules_triggered") or []] or ["当前未触发强封顶规则，但仍需要人工复核经营指标和字段完整度。"]
+    event_suggestions = ((events.get("ai_context") or {}).get("suggestions") or ["周边活动未接入或不足，暂不能用活动辅助判断需求。"])
+    action_lines = [
+        "P0｜OTA运营｜核对各模块时间口径，补齐缺失字段后重新生成报告｜字段完整度、数据新鲜度｜3天",
+        "P1｜运营负责人｜同时复盘周期漏斗、最新日和上一日漏斗，确认曝光、一转、二转哪个断点最大｜曝光、浏览、二转、订单｜7天",
+        "P1｜收益经理｜结合周边活动和PMS月度趋势复核远期价格和库存｜RevPAR、ADR、出租率、活动日期入住率｜7天",
+    ]
     return {
         "source": "rule_based_fallback_no_ai_config",
-        "overview": [f"原始分 {result.get('score_before_cap')}/100，最终分 {result.get('final_score')}/100，风险等级 {result.get('risk_level')}。先看 PMS 经营底盘，再看主渠道流量、二转、价格房型和口碑。", f"当前周期 RevPAR {_money(op.get('revpar'))}，ADR {_money(op.get('adr'))}，出租率 {_pct(op.get('occupancy_rate'))}。"],
-        "metrics": [f"经营指标按所选周期聚合，出租率为总售出间夜除以总可售房晚；当前出租率 {_pct(op.get('occupancy_rate'))}。"],
+        "overview": [f"原始分 {result.get('score_before_cap')}/100，最终分 {result.get('final_score')}/100，风险等级 {result.get('risk_level')}。先看时间口径，再看PMS经营底盘、主渠道流量、二转、价格房型和口碑。"],
+        "time_context": ["报告已拆分PMS日粒度、月度趋势、OTA漏斗日粒度/周期汇总、价格活动快照、口碑近90天和周边活动事件日期。跨粒度模块不能直接混算。"],
+        "metrics": [f"当前周期 RevPAR {_money(op.get('revpar'))}，ADR {_money(op.get('adr'))}，出租率 {_pct(op.get('occupancy_rate'))}。"],
         "revpar": [f"RevPAR {_money(op.get('revpar'))} = ADR {_money(op.get('adr'))} × 出租率 {_pct(op.get('occupancy_rate'))}；先判断是价格问题还是入住问题。"],
         "contribution": ["渠道贡献矩阵用于比较曝光占比、订单占比、销售额占比和客单价；不要只按曝光量判断渠道价值。"],
         "quadrant": ["四象限用于决定渠道动作：高流量低转化先修转化，低流量高转化先加曝光。"],
@@ -197,15 +200,17 @@ def _fallback(result: dict[str, Any]) -> dict[str, Any]:
         "cap": cap_lines,
         "rules": [f"当前命中规则数 {len(result.get('rule_hits') or [])}，应优先解释低分模块和data_gap/partial模块，而不是只看总分。"],
         "optimization": ["整改复盘需要动作日志和前后指标；分数提升但订单、收入或RevPAR不提升，不能算有效优化。"],
-        "funnel": [f"订单量=流量×转化。当前曝光 {_plain(funnel.get('exposure'))}，浏览 {_plain(funnel.get('views'))}，支付订单 {_plain(funnel.get('paid_orders'))}。"],
-        "modules": ["模块诊断已拆为 PMS、各 OTA 渠道和系统/数据质量层。"],
+        "funnel": [f"订单量=流量×转化。当前周期曝光 {_plain(funnel.get('exposure'))}，浏览 {_plain(funnel.get('views'))}，支付订单 {_plain(funnel.get('paid_orders'))}；最新日和上一日需分开看。"],
+        "modules": ["模块诊断已拆为收益、流量、转化、价格、推广、页面、口碑和数据质量层。"],
         "channels": channel_lines,
         "price": [f"商品数 {_plain(price.get('product_count'))}，最低价 {_money(price.get('min_price'))}，最高价 {_money(price.get('max_price'))}；需检查引流价、团购价、钟点房和远期价。"],
         "promotion": [f"活动数 {_plain(promo.get('activity_count'))}，活动商品数 {_plain(promo.get('activity_product_count'))}；推广成本、点击、推广订单、推广收入和 ROI 未完整接入时，不能判断投放效率。"],
         "page": ["图片质量、视频状态、房型卖点和入口标签需要结构化采集；字段未知时只能标记待补齐。"],
-        "reputation": [f"平台评分 {_plain(rep.get('rating_avg'))}，评价数 {_plain(rep.get('review_count'))}，差评率 {_pct(rep.get('negative_review_rate'))}；评价量太小时不能只因评分高就判断口碑稳定。"],
+        "reputation": [f"平台评分 {_plain(rep.get('rating_avg'))}，评价数 {_plain(rep.get('review_count'))}，差评率 {_pct(rep.get('negative_review_rate'))}；近90天评论和全部概览要分开看。"],
+        "nearby_events": event_suggestions,
         "missing": ["缺字段不是经营差，但会降低结论可信度，尤其影响推广ROI、页面包装、竞对和远期价判断。"],
-        "actions": [f"未来60天周边活动数 {_plain(events.get('upcoming_60d_count'))} 可辅助需求判断；优先补数据和页面，再做渠道曝光、二转和推广复盘。"],
+        "action_plan": action_lines,
+        "actions": action_lines,
     }
 
 
