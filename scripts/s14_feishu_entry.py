@@ -4,8 +4,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,11 @@ STATE_DIR = Path(os.environ.get("S14_STATE_DIR", "/tmp/s14_state"))
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 
 TRIGGERS = ("S14诊断", "S14 诊断", "运营诊断", "OTA诊断", "OTA全面诊断", "生成诊断报告", "美团诊断", "携程诊断", "多渠道诊断")
+HOTEL_ALIASES = {
+    "puyue": ("puyue", "璞悦"),
+    "璞悦": ("puyue", "璞悦"),
+    "璞悦酒店": ("puyue", "璞悦"),
+}
 
 
 def _load_env_file() -> None:
@@ -76,23 +82,55 @@ def _config() -> dict[str, Any]:
     return cfg
 
 
-def _run_database(platform: str = "multi") -> dict[str, Any]:
-    S14OperationDiagnosis = _load_skill_class()
-    return S14OperationDiagnosis(_config()).execute({"hotel_id": "puyue", "platform": platform, "data_source_mode": "database", "dry_run": True})
-
-
-def _run_excel(excel_path: str, platform: str = "multi") -> dict[str, Any]:
-    S14OperationDiagnosis = _load_skill_class()
-    return S14OperationDiagnosis(_config()).execute({"hotel_id": "puyue", "platform": platform, "data_source_mode": "excel_upload", "input_excel_path": excel_path, "dry_run": True})
-
-
 def _platform(text: str) -> str:
     lower = text.lower()
     if "美团" in text or "meituan" in lower:
         return "meituan"
     if "携程" in text or "ctrip" in lower:
         return "ctrip"
+    if "飞猪" in text or "fliggy" in lower:
+        return "fliggy"
+    if "多渠道" in text or "全渠道" in text or "multi" in lower:
+        return "multi"
     return "multi"
+
+
+def _hotel(text: str) -> tuple[str, str | None]:
+    lower = text.lower()
+    for alias, value in HOTEL_ALIASES.items():
+        if alias.lower() in lower or alias in text:
+            return value
+    return "puyue", "璞悦"
+
+
+def _request_context(text: str) -> dict[str, Any]:
+    today = datetime.now().date()
+    days = 30
+    match = re.search(r"最近\s*(\d+)\s*天", text)
+    if match:
+        days = max(1, min(366, int(match.group(1))))
+    start = today - timedelta(days=days - 1)
+    hotel_id, hotel_name = _hotel(text)
+    return {
+        "hotel_id": hotel_id,
+        "hotel_name": hotel_name,
+        "platform": _platform(text),
+        "period_start": str(start),
+        "period_end": str(today),
+        "period_days": days,
+    }
+
+
+def _run_database(text: str = "") -> dict[str, Any]:
+    S14OperationDiagnosis = _load_skill_class()
+    context = _request_context(text)
+    return S14OperationDiagnosis(_config()).execute({**context, "data_source_mode": "database", "dry_run": True})
+
+
+def _run_excel(excel_path: str, text: str = "") -> dict[str, Any]:
+    S14OperationDiagnosis = _load_skill_class()
+    context = _request_context(text)
+    return S14OperationDiagnosis(_config()).execute({**context, "data_source_mode": "excel_upload", "input_excel_path": excel_path, "dry_run": True})
 
 
 def main() -> int:
@@ -107,14 +145,14 @@ def main() -> int:
     try:
         if args.excel:
             _save_excel_state(chat_id, args.excel)
-            result = _run_excel(args.excel, platform="multi")
+            result = _run_excel(args.excel, args.text)
         elif args.text and any(token in args.text for token in TRIGGERS):
-            result = _run_database(platform=_platform(args.text))
+            result = _run_database(args.text)
         elif args.text and "复用Excel" in args.text:
             excel = _load_excel_state(chat_id)
             if not excel:
                 return _print("没有可复用的 Excel，请重新上传。")
-            result = _run_excel(excel, platform="multi")
+            result = _run_excel(excel, args.text)
         else:
             return _print("收到。需要生成 S14 OTA 营销诊断报告时，请发送「S14诊断」或上传诊断 Excel。")
         return _print(result.get("feishu_card") if args.format == "card" else result.get("feishu_message"))
