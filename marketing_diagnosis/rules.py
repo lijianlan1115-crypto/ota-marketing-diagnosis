@@ -1,4 +1,12 @@
-from marketing_diagnosis.metrics_core import competitor_metrics, funnel_metrics, operating_metrics, price_ladder_metrics, reputation_metrics
+from marketing_diagnosis.metrics_core import (
+    competitor_metrics,
+    funnel_metrics,
+    nearby_event_metrics,
+    operating_metrics,
+    price_ladder_metrics,
+    promotion_metrics,
+    reputation_metrics,
+)
 
 
 MODULES = [
@@ -44,19 +52,18 @@ def _risk(score):
     return "low"
 
 
-def _has_value(payload, key):
-    return isinstance(payload, dict) and payload.get(key) is not None
-
-
 def score_modules(metrics, data_quality):
     op = metrics["operating"]
     funnel = metrics["ota_funnel"]
     price = metrics["price_ladder"]
+    promo = metrics["promotion"]
     rep = metrics["reputation"]
+    events = metrics["nearby_events"]
     missing_count = sum(len(v or []) for v in (data_quality.get("missing_fields") or {}).values())
     empty_sections = data_quality.get("empty_sections") or {}
 
     occ = op.get("occupancy_rate")
+    revpar = op.get("revpar")
     conv = funnel.get("payment_conversion_rate")
     peer_conv = funnel.get("peer_avg_conversion_rate")
     neg = rep.get("negative_review_rate")
@@ -66,62 +73,91 @@ def score_modules(metrics, data_quality):
     review_count = rep.get("review_count") or 0
     exposure = funnel.get("exposure")
     views = funnel.get("views")
+    active_promo = promo.get("active_activity_count") or 0
+    promo_products = promo.get("activity_product_count") or 0
+    keywords = rep.get("keywords") or []
 
     scores = []
     if occ is None:
         scores.append(_module_score("M01", "operating_result", 16, None, ["data_gap: occupancy_rate missing"], "data_gap", ["jy01.occupancy_rate or room_count+room_nights"]))
     else:
-        scores.append(_module_score("M01", "operating_result", 16, 0.95 if occ >= 0.85 else 0.75 if occ >= 0.7 else 0.45, ["occupancy_rate from normalized hotel_daily"], "ok", ["hotel_daily.occupancy_rate", "hotel_daily.room_count", "hotel_daily.room_nights"]))
+        occ_rate = 0.95 if occ >= 0.85 else 0.82 if occ >= 0.75 else 0.65 if occ >= 0.6 else 0.45
+        if revpar is not None:
+            occ_rate = min(0.98, occ_rate + (0.08 if revpar >= 120 else 0.03 if revpar >= 90 else -0.05))
+        scores.append(_module_score("M01", "operating_result", 16, occ_rate, ["period occupancy and RevPAR from PMS jy01/jy03"], "ok", ["hotel_daily.room_count", "hotel_daily.room_nights", "hotel_daily.room_revenue", "hotel_monthly.revpar"]))
 
     if views is None and exposure is None:
         scores.append(_module_score("M02", "traffic_exposure", 12, None, ["data_gap: exposure/views missing"], "data_gap", ["ota_business_metrics.曝光量", "ota_business_metrics.浏览人数"]))
     else:
-        scores.append(_module_score("M02", "traffic_exposure", 12, 0.9 if (exposure or 0) >= 800 or (views or 0) >= 100 else 0.65, ["exposure and views from OTA business metrics"], "ok", ["ota_funnel.exposure", "ota_funnel.views"]))
+        traffic_rate = 0.9 if (exposure or 0) >= 2000 or (views or 0) >= 300 else 0.75 if (exposure or 0) >= 800 or (views or 0) >= 100 else 0.55
+        scores.append(_module_score("M02", "traffic_exposure", 12, traffic_rate, ["exposure and views from OTA business metrics"], "ok", ["ota_funnel.exposure", "ota_funnel.views", "ota_funnel.peer_rank"]))
 
     if conv is None:
         scores.append(_module_score("M03", "conversion_path", 14, None, ["data_gap: payment_conversion_rate missing"], "data_gap", ["ota_business_metrics.支付转化率", "ota_business_metrics.浏览-支付转化率"]))
     else:
         if peer_conv:
-            conversion_rate = 0.9 if conv >= peer_conv else 0.55 if conv >= peer_conv * 0.7 else 0.3
+            conversion_rate = 0.9 if conv >= peer_conv else 0.65 if conv >= peer_conv * 0.75 else 0.35
         else:
-            conversion_rate = 0.85 if conv >= 0.08 else 0.6 if conv >= 0.04 else 0.35
+            conversion_rate = 0.9 if conv >= 0.08 else 0.65 if conv >= 0.04 else 0.35
         scores.append(_module_score("M03", "conversion_path", 14, conversion_rate, ["payment conversion from OTA business metrics"], "ok", ["ota_funnel.payment_conversion_rate", "ota_funnel.peer_avg_conversion_rate"]))
 
     if not product_count:
-        scores.append(_module_score("M04", "price_inventory", 12, None, ["data_gap: products missing"], "data_gap", ["ota_goods_price_mapping"] ))
+        scores.append(_module_score("M04", "price_inventory", 12, None, ["data_gap: products missing"], "data_gap", ["ota_goods_price_mapping"]))
     else:
-        price_rate = 0.8 if not jump_count else 0.55
-        scores.append(_module_score("M04", "price_inventory", 12, price_rate, ["product ladder from OTA goods price mapping"], "ok", ["products.listed_price", "products.final_price"]))
+        price_rate = 0.84 if not jump_count else 0.6
+        if price.get("room_type_count") and price.get("room_type_count") >= 8:
+            price_rate = min(0.92, price_rate + 0.06)
+        scores.append(_module_score("M04", "price_inventory", 12, price_rate, ["product ladder from OTA goods price mapping latest snapshot"], "ok", ["products.listed_price", "products.final_price", "products.room_type_name"]))
 
-    scores.append(_module_score("M05", "promotion_efficiency", 10, None, ["data_gap: promotion tables not wired into MVP metrics yet"], "data_gap", ["ota_promotion_activity", "ota_activity_product_detail", "promo_cost", "promo_roi"]))
+    if promo.get("status") == "data_gap":
+        scores.append(_module_score("M05", "promotion_efficiency", 10, None, ["data_gap: promotion activity tables empty"], "data_gap", ["ota_promotion_activity", "ota_activity_product_detail"]))
+    else:
+        # Current export has activity coverage but no spend/click/order ROI fields, so keep partial.
+        promo_rate = 0.55
+        if active_promo >= 5:
+            promo_rate += 0.12
+        if promo_products >= 30:
+            promo_rate += 0.08
+        if promo.get("has_cost_roi_fields"):
+            promo_rate = max(promo_rate, 0.8)
+        scores.append(_module_score("M05", "promotion_efficiency", 10, promo_rate, ["promotion activity coverage wired; ROI/cost fields still missing"], "partial", ["ota_promotion_activity.activity_status", "ota_activity_product_detail.remaining_inventory", "promo_cost/promo_roi missing"]))
 
     if not product_count:
-        scores.append(_module_score("M06", "content_entry", 10, None, ["data_gap: page/content fields not wired"], "data_gap", ["page_collection", "product tags", "image/video status"]))
+        scores.append(_module_score("M06", "content_entry", 10, None, ["data_gap: product/page content missing"], "data_gap", ["goods_price_mapping", "review_ranking", "page_collection"]))
     else:
-        scores.append(_module_score("M06", "content_entry", 10, None, ["data_gap: product presence is real, but page content score requires page collection fields"], "data_gap", ["page_collection", "image/video status", "entry tags"]))
+        content_rate = 0.58
+        if keywords:
+            content_rate += 0.12
+        if active_promo:
+            content_rate += 0.05
+        if events.get("upcoming_60d_count"):
+            content_rate += 0.03
+        scores.append(_module_score("M06", "content_entry", 10, content_rate, ["product names, review keyword rankings and activity tags available; image/video page fields still missing"], "partial", ["products.product_name", "review_rankings.rank_item_name", "page image/video fields missing"]))
 
     if rating is None and not review_count:
-        scores.append(_module_score("M07", "reputation_trust", 16, None, ["data_gap: review score/detail missing"], "data_gap", ["ota_review_detail.review_score", "ota_review_overview"] ))
+        scores.append(_module_score("M07", "reputation_trust", 16, None, ["data_gap: review score/detail/overview missing"], "data_gap", ["ota_review_detail.review_score", "ota_review_overview.review_score"]))
     else:
         if rating is None:
-            rep_rate = 0.45
+            rep_rate = 0.5
         else:
-            rep_rate = 0.9 if rating >= 4.7 and (neg is None or neg <= 0.03) else 0.65 if rating >= 4.4 else 0.4
+            rep_rate = 0.92 if rating >= 4.7 and (neg is None or neg <= 0.03) else 0.72 if rating >= 4.4 else 0.45
         if review_count < 10:
             rep_rate = min(rep_rate, 0.7)
-        scores.append(_module_score("M07", "reputation_trust", 16, rep_rate, ["rating and negative reviews from OTA review data"], "ok", ["reviews.rating", "reviews.is_negative", "reviews.review_text"]))
+        scores.append(_module_score("M07", "reputation_trust", 16, rep_rate, ["rating/count from review overview; detail reviews used for samples"], "ok", ["reviews.rating", "review_overviews.review_score", "review_rankings.rank_item_name"]))
 
-    quality_rate = 0.9 if missing_count == 0 and not empty_sections else 0.65 if missing_count <= 5 else 0.4
+    quality_rate = 0.92 if missing_count == 0 and not empty_sections else 0.72 if missing_count <= 3 else 0.45
     scores.append(_module_score("M08", "execution_data_quality", 10, quality_rate, [f"missing_fields={missing_count}", f"empty_sections={list(empty_sections.keys())}"], "ok" if missing_count == 0 and not empty_sections else "partial", ["normalization diagnostics", "source diagnostics"]))
     return scores
 
 
 def process(data):
     sections = data.get("sections") or {}
-    operating = operating_metrics(sections.get("hotel_daily", []))
+    operating = operating_metrics(sections.get("hotel_daily", []), sections.get("hotel_monthly", []))
     funnel = funnel_metrics(sections.get("ota_funnel", []))
     price = price_ladder_metrics(sections.get("products", []))
-    reputation = reputation_metrics(sections.get("reviews", []))
+    promotion = promotion_metrics(sections.get("promotions", []), sections.get("promotion_products", []))
+    reputation = reputation_metrics(sections.get("reviews", []), sections.get("review_overviews", []), sections.get("review_rankings", []))
+    events = nearby_event_metrics(sections.get("nearby_events", []))
     competitors = competitor_metrics(sections.get("competitors", []), own_min_price=price.get("min_price") if price.get("status") == "ok" else None)
     data_quality = {
         "status": data.get("status"),
@@ -130,23 +166,28 @@ def process(data):
         "diagnostics": data.get("diagnostics") or {},
         "source_diagnostics": data.get("source_diagnostics") or [],
     }
-    metrics = {"operating": operating, "ota_funnel": funnel, "price_ladder": price, "reputation": reputation, "competitors": competitors}
+    metrics = {"operating": operating, "ota_funnel": funnel, "price_ladder": price, "promotion": promotion, "reputation": reputation, "nearby_events": events, "competitors": competitors}
     module_scores = score_modules(metrics, data_quality)
     final_score = round(sum(item["score"] for item in module_scores), 2)
     notes = []
     actions = []
     conv = funnel.get("payment_conversion_rate")
     peer = funnel.get("peer_avg_conversion_rate")
-    if conv is not None and peer is not None and conv < peer * 0.7:
+    if conv is not None and peer is not None and conv < peer * 0.75:
         notes.append({"level": "high", "title": "conversion below peers", "evidence": f"conversion={conv:.4f}, peer={peer:.4f}", "suggestion": "Improve content, tags, review placement, and product ladder."})
         actions.append("Improve OTA content page first.")
     jump_count = len(price.get("price_jump_risks") or [])
     if jump_count:
         notes.append({"level": "medium", "title": "product ladder jump risk", "evidence": f"risk_products={jump_count}", "suggestion": "Review group-buy, hourly, and full-day products together."})
         actions.append("Make the product price ladder clearer.")
+    if promotion.get("status") == "partial" and not promotion.get("has_cost_roi_fields"):
+        notes.append({"level": "medium", "title": "promotion ROI cannot be verified", "evidence": "activity tables exist, but cost/click/order ROI fields are missing", "suggestion": "Add promotion cost, clicks, promotion orders, promotion revenue and ROI fields."})
+        actions.append("Complete promotion ROI data collection before judging ad efficiency.")
     neg_rate = reputation.get("negative_review_rate")
     if neg_rate is not None and neg_rate > 0.05:
         notes.append({"level": "medium", "title": "negative review rate is high", "evidence": f"negative_rate={neg_rate:.4f}", "suggestion": "Fix repeated service and facility issues."})
+    if events.get("upcoming_60d_count"):
+        notes.append({"level": "low", "title": "nearby demand events available", "evidence": f"upcoming_60d={events.get('upcoming_60d_count')}", "suggestion": "Use nearby event calendar for demand forecast and package planning."})
     gap = competitors.get("own_min_price_vs_competitor_avg_gap")
     if gap is not None and gap > 30:
         notes.append({"level": "medium", "title": "entry price above competitor average", "evidence": f"gap={gap:.2f}", "suggestion": "Optimize entry product before broad discounting."})
