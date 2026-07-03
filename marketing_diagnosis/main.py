@@ -40,18 +40,18 @@ def _run(raw_dataset, args):
     result = process(normalized)
     period_start, period_end = _period(args)
     report_dir = _report_dir(args.output, args.hotel_id, args.platform, period_start, period_end)
-    paths = write_reports(result, report_dir)
-    return {
-        "status": result.get("status"),
+    enriched = {
+        **result,
         "run_id": report_dir.name,
         "hotel_id": args.hotel_id,
+        "hotel_name": args.hotel_name,
         "platform": args.platform,
         "period_start": period_start,
         "period_end": period_end,
         "report_dir": str(report_dir),
-        **paths,
-        "data_quality": result.get("data_quality"),
     }
+    paths = write_reports(enriched, report_dir)
+    return {**enriched, **paths}
 
 
 def command_excel(args):
@@ -68,13 +68,22 @@ def command_db(args):
     dsn = args.dsn or os.environ.get(args.dsn_env)
     if not dsn:
         raise SystemExit(f"missing DSN: pass --dsn or set {args.dsn_env}")
-    raw_dataset = load_mysql_dsn_dataset(dsn, limit=args.limit)
+    period_start, period_end = _period(args)
+    raw_dataset = load_mysql_dsn_dataset(
+        dsn,
+        limit=args.limit,
+        hotel_id=args.hotel_id,
+        platform=args.platform,
+        period_start=period_start,
+        period_end=period_end,
+    )
     print(json.dumps(_run(raw_dataset, args), ensure_ascii=False, indent=2))
 
 
 def _add_common_args(parser):
     parser.add_argument("--output", default=os.environ.get("S14_REPORT_OUTPUT_DIR") or str(DEFAULT_REPORT_ROOT), help="Report root directory. Each run writes to hotel/platform/period/run_id under this root.")
     parser.add_argument("--hotel-id", default="puyue")
+    parser.add_argument("--hotel-name", default="璞悦")
     parser.add_argument("--platform", default="multi")
     parser.add_argument("--period-start", default="")
     parser.add_argument("--period-end", default="")
