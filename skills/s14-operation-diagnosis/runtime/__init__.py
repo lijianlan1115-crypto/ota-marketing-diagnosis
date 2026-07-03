@@ -46,7 +46,14 @@ class S14OperationDiagnosis:
             dsn = self._resolve_dsn()
             if not dsn:
                 raise ValueError("S14 database mode requires S14_DB_DSN or config db_dsn")
-            raw_dataset = load_mysql_dsn_dataset(dsn, limit=int(self.config.get("limit") or prepared.get("limit") or 5000))
+            raw_dataset = load_mysql_dsn_dataset(
+                dsn,
+                limit=int(self.config.get("limit") or prepared.get("limit") or 5000),
+                hotel_id=prepared.get("hotel_id"),
+                platform=prepared.get("platform"),
+                period_start=prepared.get("period_start"),
+                period_end=prepared.get("period_end"),
+            )
             data_source = "hotel_puyue_mysql"
         else:
             raise ValueError(f"unsupported S14 data_source_mode: {mode}")
@@ -55,9 +62,6 @@ class S14OperationDiagnosis:
         result = process(normalized)
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
         report_dir = self._report_dir(prepared, run_id)
-        paths = write_reports(result, report_dir)
-        report_file_path = paths["report_html"]
-        report_url = self._public_url(report_file_path, prepared["output_root"])
         skill_result = {
             **result,
             "skill_id": SKILL_ID,
@@ -67,15 +71,21 @@ class S14OperationDiagnosis:
             "platform": prepared.get("platform"),
             "period_start": prepared.get("period_start"),
             "period_end": prepared.get("period_end"),
+            "period_days": prepared.get("period_days"),
             "data_source": data_source,
             "report_dir": str(report_dir),
+            "approval_required": False,
+            "dry_run": True,
+        }
+        paths = write_reports(skill_result, report_dir)
+        report_file_path = paths["report_html"]
+        report_url = self._public_url(report_file_path, prepared["output_root"])
+        skill_result.update({
             "report_file_path": report_file_path,
             "report_url": report_url,
             "report_json": paths["report_json"],
             "report_markdown": paths["report_markdown"],
-            "approval_required": False,
-            "dry_run": True,
-        }
+        })
         skill_result["feishu_message"] = build_feishu_reply(skill_result)
         skill_result["feishu_card"] = build_feishu_card_reply(skill_result)
         return skill_result
@@ -86,7 +96,8 @@ class S14OperationDiagnosis:
 
     def _prepare_inputs(self, inputs: dict[str, Any]) -> dict[str, Any]:
         today = datetime.now().date()
-        start = today - timedelta(days=29)
+        period_days = int(inputs.get("period_days") or 30)
+        start = today - timedelta(days=max(1, period_days) - 1)
         output_root = (
             inputs.get("output_root")
             or inputs.get("output_dir")
@@ -102,6 +113,7 @@ class S14OperationDiagnosis:
             "platform": inputs.get("platform") or "multi",
             "period_start": inputs.get("period_start") or str(start),
             "period_end": inputs.get("period_end") or str(today),
+            "period_days": period_days,
             "output_root": output_root,
             "public_base_url": inputs.get("public_base_url") or self.config.get("public_base_url") or os.environ.get("S14_PUBLIC_BASE_URL"),
             "dry_run": True,
