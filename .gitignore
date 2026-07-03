@@ -3,13 +3,16 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# OpenClaw local runtime state generated on first run.
+.openclaw/
+
 # Local env / database files
 .env
 *.sqlite
 *.db
 
-# Generated reports must never be versioned.
+# Generated reports and public artifacts must never be versioned.
 reports/
 s14-reports/
-public/s14-reports/
+public/
 *.local.html
