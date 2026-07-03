@@ -12,7 +12,7 @@ from marketing_diagnosis.data import normalize_dataset
 from marketing_diagnosis.excel_loader import load_excel_dataset
 from marketing_diagnosis.db_loader import load_database_dataset, load_mysql_dsn_dataset
 from marketing_diagnosis.reporting_v2 import write_reports
-from marketing_diagnosis.rules import process
+from marketing_diagnosis.rules_v2 import process
 
 DEFAULT_REPORT_ROOT = Path("/var/lib/ota-marketing-diagnosis/reports")
 
@@ -65,12 +65,12 @@ def command_config(args):
 
 
 def command_db(args):
-    dsn = args.dsn or os.environ.get(args.dsn_env)
-    if not dsn:
-        raise SystemExit(f"missing DSN: pass --dsn or set {args.dsn_env}")
+    source = args.dsn or os.environ.get(args.dsn_env)
+    if not source:
+        raise SystemExit(f"missing database source: pass --dsn or set {args.dsn_env}")
     period_start, period_end = _period(args)
     raw_dataset = load_mysql_dsn_dataset(
-        dsn,
+        source,
         limit=args.limit,
         hotel_id=args.hotel_id,
         platform=args.platform,
