@@ -2,7 +2,14 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-reports/
+
+# Local env / database files
 .env
 *.sqlite
 *.db
+
+# Generated reports must never be versioned.
+reports/
+s14-reports/
+public/s14-reports/
+*.local.html
