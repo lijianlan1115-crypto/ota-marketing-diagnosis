@@ -1,3 +1,4 @@
+from marketing_diagnosis.ai_analysis import build_ai_analysis
 from marketing_diagnosis.metrics_core import (
     competitor_metrics,
     funnel_metrics,
@@ -112,7 +113,6 @@ def score_modules(metrics, data_quality):
     if promo.get("status") == "data_gap":
         scores.append(_module_score("M05", "promotion_efficiency", 10, None, ["data_gap: promotion activity tables empty"], "data_gap", ["ota_promotion_activity", "ota_activity_product_detail"]))
     else:
-        # Current export has activity coverage but no spend/click/order ROI fields, so keep partial.
         promo_rate = 0.55
         if active_promo >= 5:
             promo_rate += 0.12
@@ -200,4 +200,6 @@ def process(data):
     if not notes:
         notes.append({"level": "low", "title": "no major risk found", "evidence": "No high-risk rule was triggered from available real data.", "suggestion": "Add more continuous data for trend analysis."})
         actions.append("Add more data before making major decisions.")
-    return {"status": "ok" if data.get("status") == "ok" and not data_gap_modules else "partial", "type": "ota_marketing", "boundary": "report_only", "final_score": final_score, "risk_level": _risk(final_score), "module_scores": module_scores, "data_quality": data_quality, "metrics": metrics, "notes": notes, "actions": actions}
+    result = {"status": "ok" if data.get("status") == "ok" and not data_gap_modules else "partial", "type": "ota_marketing", "boundary": "report_only", "final_score": final_score, "risk_level": _risk(final_score), "module_scores": module_scores, "data_quality": data_quality, "metrics": metrics, "notes": notes, "actions": actions}
+    result["ai_analysis"] = build_ai_analysis(result)
+    return result
