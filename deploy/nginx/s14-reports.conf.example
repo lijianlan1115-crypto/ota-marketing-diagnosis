@@ -1,0 +1,9 @@
+server {
+    listen 8088;
+    server_name _;
+
+    location /s14-reports/ {
+        alias /var/lib/ota-marketing-diagnosis/reports/;
+        autoindex off;
+    }
+}
