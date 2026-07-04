@@ -7,7 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-TEMPLATE_FILE_NAME = "S14_OTA诊断数据模板.xlsx"
+TEMPLATE_FILE_NAME = "s14_ota_diagnosis_template.xlsx"
 
 SHEETS: dict[str, list[str]] = {
     "hotel_daily": ["business_date", "hotel_id", "room_count", "room_nights", "room_revenue", "adr", "occupancy_rate"],
