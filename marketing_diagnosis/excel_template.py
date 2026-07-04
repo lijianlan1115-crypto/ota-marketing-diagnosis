@@ -12,7 +12,7 @@ TEMPLATE_FILE_NAME = "s14_ota_diagnosis_template.xlsx"
 SHEETS: dict[str, list[str]] = {
     "hotel_daily": ["business_date", "hotel_id", "room_count", "room_nights", "room_revenue", "adr", "occupancy_rate"],
     "hotel_monthly": ["month", "hotel_id", "room_revenue", "room_nights", "adr", "occupancy_rate", "revpar"],
-    "ota_funnel": ["business_date", "platform", "exposure", "exposure_people", "views", "paid_orders", "sales_revenue", "sold_room_nights", "payment_conversion_rate", "period_type"],
+    "ota_funnel": ["business_date", "platform", "room_type_name", "exposure", "exposure_people", "views", "paid_orders", "sales_revenue", "sold_room_nights", "payment_conversion_rate", "period_type"],
     "products": ["snapshot_time", "platform", "product_name", "room_type_name", "listed_price", "final_price", "group_buy", "hour_room"],
     "promotions": ["snapshot_time", "platform", "activity_name", "activity_status", "start_date", "end_date"],
     "promotion_products": ["snapshot_time", "platform", "activity_name", "product_name", "room_type_name", "activity_price", "activity_status"],
@@ -20,7 +20,7 @@ SHEETS: dict[str, list[str]] = {
     "review_overviews": ["snapshot_time", "platform", "review_count", "rating_avg", "negative_review_count", "negative_review_rate", "unreplied_review_count"],
     "review_rankings": ["snapshot_time", "platform", "rank_item_name", "rank_item_count", "sentiment"],
     "nearby_events": ["event_name", "event_start_date", "event_end_date", "distance_km", "countdown_days", "event_type", "expected_demand"],
-    "competitors": ["business_date", "platform", "competitor_name", "price", "rank", "rating", "sold_rooms", "activity_tag"],
+    "competitors": ["business_date", "platform", "competitor_name", "room_type_name", "price", "rank", "rating", "sold_rooms", "activity_tag"],
 }
 
 INSTRUCTIONS = [
@@ -28,9 +28,10 @@ INSTRUCTIONS = [
     ["1", "每个业务模块对应一个 sheet，sheet 名不要修改。"],
     ["2", "第一行是字段名，不要删除；从第二行开始填写真实数据。"],
     ["3", "日期建议使用 YYYY-MM-DD；月份建议使用 YYYY-MM。"],
-    ["4", "曝光量缺失但有曝光人数时，可以填写 exposure_people，系统会明确标记为临时替代口径。"],
-    ["5", "review_overviews 是平台累计/概览快照；reviews 是评论明细，二者不要混填。"],
-    ["6", "没有的数据可以留空，报告会显示数据缺口，不会把缺字段当经营差。"],
+    ["4", "ota_funnel 建议填写 room_type_name，这样可以做具体房型销售、二转、单价和收入贡献分析。"],
+    ["5", "曝光量缺失但有曝光人数时，可以填写 exposure_people，系统会明确标记为临时替代口径。"],
+    ["6", "review_overviews 是平台累计/概览快照；reviews 是评论明细，二者不要混填。"],
+    ["7", "没有的数据可以留空，报告会显示数据缺口，不会把缺字段当经营差。"],
 ]
 
 
