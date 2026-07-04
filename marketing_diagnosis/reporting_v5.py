@@ -16,7 +16,7 @@ TEXT_REPLACEMENTS = {
     "PMS经营总览为日粒度汇总，两者不要混算。": "PMS经营总览为日粒度汇总，月度趋势用于观察长期方向。",
     "系统/数据口径：": "",
     "解释每个模块为什么得分、为什么扣分。": "展示各评分项的判断依据。",
-    "字段</th>": "评分依据</th>",
+    "<th>字段</th>": "<th>评分依据</th>",
     "operating.occupancy_rate": "出租率水平",
     "operating.revpar": "RevPAR收益水平",
     "operating.monthly_trend.revenue_mom": "收入与RevPAR趋势",
