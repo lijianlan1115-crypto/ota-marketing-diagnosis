@@ -5,6 +5,9 @@ from typing import Any
 from marketing_diagnosis.rule_catalog import CAP_RULES
 
 
+SEVERITY_ZH = {"high": "高", "medium": "中", "low": "低", "高": "高", "中": "中", "低": "低"}
+
+
 def _num(value: Any) -> float | None:
     try:
         if value in (None, ""):
@@ -23,11 +26,12 @@ def _cap_meta(cap_id: str) -> dict[str, Any]:
     for item in CAP_RULES:
         if item["cap_id"] == cap_id:
             return item
-    return {"cap_id": cap_id, "name": cap_id, "cap_score": 100, "severity": "low", "description": ""}
+    return {"cap_id": cap_id, "name": cap_id, "cap_score": 100, "severity": "低", "description": ""}
 
 
 def _trigger(cap_id: str, evidence: str) -> dict[str, Any]:
     item = dict(_cap_meta(cap_id))
+    item["severity"] = SEVERITY_ZH.get(str(item.get("severity") or "low"), str(item.get("severity") or "低"))
     item["evidence"] = evidence
     return item
 
