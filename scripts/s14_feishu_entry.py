@@ -17,6 +17,7 @@ STATE_DIR = Path(os.environ.get("S14_STATE_DIR", "/tmp/s14_state"))
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 
 TRIGGERS = ("S14诊断", "S14 诊断", "运营诊断", "OTA诊断", "OTA全面诊断", "生成诊断报告", "美团诊断", "携程诊断", "多渠道诊断")
+TEMPLATE_TRIGGERS = ("Excel模板", "excel模板", "表格模板", "诊断模板", "数据模板", "模板", "可以发模板", "发个模板")
 HOTEL_ALIASES = {
     "puyue": ("puyue", "璞悦"),
     "璞悦": ("puyue", "璞悦"),
@@ -82,6 +83,10 @@ def _config() -> dict[str, Any]:
     return cfg
 
 
+def _output_root() -> str:
+    return os.environ.get("S14_REPORT_OUTPUT_DIR") or "/var/lib/ota-marketing-diagnosis/reports"
+
+
 def _platform(text: str) -> str:
     lower = text.lower()
     if "美团" in text or "meituan" in lower:
@@ -133,16 +138,52 @@ def _run_excel(excel_path: str, text: str = "") -> dict[str, Any]:
     return S14OperationDiagnosis(_config()).execute({**context, "data_source_mode": "excel_upload", "input_excel_path": excel_path, "dry_run": True})
 
 
+def _template_url(template_path: Path) -> str:
+    base = os.environ.get("S14_PUBLIC_BASE_URL")
+    if not base:
+        return str(template_path)
+    root = Path(_output_root()).resolve()
+    try:
+        rel = template_path.resolve().relative_to(root)
+        return base.rstrip("/") + "/" + rel.as_posix()
+    except ValueError:
+        return base.rstrip("/") + "/" + template_path.name
+
+
+def _template_reply() -> str:
+    sys.path.insert(0, str(ROOT))
+    from marketing_diagnosis.excel_template import ensure_excel_template
+
+    template_path = ensure_excel_template(_output_root())
+    url = _template_url(template_path)
+    return (
+        "可以发送 Excel 分析。\n"
+        f"请先下载并填写 S14 数据模板：{url}\n"
+        "填写后把 Excel 文件发回来，我会按同一套 S14 流程读取数据并生成 HTML 诊断报告。\n"
+        "注意：sheet 名和第一行字段名不要改；没有的数据可以留空。"
+    )
+
+
+def _is_template_request(text: str) -> bool:
+    if not text:
+        return False
+    lower = text.lower()
+    return any(token in text or token.lower() in lower for token in TEMPLATE_TRIGGERS) and ("excel" in lower or "表" in text or "模板" in text)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="S14 Feishu/OpenClaw entry wrapper")
     parser.add_argument("--text", default="")
     parser.add_argument("--excel", default="")
     parser.add_argument("--chat-id", default="")
+    parser.add_argument("--make-template", action="store_true")
     parser.add_argument("--format", choices=("text", "card"), default=os.environ.get("S14_FEISHU_REPLY_FORMAT", "card"))
     args = parser.parse_args()
     _load_env_file()
     chat_id = args.chat_id or None
     try:
+        if args.make_template or _is_template_request(args.text):
+            return _print(_template_reply())
         if args.excel:
             _save_excel_state(chat_id, args.excel)
             result = _run_excel(args.excel, args.text)
@@ -154,7 +195,7 @@ def main() -> int:
                 return _print("没有可复用的 Excel，请重新上传。")
             result = _run_excel(excel, args.text)
         else:
-            return _print("收到。需要生成 S14 OTA 营销诊断报告时，请发送「S14诊断」或上传诊断 Excel。")
+            return _print("收到。需要生成 S14 OTA 诊断报告时，请发送「S14诊断」；需要 Excel 填报模板时，请发送「Excel模板」。")
         return _print(result.get("feishu_card") if args.format == "card" else result.get("feishu_message"))
     except Exception as exc:
         return _print(f"S14诊断失败：{exc}")
