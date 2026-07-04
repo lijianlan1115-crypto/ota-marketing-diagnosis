@@ -75,6 +75,5 @@ def build_excel_template(path: str | Path) -> Path:
 
 def ensure_excel_template(output_root: str | Path) -> Path:
     template_path = Path(output_root) / "_templates" / TEMPLATE_FILE_NAME
-    if not template_path.exists():
-        build_excel_template(template_path)
+    build_excel_template(template_path)
     return template_path
