@@ -58,11 +58,33 @@ pip install -e .
 
 ```bash
 cd /opt/openclaw/workspaces
-git clone https://github.com/TAI-YE-1/ota-marketing-diagnosis.git
+git clone https://github.com/lijianlan1115-crypto/ota-marketing-diagnosis.git
 cd ota-marketing-diagnosis
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
+```
+
+## 下载与同步
+
+下载代码：
+
+```bash
+git clone https://github.com/lijianlan1115-crypto/ota-marketing-diagnosis.git
+```
+
+同步远程最新修改：
+
+```bash
+git pull origin main
+```
+
+修改后提交到自己有写入权限的仓库：
+
+```bash
+git add .
+git commit -m '描述本次修改'
+git push origin main
 ```
 
 配置环境变量：
