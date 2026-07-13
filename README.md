@@ -196,7 +196,28 @@ report.md
 report.html
 ```
 
-`report.html` 是完整可打开报告，包含总览、数据来源核验、M01-M08 评分、经营、OTA 漏斗、商品价格、口碑、竞品、动作建议和数据质量章节。
+`report.html` 是完整可打开报告，包含总览、数据来源核验、M01-M08 评分、经营、OTA 漏斗、商品价格、口碑、竞品和数据质量章节。
+
+HTML 采用绿色运营看板模板，展示规则计算结果和真实采集数据，不展示 AI 诊断分析。新生成的报告会自动使用当前模板。
+
+如果需要把已有 demo 或旧报告替换为新模板，使用原有 `report.json` 重新渲染：
+
+```bash
+python scripts/render_report_html.py \
+  --input /path/to/report.json \
+  --output /path/to/report.html
+```
+
+在服务器更新已展示的页面：
+
+```bash
+cd /opt/openclaw/workspaces/ota-marketing-diagnosis
+git pull origin main
+source .venv/bin/activate
+python scripts/render_report_html.py \
+  --input "$S14_REPORT_OUTPUT_DIR/<原报告目录>/report.json" \
+  --output "$S14_REPORT_OUTPUT_DIR/<原报告目录>/report.html"
+```
 
 报告包含：
 

@@ -116,7 +116,7 @@ def _inject_client_hero(html_text: str, result: dict) -> str:
       <div><small>综合得分</small><strong>{score_text}</strong><span>风险等级：{_e(risk)}</span></div>
       <div><small>诊断模块</small><strong>{modules or '待统计'}项</strong><span>按当前规则结果展示</span></div>
       <div><small>数据缺失</small><strong>{missing}项</strong><span>缺失值不使用0替代</span></div>
-      <div><small>报告类型</small><strong>客户展示版</strong><span>不展示AI诊断分析</span></div>
+      <div><small>报告类型</small><strong>规则诊断版</strong><span>仅展示规则计算和真实数据</span></div>
     </div>
   </div>
 </section>

@@ -106,7 +106,6 @@ def _room_type_section(result: dict[str, Any]) -> str:
     {_room_type_cards(room_types)}
     <div class='callout'>{note_html}</div>
     {_table(['渠道','房型','定位','商品数','最低价','最高价','价格跨度','浏览','订单','销售额','二转','客单价','销售ADR','收入占比','竞品均价','价差','建议'], _room_type_rows(room_types))}
-    <details class='analysis' open><summary><span class='badge info'>AI分析</span> 房型分析建议</summary><div class='txt'><p>房型分析优先看销售贡献、二转、价格跨度和竞品价差。主力房型要保库存和稳定价格；高浏览低转化房型优先查页面、价格和口碑；价格跨度大的房型要复核团购、钟点房、活动价和全日价。</p></div></details>
   </div>
 </section>
 """
