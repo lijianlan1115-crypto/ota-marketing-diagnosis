@@ -30,6 +30,13 @@ DEFAULT_MYSQL_TABLES = {
     "meituan_review_ranking": "meituan_ota_review_ranking",
     "ctrip_review_ranking": "ctrip_ota_review_ranking",
     "meituan_nearby_events": "meituan_ota_nearby_event",
+    "meituan_exposure_daily": "meituan_ota_exposure_source_daily",
+    "meituan_user_source_monthly": "meituan_ota_user_source_monthly",
+    "meituan_promotion_finance": "meituan_ota_promotion_finance_detail",
+    "meituan_order_loss_monthly": "meituan_ota_order_loss_monthly",
+    "meituan_joined_rights": "meituan_ota_joined_rights",
+    "meituan_promotion_status": "meituan_ota_promotion_status",
+    "meituan_video_upload_status": "meituan_ota_video_upload_status",
 }
 
 
@@ -194,14 +201,21 @@ def _pivot_funnel(rows: list[dict[str, Any]], platform: str) -> list[dict[str, A
         if target in {"payment_conversion_rate", "exposure_to_view_rate", "full_occupancy_rate"}:
             item[target] = _ratio(row.get("metric_value"))
             peer = _ratio(row.get("peer_average"))
-            if peer is not None and target == "payment_conversion_rate":
-                item["peer_avg_conversion_rate"] = peer
+            if peer is not None:
+                item[f"peer_{target}"] = peer
+                if target == "payment_conversion_rate":
+                    item["peer_avg_conversion_rate"] = peer
         else:
             item[target] = _float(row.get("metric_value"))
+            peer = _float(row.get("peer_average"))
+            if peer is not None:
+                item[f"peer_{target}"] = peer
         rank = _rank(row.get("competitor_rank"))
         if rank is not None:
             item[f"{target}_rank"] = rank
             item.setdefault("peer_rank", rank)
+        if row.get("metric_code") not in (None, ""):
+            item[f"{target}_metric_code"] = row.get("metric_code")
     return list(grouped.values())
 
 
@@ -341,10 +355,19 @@ def load_mysql_dsn_dataset(
             dataset["hotel_monthly"].extend(_tag_rows(rows, table_map["jy03"]))
             diagnostics["transformations"].append({"section": "hotel_monthly", "rows": len(dataset["hotel_monthly"]), "rule": "monthly PMS trend from jy03_hotel_statistics_month"})
 
+            # 美团推广 ROI 的订单金额口径：本月、渠道、美团 EBK。
+            params = []
+            filters = ["dimension_type='渠道'", "dimension_name='美团EBK'"] + _base_filters(hotel_id, params)
+            rows, diag = _fetch(cursor, table_map["jy03"], 24, _where(filters), params, "period_month DESC")
+            diagnostics["tables"]["jy03_meituan_revenue"] = diag
+            dataset["promotion_revenue"].extend(_tag_rows(rows, table_map["jy03"]))
+
             for plat in enabled:
                 # OTA business metrics: actual export is metric_name rows by period_type/date.
                 params = []
                 filters = _base_filters(hotel_id, params, "business_date", period_start, period_end)
+                if plat == "meituan":
+                    filters.append("(metric_code LIKE 'flow%' OR metric_name IN ('HOS分','信息分'))")
                 rows, diag = _fetch(cursor, table_map[f"{plat}_funnel"], limit, _where(filters), params, "business_date ASC, stats_period_type ASC, metric_name ASC")
                 diagnostics["tables"][f"{plat}_funnel"] = diag
                 dataset["ota_funnel"].extend(_pivot_funnel(_tag_rows(rows, table_map[f"{plat}_funnel"]), plat))
@@ -399,6 +422,37 @@ def load_mysql_dsn_dataset(
                 diagnostics["tables"]["meituan_nearby_events"] = diag
                 dataset["nearby_events"].extend(_copy_rows(rows, "meituan", table_map["meituan_nearby_events"]))
 
+            if "meituan" in enabled:
+                # 以下表直接服务于 23 项可视化规则。所有查询均保留空表/失败诊断，
+                # 由上层把 empty/error 与真实 0 分开处理。
+                specs = [
+                    ("exposure_daily", "meituan_exposure_daily", "business_date", "business_date ASC"),
+                    ("user_source_monthly", "meituan_user_source_monthly", None, "period_month DESC"),
+                    ("promotion_finance", "meituan_promotion_finance", "transaction_time", "transaction_time DESC"),
+                    ("order_loss_monthly", "meituan_order_loss_monthly", None, "period_month DESC"),
+                    ("joined_rights", "meituan_joined_rights", None, None),
+                    ("promotion_status", "meituan_promotion_status", None, None),
+                    ("video_upload_status", "meituan_video_upload_status", None, None),
+                ]
+                for section, table_key, date_column, order_by in specs:
+                    params = []
+                    filters = _base_filters(
+                        hotel_id, params, date_column,
+                        period_start if date_column else None,
+                        period_end if date_column else None,
+                    )
+                    rows, diag = _fetch(
+                        cursor, table_map[table_key], limit, _where(filters), params, order_by
+                    )
+                    if section in {"joined_rights", "promotion_status", "video_upload_status"}:
+                        rows = _latest_snapshot(rows)
+                    if section == "order_loss_monthly" and rows:
+                        latest_month = max(str(row.get("period_month") or "")[:7] for row in rows)
+                        if latest_month:
+                            rows = [row for row in rows if str(row.get("period_month") or "")[:7] == latest_month]
+                    diagnostics["tables"][table_key] = diag
+                    dataset[section].extend(_tag_rows(rows, table_map[table_key]))
+
             diagnostics["transformations"].extend([
                 {"section": "ota_funnel", "rows": len(dataset["ota_funnel"]), "rule": "metric_name tall table pivoted into funnel metrics"},
                 {"section": "products", "rows": len(dataset["products"]), "rule": "latest OTA goods price snapshot"},
@@ -408,6 +462,14 @@ def load_mysql_dsn_dataset(
                 {"section": "review_overviews", "rows": len(dataset["review_overviews"]), "rule": "latest platform review score/count summary"},
                 {"section": "review_rankings", "rows": len(dataset["review_rankings"]), "rule": "latest platform review keyword ranking"},
                 {"section": "nearby_events", "rows": len(dataset["nearby_events"]), "rule": "nearby event feed for demand context"},
+                {"section": "exposure_daily", "rows": len(dataset["exposure_daily"]), "rule": "daily total/non-ad/ad exposure"},
+                {"section": "user_source_monthly", "rows": len(dataset["user_source_monthly"]), "rule": "latest monthly local/nonlocal/new/returning user mix"},
+                {"section": "promotion_finance", "rows": len(dataset["promotion_finance"]), "rule": "promotion spend transactions in requested period"},
+                {"section": "promotion_revenue", "rows": len(dataset["promotion_revenue"]), "rule": "current-month Meituan EBK room revenue"},
+                {"section": "order_loss_monthly", "rows": len(dataset["order_loss_monthly"]), "rule": "latest monthly competitor order loss"},
+                {"section": "joined_rights", "rows": len(dataset["joined_rights"]), "rule": "joined rights list"},
+                {"section": "promotion_status", "rows": len(dataset["promotion_status"]), "rule": "promotion/configuration status snapshot"},
+                {"section": "video_upload_status", "rows": len(dataset["video_upload_status"]), "rule": "video uploaded/required counts"},
             ])
     dataset["__source_diagnostics__"] = [diagnostics]
     return dataset

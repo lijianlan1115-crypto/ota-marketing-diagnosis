@@ -16,9 +16,25 @@ SECTIONS = [
     "review_rankings",
     "nearby_events",
     "competitors",
+    # S14 可视化规则手册专用数据集。保留数据库原字段，由
+    # visual_diagnosis.py 统一计算，避免把“缺失”误判成真实 0。
+    "exposure_daily",
+    "user_source_monthly",
+    "promotion_finance",
+    "promotion_revenue",
+    "order_loss_monthly",
+    "joined_rights",
+    "promotion_status",
+    "video_upload_status",
 ]
 
-OPTIONAL_SECTIONS = {"hotel_monthly", "promotions", "promotion_products", "review_overviews", "review_rankings", "nearby_events", "competitors"}
+OPTIONAL_SECTIONS = {
+    "hotel_monthly", "promotions", "promotion_products", "review_overviews",
+    "review_rankings", "nearby_events", "competitors", "exposure_daily",
+    "user_source_monthly", "promotion_finance", "promotion_revenue",
+    "order_loss_monthly", "joined_rights", "promotion_status",
+    "video_upload_status",
+}
 
 SHEET_NAMES = {
     "hotel_daily": {"hotel_daily", "daily", "酒店日报", "每日经营", "经营日报", "jy01", "rs01", "jy01_hotel_statistics_daily", "rs01_room_revenue_daily"},
@@ -32,6 +48,14 @@ SHEET_NAMES = {
     "review_rankings": {"review_rankings", "review_ranking", "评价标签", "ota_review_ranking"},
     "nearby_events": {"nearby_events", "nearby_event", "周边活动", "ota_nearby_event"},
     "competitors": {"competitors", "competition", "竞品", "竞品数据"},
+    "exposure_daily": {"exposure_daily", "meituan_ota_exposure_source_daily"},
+    "user_source_monthly": {"user_source_monthly", "meituan_ota_user_source_monthly"},
+    "promotion_finance": {"promotion_finance", "meituan_ota_promotion_finance_detail"},
+    "promotion_revenue": {"promotion_revenue", "推广订单金额"},
+    "order_loss_monthly": {"order_loss_monthly", "meituan_ota_order_loss_monthly"},
+    "joined_rights": {"joined_rights", "meituan_ota_joined_rights"},
+    "promotion_status": {"promotion_status", "meituan_ota_promotion_status"},
+    "video_upload_status": {"video_upload_status", "meituan_ota_video_upload_status"},
 }
 
 FIELD_MAP = {
@@ -105,6 +129,14 @@ FIELD_MAP = {
         "房型": "room_type_name", "价格": "price", "售卖价": "price", "peer_average": "price",
         "排名": "rank", "competitor_rank": "rank", "距离": "distance", "活动标签": "promotion_tag",
     },
+    "exposure_daily": {},
+    "user_source_monthly": {},
+    "promotion_finance": {},
+    "promotion_revenue": {},
+    "order_loss_monthly": {},
+    "joined_rights": {},
+    "promotion_status": {},
+    "video_upload_status": {},
 }
 
 REQUIRED = {
@@ -119,6 +151,14 @@ REQUIRED = {
     "review_rankings": set(),
     "nearby_events": set(),
     "competitors": set(),
+    "exposure_daily": set(),
+    "user_source_monthly": set(),
+    "promotion_finance": set(),
+    "promotion_revenue": set(),
+    "order_loss_monthly": set(),
+    "joined_rights": set(),
+    "promotion_status": set(),
+    "video_upload_status": set(),
 }
 
 NUMBER_FIELDS = {
@@ -128,6 +168,11 @@ NUMBER_FIELDS = {
     "listed_price", "activity_price", "final_price", "commission_rate", "rating", "rating_avg", "rating_max", "review_count", "unreplied_review_count", "negative_review_count",
     "environment_score", "facility_score", "service_score", "hygiene_score", "ranking_position", "rank_item_value", "activity_room_type_count", "distance_km", "countdown_days",
     "price", "rank",
+    "total_exposure", "non_ad_exposure", "ad_exposure", "ad_exposure_ratio_pct",
+    "local_user_pct", "nonlocal_user_pct", "new_user_pct", "returning_user_pct",
+    "transaction_amount", "amount", "room_revenue", "competitor_loss_order_count",
+    "competitor_loss_amount", "total_review_count", "unreplied_review_count",
+    "uploaded_count", "required_count",
 }
 
 BOOL_FIELDS = {"is_hour_room", "is_group_buy", "is_negative", "is_replied"}

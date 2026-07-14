@@ -20,7 +20,7 @@ body{background:var(--bg);color:var(--ink);font-family:Inter,Arial,'PingFang SC'
 .side a{display:flex;gap:9px;align-items:center;padding:9px 13px;border-bottom:0;border-top:1px solid #eef2f1;font-size:12px;color:#3f4b55}
 .side a:before{content:attr(data-no);width:26px;height:22px;border-radius:6px;background:#edf4f1;display:grid;place-items:center;font-size:11px;color:var(--green);flex:0 0 auto}
 .side a:hover{background:var(--mint2);color:var(--green)}
-main{gap:18px}.card{border-color:var(--line);border-radius:12px;box-shadow:var(--shadow);scroll-margin-top:90px}.head{padding:17px 19px;border-bottom-color:#edf2f0;background:#fff}.head h2{font-size:18px}.head p{font-size:13px}.body{padding:18px}
+main{gap:18px;width:100%;max-width:100%;min-width:0;overflow:hidden}.card{border-color:var(--line);border-radius:12px;box-shadow:var(--shadow);scroll-margin-top:90px}.head{padding:17px 19px;border-bottom-color:#edf2f0;background:#fff}.head h2{font-size:18px}.head p{font-size:13px}.body{padding:18px}
 .badge.good{background:#e5f5ed;color:#15734e}.badge.warn{background:#fff4d9;color:#92610f}.badge.bad{background:#fdebea;color:#aa302c}.badge.info{background:#e8f5ef;color:#15734e}.badge.neutral{background:#edf2f7;color:#475569}
 .kpi,.tile,.panel{border-color:var(--line);border-radius:10px}.kpi,.tile{background:#f8fbfa}.kpi strong{font-size:25px}.panel h3{background:#f7faf9}
 .table th{background:#f7faf9;color:#53616b}.table th,.table td{border-bottom-color:#eaf0ed}.table tbody tr:nth-child(even){background:#fbfdfc}.table tbody tr:hover{background:#f1faf6}
@@ -34,7 +34,9 @@ main{gap:18px}.card{border-color:var(--line);border-radius:12px;box-shadow:var(-
 details.metric-details{margin-top:14px;border:1px solid #cbd8e8;border-radius:10px;overflow:hidden;background:#fff}
 details.metric-details>summary{list-style:none;cursor:pointer;padding:13px 14px;background:#f4f8fd;color:#1f3e64;font-weight:800;display:flex;justify-content:space-between;gap:12px;align-items:center}details.metric-details>summary::-webkit-details-marker{display:none}details.metric-details[open]>summary{background:#eef5fd;border-bottom:1px solid #dce6f2}
 .metric-details-title small{display:block;margin-top:4px;color:#667085;font-weight:400}.metric-details-action{display:inline-flex;align-items:center;min-height:28px;padding:0 9px;border:1px solid #cbd8e8;border-radius:999px;background:#fff;color:#315b88;font-size:12px;white-space:nowrap}.metric-details-content{padding:0}.metric-details-arrow{display:inline-block;margin-left:6px;transition:transform .2s ease}details.metric-details[open] .metric-details-arrow{transform:rotate(180deg)}
-@media(max-width:1100px){.client-hero-grid{grid-template-columns:1fr}.client-source{grid-template-columns:1fr 1fr}}@media(max-width:980px){.client-summary{grid-template-columns:1fr 1fr}}@media(max-width:640px){.client-summary,.client-source{grid-template-columns:1fr}.client-hero h2{font-size:23px}}
+.s14-scorebar{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.s14-scorebar>div{padding:16px 18px;border:1px solid var(--line);border-radius:11px;background:#fff;box-shadow:var(--shadow)}.s14-scorebar small{display:block;color:var(--muted);font-weight:700}.s14-scorebar strong{display:block;margin-top:6px;font-size:25px;color:var(--green)}
+.s14-summary,.s14-items{width:100%;max-width:100%;min-width:0}.s14-summary{margin-bottom:18px}.s14-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.s14-item{min-width:0;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:var(--shadow);overflow:hidden;scroll-margin-top:90px}.s14-item-head{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;align-items:center;padding:15px 16px;border-bottom:1px solid #edf2f0}.s14-no{height:34px;border-radius:8px;background:#173d34;color:#fff;display:grid;place-items:center;font-weight:900}.s14-item h3{margin:0;font-size:16px}.s14-item-meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.s14-item-body{padding:14px 16px}.s14-source{margin-bottom:10px;padding:9px 11px;border:1px solid #dce6f2;border-radius:8px;background:#f4f8fd;color:#315b88;font-size:11px;word-break:break-word}.s14-source b{font-size:12px}.s14-source span{display:block;margin-top:3px;color:#667085}.s14-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.s14-field{min-width:0;padding:10px 11px;border:1px solid #e7eeeb;border-radius:8px;background:#f8fbfa}.s14-field small,.s14-field span{display:block}.s14-field small{color:var(--muted);font-weight:700}.s14-field b{display:block;margin-top:4px;word-break:break-word}.s14-field span{margin-top:3px;color:var(--muted);font-size:11px}.s14-note{margin-top:10px;padding:9px 11px;border-left:3px solid #cfe5dc;background:#f4fbf7;color:#4d625a;font-size:12px}.s14-status{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800}.s14-status.success{background:#e5f5ed;color:#15734e}.s14-status.zero{background:#fdebea;color:#aa302c}.s14-status.pending_rule,.s14-status.manual_pending{background:#fff4d9;color:#92610f}.s14-status.missing,.s14-status.error{background:#edf2f7;color:#475569}
+@media(max-width:1100px){.layout{grid-template-columns:minmax(0,1fr)}.side{position:static;max-height:none;display:none}.client-hero-grid{grid-template-columns:minmax(0,1fr)}.client-source{grid-template-columns:1fr 1fr}.s14-items{grid-template-columns:minmax(0,1fr)}}@media(max-width:980px){.client-summary{grid-template-columns:1fr 1fr}}@media(max-width:640px){.layout{padding:13px}.client-summary,.client-source,.s14-scorebar,.s14-fields{grid-template-columns:minmax(0,1fr)}.client-hero h2{font-size:23px}.s14-item-head{grid-template-columns:38px minmax(0,1fr)}.s14-item-meta{grid-column:1/-1}}
 @media print{details.metric-details>summary{display:none!important}details.metric-details>.metric-details-content{display:block!important}.client-result-summary{box-shadow:none}}
 """
 
@@ -88,14 +90,16 @@ def _source_summary(result: dict) -> tuple[int, int]:
 
 
 def _inject_client_hero(html_text: str, result: dict) -> str:
-    score = result.get("final_score")
+    visual = result.get("visual_diagnosis") or {}
+    score = visual.get("normalized_score") if visual else result.get("final_score")
     try:
         score_text = f"{float(score):.1f}"
     except (TypeError, ValueError):
         score_text = "待计算"
-    risk = result.get("risk_level") or "待判断"
-    modules = len(result.get("module_scores") or [])
-    missing = sum(len(v or []) for v in ((result.get("data_quality") or {}).get("missing_fields") or {}).values())
+    risk = ("待判断" if score is None else "高" if float(score) < 60 else "中" if float(score) < 80 else "低") if visual else (result.get("risk_level") or "待判断")
+    modules = len(visual.get("items") or []) if visual else len(result.get("module_scores") or [])
+    missing = (sum(1 for item in visual.get("items") or [] if item.get("data_status") in {"missing", "error"})
+               if visual else sum(len(v or []) for v in ((result.get("data_quality") or {}).get("missing_fields") or {}).values()))
     rows, tables = _source_summary(result)
     period_start = result.get("period_start") or "未标注"
     period_end = result.get("period_end") or "未标注"
@@ -113,7 +117,7 @@ def _inject_client_hero(html_text: str, result: dict) -> str:
       </div>
     </div>
     <div class='client-summary'>
-      <div><small>综合得分</small><strong>{score_text}</strong><span>风险等级：{_e(risk)}</span></div>
+      <div><small>折算得分</small><strong>{score_text}</strong><span>风险等级：{_e(risk)}</span></div>
       <div><small>诊断模块</small><strong>{modules or '待统计'}项</strong><span>按当前规则结果展示</span></div>
       <div><small>数据缺失</small><strong>{missing}项</strong><span>缺失值不使用0替代</span></div>
       <div><small>报告类型</small><strong>规则诊断版</strong><span>仅展示规则计算和真实数据</span></div>
@@ -158,6 +162,84 @@ def _inject_result_summary(html_text: str, result: dict) -> str:
     return html_text.replace("</section>", "</section>" + block, 1)
 
 
+def _visual_value(label: str, value: Any) -> str:
+    if value in (None, ""):
+        return "暂无数据"
+    if isinstance(value, float):
+        if any(key in label for key in ("占比", "转化率", "YOY", "同比", "出租率")):
+            return f"{value:.2%}"
+        if any(key in label for key in ("金额", "房费", "投入", "收入")):
+            return f"¥{value:,.2f}"
+        return f"{value:,.2f}"
+    return str(value)
+
+
+def _inject_visual_diagnosis(html_text: str, result: dict) -> str:
+    visual = result.get("visual_diagnosis") or {}
+    items = visual.get("items") or []
+    if not items:
+        return html_text
+    status_text = {
+        "success": "已计算", "zero": "真实为0", "missing": "数据缺失",
+        "error": "采集失败", "pending_rule": "规则待确认", "manual_pending": "待人工录入",
+    }
+    summary_rows = []
+    cards = []
+    for item in items:
+        no = int(item.get("standard_item_id") or 0)
+        status = str(item.get("data_status") or "missing")
+        score = item.get("item_score")
+        participates = bool(item.get("participates_in_score"))
+        score_text = "仅展示" if not participates else ("待计算" if score is None else f"{float(score):g}分")
+        base_text = "仅展示" if not participates else f"{float(item.get('base_score') or 0):g}分"
+        summary_rows.append(
+            f"<tr><td>{no:02d}</td><td><a href='#rule-{no}'>{_e(item.get('item_name'))}</a></td>"
+            f"<td>{base_text}</td><td>{score_text}</td><td><span class='s14-status {status}'>{_e(status_text.get(status, status))}</span></td>"
+            f"<td>数据表：{_e(item.get('source_table'))}<br>{_e(item.get('note') or '按数据库字段与规则手册计算')}</td></tr>"
+        )
+        fields = []
+        for field in item.get("fields") or []:
+            fields.append(
+                "<div class='s14-field'>"
+                f"<small>{_e(field.get('label'))}</small><b>{_e(_visual_value(str(field.get('label') or ''), field.get('value')))}</b>"
+                f"<span>{_e(field.get('note') or '')}</span></div>"
+            )
+        if not fields:
+            fields.append("<div class='s14-field'><small>数据状态</small><b>暂无数据</b><span>缺失值不会按0处理</span></div>")
+        note = f"<div class='s14-note'>{_e(item.get('note'))}</div>" if item.get("note") else ""
+        source_fields = "、".join(str(value) for value in (item.get("source_fields") or [])) or "待补充"
+        source = (
+            "<div class='s14-source'><b>数据库表：" + _e(item.get("source_table")) + "</b>"
+            "<span>对应字段：" + _e(source_fields) + "</span></div>"
+        )
+        cards.append(
+            f"<article class='s14-item' id='rule-{no}'><div class='s14-item-head'><div class='s14-no'>{no:02d}</div>"
+            f"<h3>{_e(item.get('item_name'))}</h3><div class='s14-item-meta'><span class='s14-status {status}'>{_e(status_text.get(status, status))}</span>"
+            f"<span class='badge neutral'>{score_text} / {base_text}</span></div></div>"
+            f"<div class='s14-item-body'>{source}<div class='s14-fields'>{''.join(fields)}</div>{note}</div></article>"
+        )
+    normalized = visual.get("normalized_score")
+    block = (
+        "<section class='s14-summary' id='s14-summary'><div class='s14-scorebar'>"
+        f"<div><small>原始得分</small><strong>{_e(visual.get('raw_score'))}/100</strong></div>"
+        f"<div><small>已接入基础分</small><strong>{_e(visual.get('connected_base_score'))}/100</strong></div>"
+        f"<div><small>按已接入项折算得分</small><strong>{'待计算' if normalized is None else f'{float(normalized):.2f}'}</strong></div>"
+        "</div><div class='client-result-summary'><div class='summary-head'><h2>23项可视化诊断结果</h2>"
+        "<p>严格区分真实为0、数据缺失、采集失败、规则待确认和人工待录入。</p></div>"
+        "<div class='summary-table-wrap'><table class='summary-table'><thead><tr><th>编号</th><th>诊断项目</th><th>满分</th><th>当前得分</th><th>状态</th><th>口径说明</th></tr></thead><tbody>"
+        + "".join(summary_rows) + "</tbody></table></div></div></section>"
+        + "<section class='s14-items'>" + "".join(cards) + "</section>"
+    )
+    nav = "<nav class='side'><a href='#client-overview' data-no='00'>诊断概览</a><a href='#s14-summary' data-no='表'>诊断结果总览</a>"
+    nav += "".join(f"<a href='#rule-{int(item.get('standard_item_id') or 0)}' data-no='{int(item.get('standard_item_id') or 0):02d}'>{_e(item.get('item_name'))}</a>" for item in items)
+    nav += "</nav>"
+    html_text = _SIDE_RE.sub(nav, html_text, count=1)
+    # v24 页面以 23 项规则为主体；移除旧版八模块明细，避免同一报告出现
+    # 两套评分口径。原始 JSON/Markdown 仍保留旧模块结果供兼容调用方使用。
+    html_text = re.sub(r"<section class='card' id='overview'.*?</main>", "</main>", html_text, count=1, flags=re.DOTALL)
+    return html_text.replace("</main>", block + "</main>", 1)
+
+
 def _wrap_detail_section(html_text: str, section_id: str) -> str:
     pattern = re.compile(
         rf"(<section class='card' id='{re.escape(section_id)}'[^>]*>.*?<div class='body'>)(.*?)(</div></section>)",
@@ -186,9 +268,12 @@ def build_html(result: dict) -> str:
     html_text = _inject_client_style(html_text)
     html_text = _number_side_links(html_text)
     html_text = _inject_client_hero(html_text, result)
-    html_text = _inject_result_summary(html_text, result)
-    for section_id in ("rules", "metrics", "missing"):
-        html_text = _wrap_detail_section(html_text, section_id)
+    if not result.get("visual_diagnosis"):
+        html_text = _inject_result_summary(html_text, result)
+    html_text = _inject_visual_diagnosis(html_text, result)
+    if not result.get("visual_diagnosis"):
+        for section_id in ("rules", "metrics", "missing"):
+            html_text = _wrap_detail_section(html_text, section_id)
     return html_text
 
 
