@@ -1,5 +1,6 @@
 import unittest
 
+from marketing_diagnosis.db_loader_v3 import _latest_review_overview_per_platform
 from marketing_diagnosis.visual_diagnosis_v3 import build_visual_diagnosis
 
 
@@ -72,6 +73,33 @@ class RoomNamesAndReviewsV4Tests(unittest.TestCase):
         self.assertEqual(values["大众点评未回复点评数"], 7)
         self.assertEqual(notes["美团未回复点评数"], "unreplied_review_count")
         self.assertEqual(notes["大众点评未回复点评数"], "unreplied_review_count")
+
+    def test_review_loader_keeps_latest_row_for_each_platform(self):
+        rows = [
+            {
+                "review_platform": "美团",
+                "unreplied_review_count": 9,
+                "snapshot_time": "2026-07-13 10:00:00",
+            },
+            {
+                "review_platform": "美团",
+                "unreplied_review_count": 3,
+                "snapshot_time": "2026-07-14 10:00:00",
+            },
+            {
+                "review_platform": "大众点评",
+                "unreplied_review_count": 7,
+                "snapshot_time": "2026-07-13 09:00:00",
+            },
+        ]
+
+        latest = _latest_review_overview_per_platform(rows)
+        values = {
+            row["review_platform"]: row["unreplied_review_count"]
+            for row in latest
+        }
+
+        self.assertEqual(values, {"美团": 3, "大众点评": 7})
 
 
 if __name__ == "__main__":
