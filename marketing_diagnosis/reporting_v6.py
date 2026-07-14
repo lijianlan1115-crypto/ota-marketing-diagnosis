@@ -2,10 +2,23 @@ from __future__ import annotations
 
 import html
 import json
+from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from marketing_diagnosis import reporting_v5
+
+
+def _json_default(value: Any) -> Any:
+    """Serialize native MySQL/Python values without losing numeric meaning."""
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, set):
+        return sorted(value, key=str)
+    return str(value)
 
 
 def _n(v: Any) -> float | None:
@@ -134,7 +147,7 @@ def write_reports(result: dict, output_dir: str | Path) -> dict[str, str]:
     json_path = path / "report.json"
     md_path = path / "report.md"
     html_path = path / "report.html"
-    json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=_json_default), encoding="utf-8")
     md_path.write_text(build_markdown(result), encoding="utf-8")
     html_path.write_text(build_html(result), encoding="utf-8")
     return {"report_json": str(json_path), "report_markdown": str(md_path), "report_html": str(html_path)}
