@@ -81,8 +81,8 @@ def _daily_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return daily or rows
 
 
-def _field(label: str, value: Any, note: str = "") -> dict[str, Any]:
-    return {"label": label, "value": value, "note": note}
+def _field(label: str, value: Any, note: str = "", origin: str = "数据库原值") -> dict[str, Any]:
+    return {"label": label, "value": value, "note": note, "origin": origin}
 
 
 def _item(no: int, name: str, base: float, participates: bool, *, fields=None,
@@ -137,7 +137,7 @@ def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name
     by_no[1] = _item(1, ITEMS[0][1], 10, True, status=status, ratio=ratio, fields=[
         _field("本期月份", current_month or None), _field("本期房费", cur_revenue),
         _field("去年同期月份", previous_month or None), _field("去年同期房费", prev_revenue),
-        _field("房费 YOY", yoy, "（本期－去年同期）÷去年同期"),
+        _field("房费 YOY", yoy, "（本期－去年同期）÷去年同期", "公式计算"),
     ], note="去年同期为0、持平及增长0%–20%按规则手册保持待确认。")
 
     by_no[2] = _item(2, ITEMS[1][1], 8, True, status="missing", fields=[
@@ -155,11 +155,17 @@ def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name
         exp_status, exp_score = "success", .5
     else:
         exp_status, exp_score = "success", 1.0
-    daily_fields = [_field("整体曝光（近30天）", total), _field("非广告曝光", non_ad),
-                    _field("广告曝光", ad), _field("广告曝光占比", ad_ratio)]
+    daily_fields = [_field("整体曝光（近30天）", total, "SUM(total_exposure)", "区间汇总"),
+                    _field("非广告曝光", non_ad, "SUM(non_ad_exposure)", "区间汇总"),
+                    _field("广告曝光", ad, "SUM(ad_exposure)", "区间汇总"),
+                    _field("广告曝光占比", ad_ratio, "广告曝光合计 ÷ 整体曝光合计", "公式计算")]
     for row in sorted(exposure, key=lambda x: str(x.get("business_date") or ""))[-30:]:
+        row_total, row_ad = _n(row.get("total_exposure")), _n(row.get("ad_exposure"))
+        daily_ratio = None if row_total in (None, 0) or row_ad is None else row_ad / row_total
         daily_fields.append(_field(f"{str(row.get('business_date') or '')[:10]} 广告曝光占比",
-                                   _pct_value(row.get("ad_exposure_ratio_pct"))))
+                                   daily_ratio,
+                                   "ad_exposure ÷ total_exposure；数据库 ad_exposure_ratio_pct 用于核验",
+                                   "公式计算"))
     by_no[3] = _item(3, ITEMS[2][1], 4, True, status=exp_status, ratio=exp_score, fields=daily_fields)
 
     funnel_rows = sections.get("ota_funnel") or []
@@ -205,7 +211,8 @@ def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name
         elif hos_avg < 4: hos_ratio = 0.0
         else: hos_status = "pending_rule"
     hos_fields = [_field("展示范围", f"{hos_rows[0].get('business_date')} 至 {hos_rows[-1].get('business_date')}" if hos_rows else None),
-                  _field("有效天数", len(hos_rows) if hos_rows else None), _field("近30天平均分", hos_avg),
+                  _field("有效天数", len(hos_rows) if hos_rows else None, "实际取得的日数据条数", "区间统计"),
+                  _field("近30天平均分", hos_avg, "日HOS分合计 ÷ 有效天数", "公式计算"),
                   _field("最新同行排名", hos_rank)]
     hos_fields.extend(_field(str(row.get("business_date") or "")[:10], row.get("hos_score"),
                              f"排名 {row.get('hos_score_rank') or '暂无'}") for row in hos_rows)
@@ -234,7 +241,9 @@ def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name
     elif roi is not None:
         promo_status, promo_ratio = "success", (1.0 if roi > 10 else .6 if roi >= 5 else 0.0)
     by_no[9] = _item(9, ITEMS[8][1], 8, True, status=promo_status, ratio=promo_ratio, fields=[
-        _field("近30天推广投入", spend), _field("本月美团EBK订单金额", revenue), _field("ROI", roi)],
+        _field("近30天推广投入", spend, "transaction_type=推广通支出的金额合计", "条件汇总"),
+        _field("本月美团EBK订单金额", revenue),
+        _field("ROI", roi, "本月美团EBK订单金额 ÷ 近30天推广投入", "公式计算")],
         note="投入金额≤1000元的评分边界未冻结；投入为0时不计算ROI。")
 
     rights = sections.get("joined_rights") or []
@@ -242,12 +251,13 @@ def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name
     suffix = re.search(r"[（(]([^）)]+)[）)]\s*$", str(db_hotel_name or ""))
     name_status, name_ratio = ("missing", None) if not db_hotel_name else (("success", 0.0) if not suffix else ("pending_rule", None))
     by_no[10] = _item(10, ITEMS[9][1], 3, True, status=name_status, ratio=name_ratio, fields=[
-        _field("酒店展示名称", db_hotel_name), _field("检测到的后缀", suffix.group(1) if suffix else None),
+        _field("酒店展示名称", db_hotel_name),
+        _field("检测到的后缀", suffix.group(1) if suffix else None, "解析名称末尾括号内容", "文本计算"),
         _field("热门商圈词命中", None)], note="热门商圈词词库尚未提供；有后缀时保持待确认。")
 
     products = sections.get("products") or []
     room_names = sorted({str(r.get("room_type_name") or "").strip() for r in products if r.get("room_type_name")})
-    room_fields = [_field(name, len(name), "字符数；卖点词库待提供") for name in room_names]
+    room_fields = [_field(name, len(name), "字符数；卖点词库待提供", "字符数计算") for name in room_names]
     room_status = "missing" if not room_names else ("success" if any(len(name) < 5 for name in room_names) else "pending_rule")
     room_ratio = 0.0 if room_names and any(len(name) < 5 for name in room_names) else None
     by_no[11] = _item(11, ITEMS[10][1], 4, True, status=room_status, ratio=room_ratio, fields=room_fields,
@@ -278,7 +288,8 @@ def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name
     elif rights_count < 3: rights_status, rights_ratio = "success", 0.0
     else: rights_status, rights_ratio = "pending_rule", None
     by_no[14] = _item(14, ITEMS[13][1], 4, True, status=rights_status, ratio=rights_ratio, fields=[
-        _field("已报名权益数量", rights_count), *[_field(str(r.get("right_name") or "未命名权益"), r.get("effective_room_scope")) for r in rights]],
+        _field("已报名权益数量", rights_count, "当前权益记录行数", "行数统计"),
+        *[_field(str(r.get("right_name") or "未命名权益"), r.get("effective_room_scope")) for r in rights]],
         note="3–5项在手册总表/明细存在冲突，保持待确认。")
 
     statuses = sections.get("promotion_status") or []

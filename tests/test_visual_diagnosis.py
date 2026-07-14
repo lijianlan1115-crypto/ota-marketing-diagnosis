@@ -15,6 +15,8 @@ class VisualDiagnosisTests(unittest.TestCase):
         self.assertEqual(item["data_status"], "success")
         self.assertEqual(item["item_score"], 4)
         self.assertEqual(item["fields"][-1]["value"], .3)
+        self.assertEqual(item["fields"][0]["origin"], "区间汇总")
+        self.assertEqual(item["fields"][3]["origin"], "公式计算")
 
     def test_missing_is_not_scored_as_zero(self):
         result = build_visual_diagnosis({})
@@ -32,12 +34,14 @@ class VisualDiagnosisTests(unittest.TestCase):
             "visual_diagnosis": visual, "metrics": {}, "data_quality": {},
             "module_scores": [], "rule_hits": [],
         })
-        self.assertIn("23项可视化诊断结果", html)
+        self.assertIn("23项诊断结果总览", html)
         self.assertIn("id='rule-21'", html)
         self.assertIn("首页视频", html)
         self.assertIn("规则待确认", html)
-        self.assertIn("数据库表：hotel_puyue.meituan_ota_video_upload_status", html)
-        self.assertIn("对应字段：video_type、uploaded_count、required_count", html)
+        self.assertIn("hotel_puyue.meituan_ota_video_upload_status", html)
+        self.assertIn("video_type、uploaded_count、required_count", html)
+        self.assertIn("取值方式", html)
+        self.assertIn("class='diagnosis-card config-status-group'", html)
 
 
 if __name__ == "__main__":

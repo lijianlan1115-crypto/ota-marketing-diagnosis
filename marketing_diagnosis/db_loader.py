@@ -124,6 +124,61 @@ def _fetch(cursor, table: str, limit: int, where: str | None = None, params: lis
         return [], {"table": table, "where": where, "rows": 0, "fields_sample": [], "status": "error", "error": str(exc)}
 
 
+def _table_columns(cursor, table: str) -> tuple[set[str], str | None]:
+    """Return the live table columns so optional filters never break a query."""
+    try:
+        cursor.execute(f"SHOW COLUMNS FROM {_safe_identifier(table)}")
+        return {str(row.get("Field") or "") for row in cursor.fetchall()}, None
+    except Exception as exc:
+        return set(), str(exc)
+
+
+def _profiled_fetch(
+    cursor,
+    table: str,
+    limit: int,
+    *,
+    hotel_id: str | None = None,
+    date_column: str | None = None,
+    period_start: str | None = None,
+    period_end: str | None = None,
+    order_candidates: tuple[str, ...] = (),
+    extra_filters: list[tuple[str, str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Query against actual columns while preserving every applied filter in diagnostics.
+
+    The ``hotel_puyue`` schema is already hotel-scoped.  If a table has no
+    ``hotel_id`` column we therefore do not invent a filter that would make the
+    query fail.  Date/order clauses follow the same rule.
+    """
+    columns, schema_error = _table_columns(cursor, table)
+    if schema_error:
+        return [], {
+            "table": table, "rows": 0, "status": "error", "fields_sample": [],
+            "error": schema_error, "stage": "SHOW COLUMNS",
+        }
+    params: list[Any] = []
+    filters: list[str] = []
+    if hotel_id and "hotel_id" in columns:
+        filters.append("hotel_id = %s")
+        params.append(hotel_id)
+    if date_column and date_column in columns:
+        date_filter = _date_range(date_column, period_start, period_end, params)
+        if date_filter:
+            filters.append(date_filter)
+    for column, operator, value in extra_filters or []:
+        if column not in columns or value is None:
+            continue
+        filters.append(f"{_safe_identifier(column)} {operator} %s")
+        params.append(value)
+    order_by = ", ".join(f"{_safe_identifier(column)} {direction}" for column, direction in (
+        (candidate.rsplit(" ", 1)[0], candidate.rsplit(" ", 1)[1].upper())
+        for candidate in order_candidates if candidate.rsplit(" ", 1)[0] in columns
+    ) if direction in {"ASC", "DESC"}) or None
+    rows, diag = _fetch(cursor, table, limit, _where(filters), params, order_by)
+    return rows, {**diag, "table_columns": sorted(columns), "hotel_filter_applied": "hotel_id" in columns}
+
+
 def _float(value: Any) -> float | None:
     if value in (None, ""):
         return None
@@ -364,11 +419,21 @@ def load_mysql_dsn_dataset(
 
             for plat in enabled:
                 # OTA business metrics: actual export is metric_name rows by period_type/date.
-                params = []
-                filters = _base_filters(hotel_id, params, "business_date", period_start, period_end)
+                rows, diag = _profiled_fetch(
+                    cursor, table_map[f"{plat}_funnel"], limit,
+                    hotel_id=hotel_id, date_column="business_date",
+                    period_start=period_start, period_end=period_end,
+                    order_candidates=("business_date ASC", "stats_period_type ASC", "metric_name ASC"),
+                )
                 if plat == "meituan":
-                    filters.append("(metric_code LIKE 'flow%' OR metric_name IN ('HOS分','信息分'))")
-                rows, diag = _fetch(cursor, table_map[f"{plat}_funnel"], limit, _where(filters), params, "business_date ASC, stats_period_type ASC, metric_name ASC")
+                    allowed_names = {
+                        "浏览人数", "支付订单数", "支付转化率", "曝光-浏览转化率",
+                        "浏览-支付转化率", "曝光人数", "HOS分", "信息分",
+                    }
+                    rows = [row for row in rows if str(row.get("metric_code") or "").startswith("flow")
+                            or str(row.get("metric_name") or "") in allowed_names]
+                    diag = {**diag, "rows_used": len(rows),
+                            "row_filter": "metric_code startswith flow OR metric_name in configured list"}
                 diagnostics["tables"][f"{plat}_funnel"] = diag
                 dataset["ota_funnel"].extend(_pivot_funnel(_tag_rows(rows, table_map[f"{plat}_funnel"]), plat))
 
@@ -403,13 +468,16 @@ def load_mysql_dsn_dataset(
                 diagnostics["tables"][f"{plat}_reviews"] = diag
                 dataset["reviews"].extend(_reviews(_tag_rows(rows, table_map[f"{plat}_reviews"]), plat))
 
-                params = []
-                filters = _base_filters(hotel_id, params)
-                rows, diag = _fetch(cursor, table_map[f"{plat}_review_overview"], 20, _where(filters), params, "snapshot_time DESC")
+                rows, diag = _profiled_fetch(
+                    cursor, table_map[f"{plat}_review_overview"], 20,
+                    hotel_id=hotel_id, order_candidates=("snapshot_time DESC",),
+                )
                 latest = _latest_snapshot(rows)
                 diagnostics["tables"][f"{plat}_review_overview"] = {**diag, "rows_used": len(latest)}
                 dataset["review_overviews"].extend(_copy_rows(latest, plat, table_map[f"{plat}_review_overview"]))
 
+                params = []
+                filters = _base_filters(hotel_id, params)
                 rows, diag = _fetch(cursor, table_map[f"{plat}_review_ranking"], 200, _where(filters), params, "snapshot_time DESC, ranking_type ASC, ranking_position ASC")
                 latest = _latest_snapshot(rows)
                 diagnostics["tables"][f"{plat}_review_ranking"] = {**diag, "rows_used": len(latest)}
@@ -435,14 +503,15 @@ def load_mysql_dsn_dataset(
                     ("video_upload_status", "meituan_video_upload_status", None, None),
                 ]
                 for section, table_key, date_column, order_by in specs:
-                    params = []
-                    filters = _base_filters(
-                        hotel_id, params, date_column,
-                        period_start if date_column else None,
-                        period_end if date_column else None,
+                    order_candidates = tuple(
+                        candidate.strip() for candidate in str(order_by or "").split(",") if candidate.strip()
                     )
-                    rows, diag = _fetch(
-                        cursor, table_map[table_key], limit, _where(filters), params, order_by
+                    rows, diag = _profiled_fetch(
+                        cursor, table_map[table_key], limit,
+                        hotel_id=hotel_id, date_column=date_column,
+                        period_start=period_start if date_column else None,
+                        period_end=period_end if date_column else None,
+                        order_candidates=order_candidates,
                     )
                     if section in {"joined_rights", "promotion_status", "video_upload_status"}:
                         rows = _latest_snapshot(rows)
