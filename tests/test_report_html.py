@@ -24,8 +24,9 @@ class ReportHtmlTests(unittest.TestCase):
     def test_uses_green_reference_theme(self):
         report = build_html(self.result)
         self.assertIn("酒店经营与线上运营综合诊断", report)
-        self.assertIn("#173d34", report)
-        self.assertIn("class='client-hero'", report)
+        self.assertIn("class='hero'", report)
+        self.assertIn("class='diagnosis-card'", report)
+        self.assertIn("23项诊断结果总览", report)
 
     def test_does_not_render_ai_analysis(self):
         report = build_html(self.result)
