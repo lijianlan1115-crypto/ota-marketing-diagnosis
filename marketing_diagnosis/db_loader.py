@@ -14,6 +14,8 @@ from marketing_diagnosis.data import SECTIONS
 DEFAULT_MYSQL_TABLES = {
     "jy01": "jy01_hotel_statistics_daily",
     "jy03": "jy03_hotel_statistics_month",
+    "jl02": "jl02_hotel_performance_daily",
+    "jl01": "jl01_room_type_performance_daily",
     "rs01": "rs01_room_revenue_daily",
     "meituan_funnel": "meituan_ota_business_metrics",
     "ctrip_funnel": "ctrip_ota_business_metrics",
@@ -410,6 +412,23 @@ def load_mysql_dsn_dataset(
             dataset["hotel_monthly"].extend(_tag_rows(rows, table_map["jy03"]))
             diagnostics["transformations"].append({"section": "hotel_monthly", "rows": len(dataset["hotel_monthly"]), "rule": "monthly PMS trend from jy03_hotel_statistics_month"})
 
+            # 经营诊断专用宽口径表：metric_name 对应本日/本月/本年三列。
+            # jl02 保留历史快照以计算去年同期；jl01 只使用最新快照展示全部房型。
+            rows, diag = _profiled_fetch(
+                cursor, table_map["jl02"], max(limit, 50000), hotel_id=hotel_id,
+                order_candidates=("snapshot_time DESC", "metric_name ASC"),
+            )
+            diagnostics["tables"]["jl02"] = diag
+            dataset["hotel_performance_daily"].extend(_tag_rows(rows, table_map["jl02"]))
+
+            rows, diag = _profiled_fetch(
+                cursor, table_map["jl01"], limit, hotel_id=hotel_id,
+                order_candidates=("snapshot_time DESC", "room_type_id ASC", "metric_name ASC"),
+            )
+            latest = _latest_snapshot(rows)
+            diagnostics["tables"]["jl01"] = {**diag, "rows_used": len(latest)}
+            dataset["room_type_performance_daily"].extend(_tag_rows(latest, table_map["jl01"]))
+
             # 美团推广 ROI 的订单金额口径：本月、渠道、美团 EBK。
             params = []
             filters = ["dimension_type='渠道'", "dimension_name='美团EBK'"] + _base_filters(hotel_id, params)
@@ -524,6 +543,8 @@ def load_mysql_dsn_dataset(
 
             diagnostics["transformations"].extend([
                 {"section": "ota_funnel", "rows": len(dataset["ota_funnel"]), "rule": "metric_name tall table pivoted into funnel metrics"},
+                {"section": "hotel_performance_daily", "rows": len(dataset["hotel_performance_daily"]), "rule": "jl02 metric rows with value_day/value_month/value_year"},
+                {"section": "room_type_performance_daily", "rows": len(dataset["room_type_performance_daily"]), "rule": "latest jl01 room-type metric snapshot"},
                 {"section": "products", "rows": len(dataset["products"]), "rule": "latest OTA goods price snapshot"},
                 {"section": "promotions", "rows": len(dataset["promotions"]), "rule": "latest OTA promotion activity snapshot"},
                 {"section": "promotion_products", "rows": len(dataset["promotion_products"]), "rule": "latest activity-room mapping snapshot"},

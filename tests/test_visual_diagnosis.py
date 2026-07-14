@@ -18,6 +18,50 @@ class VisualDiagnosisTests(unittest.TestCase):
         self.assertEqual(item["fields"][0]["origin"], "区间汇总")
         self.assertEqual(item["fields"][3]["origin"], "公式计算")
 
+    def test_exposure_deduplicates_days_before_30_day_sum(self):
+        rows = []
+        for day in range(1, 32):
+            date = f"2026-06-{day:02d}" if day <= 30 else "2026-07-01"
+            rows.append({"business_date": date, "snapshot_time": f"{date} 10:00:00",
+                         "total_exposure": 10, "non_ad_exposure": 8, "ad_exposure": 2})
+        rows.append({"business_date": "2026-07-01", "snapshot_time": "2026-07-01 09:00:00",
+                     "total_exposure": 999, "non_ad_exposure": 999, "ad_exposure": 0})
+        item = build_visual_diagnosis({"exposure_daily": rows})["items"][2]
+        self.assertEqual(item["fields"][0]["value"], 300)
+        self.assertEqual(item["fields"][2]["value"], 60)
+
+    def test_jl02_and_jl01_are_rendered_with_requested_grains(self):
+        visual = build_visual_diagnosis({
+            "hotel_performance_daily": [
+                {"metric_name": "房费", "value_day": 100, "value_month": 3000, "value_year": 20000, "snapshot_time": "2026-07-14 10:00:00"},
+                {"metric_name": "房费", "value_day": 90, "value_month": 2000, "value_year": 18000, "snapshot_time": "2025-07-14 10:00:00"},
+            ],
+            "room_type_performance_daily": [
+                {"room_type_id": "r1", "room_type_name": "云栖大床房", "metric_name": "出租率", "value_day": 80, "value_month": 55, "value_year": 70},
+                {"room_type_id": "r1", "room_type_name": "云栖大床房", "metric_name": "RevPar", "value_day": 120, "value_month": 100, "value_year": 110},
+            ],
+        })
+        yoy, rooms = visual["items"][0], visual["items"][1]
+        self.assertEqual(yoy["fields"][0]["value"], 3000)
+        self.assertEqual(yoy["fields"][1]["value"], 2000)
+        self.assertEqual(yoy["fields"][2]["value"], .5)
+        self.assertEqual(rooms["fields"][0]["value"], 1)
+        self.assertEqual(rooms["records"][0]["revpar_month"], 100)
+
+    def test_flow_sums_available_daily_values_and_peer_averages(self):
+        rows = [
+            {"platform": "meituan", "period_type": "日", "business_date": "2026-07-13",
+             "exposure": 100, "peer_exposure": 80, "views": 20, "peer_views": 15, "paid_orders": 2},
+            {"platform": "meituan", "period_type": "日", "business_date": "2026-07-14",
+             "exposure": 120, "peer_exposure": 90, "views": 30, "peer_views": 25, "paid_orders": 3},
+        ]
+        item = build_visual_diagnosis({"ota_funnel": rows})["items"][3]
+        values = {field["label"]: field["value"] for field in item["fields"]}
+        self.assertEqual(values["曝光人数"], 220)
+        self.assertEqual(values["曝光人数同行均值"], 170)
+        self.assertEqual(values["浏览人数"], 50)
+        self.assertEqual(values["浏览人数同行均值"], 40)
+
     def test_missing_is_not_scored_as_zero(self):
         result = build_visual_diagnosis({})
         self.assertEqual(result["items"][2]["data_status"], "missing")

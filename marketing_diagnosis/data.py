@@ -7,6 +7,8 @@ from typing import Any
 SECTIONS = [
     "hotel_daily",
     "hotel_monthly",
+    "hotel_performance_daily",
+    "room_type_performance_daily",
     "ota_funnel",
     "products",
     "promotions",
@@ -29,7 +31,7 @@ SECTIONS = [
 ]
 
 OPTIONAL_SECTIONS = {
-    "hotel_monthly", "promotions", "promotion_products", "review_overviews",
+    "hotel_monthly", "hotel_performance_daily", "room_type_performance_daily", "promotions", "promotion_products", "review_overviews",
     "review_rankings", "nearby_events", "competitors", "exposure_daily",
     "user_source_monthly", "promotion_finance", "promotion_revenue",
     "order_loss_monthly", "joined_rights", "promotion_status",
@@ -39,6 +41,8 @@ OPTIONAL_SECTIONS = {
 SHEET_NAMES = {
     "hotel_daily": {"hotel_daily", "daily", "酒店日报", "每日经营", "经营日报", "jy01", "rs01", "jy01_hotel_statistics_daily", "rs01_room_revenue_daily"},
     "hotel_monthly": {"hotel_monthly", "monthly", "月度经营", "jy03", "jy03_hotel_statistics_month"},
+    "hotel_performance_daily": {"hotel_performance_daily", "jl02", "jl02_hotel_performance_daily"},
+    "room_type_performance_daily": {"room_type_performance_daily", "jl01", "jl01_room_type_performance_daily"},
     "ota_funnel": {"ota_funnel", "funnel", "OTA漏斗", "流量漏斗", "ota_business_metrics", "meituan_ota_business_metrics", "ctrip_ota_business_metrics"},
     "products": {"products", "商品", "商品价格", "goods_price_mapping", "ota_goods_price_mapping"},
     "promotions": {"promotions", "promotion", "活动", "促销", "ota_promotion_activity"},
@@ -72,6 +76,8 @@ FIELD_MAP = {
         "room_count": "room_count", "room_nights": "room_nights", "room_revenue": "room_revenue",
         "maintain_rooms": "maintain_rooms", "occupancy_rate": "occupancy_rate", "adr": "adr", "revpar": "revpar",
     },
+    "hotel_performance_daily": {},
+    "room_type_performance_daily": {},
     "ota_funnel": {
         "日期": "business_date", "平台": "platform", "渠道": "platform", "channel_source": "platform", "source_platform": "platform",
         "stats_period_type": "period_type", "period_days": "period_days",
@@ -142,6 +148,8 @@ FIELD_MAP = {
 REQUIRED = {
     "hotel_daily": {"business_date", "room_count", "room_nights"},
     "hotel_monthly": set(),
+    "hotel_performance_daily": set(),
+    "room_type_performance_daily": set(),
     "ota_funnel": {"platform", "views", "paid_orders"},
     "products": {"product_name", "listed_price"},
     "promotions": set(),
@@ -173,6 +181,7 @@ NUMBER_FIELDS = {
     "transaction_amount", "amount", "room_revenue", "competitor_loss_order_count",
     "competitor_loss_amount", "total_review_count", "unreplied_review_count",
     "uploaded_count", "required_count",
+    "value_day", "value_month", "value_year",
 }
 
 BOOL_FIELDS = {"is_hour_room", "is_group_buy", "is_negative", "is_replied"}

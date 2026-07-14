@@ -22,8 +22,8 @@ ITEMS = [
 
 
 SOURCE_MAP: dict[int, tuple[str, list[str]]] = {
-    1: ("hotel_puyue.jy03_hotel_statistics_month", ["period_month", "dimension_type", "dimension_name", "room_revenue", "adr", "occupancy_rate", "revpar"]),
-    2: ("待补充房型经营明细表", ["room_type_name", "occupancy_rate", "revpar"]),
+    1: ("hotel_puyue.jl02_hotel_performance_daily", ["metric_name", "value_day", "value_month", "value_year", "snapshot_time"]),
+    2: ("hotel_puyue.jl01_room_type_performance_daily", ["room_type_name", "room_type_id", "metric_name", "value_day", "value_month", "value_year", "snapshot_time"]),
     3: ("hotel_puyue.meituan_ota_exposure_source_daily", ["business_date", "total_exposure", "non_ad_exposure", "ad_exposure", "ad_exposure_ratio_pct"]),
     4: ("hotel_puyue.meituan_ota_business_metrics", ["metric_code=flow*", "metric_name", "metric_value", "peer_average", "competitor_rank", "business_date"]),
     5: ("hotel_puyue.meituan_ota_user_source_monthly", ["period_month", "local_user_pct", "nonlocal_user_pct", "new_user_pct", "returning_user_pct"]),
@@ -81,6 +81,25 @@ def _daily_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return daily or rows
 
 
+def _latest_distinct_days(rows: list[dict[str, Any]], limit: int = 30) -> list[dict[str, Any]]:
+    """Keep the latest snapshot for each business day, then take at most 30 days."""
+    by_day: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        day = str(row.get("business_date") or "")[:10]
+        if not day:
+            continue
+        current = by_day.get(day)
+        if current is None or str(row.get("snapshot_time") or "") >= str(current.get("snapshot_time") or ""):
+            by_day[day] = row
+    return [by_day[key] for key in sorted(by_day)[-limit:]]
+
+
+def _sum_keys(rows: list[dict[str, Any]], key: str) -> float | None:
+    values = [_n(row.get(key)) for row in rows]
+    clean = [value for value in values if value is not None]
+    return sum(clean) if clean else None
+
+
 def _field(label: str, value: Any, note: str = "", origin: str = "数据库原值") -> dict[str, Any]:
     return {"label": label, "value": value, "note": note, "origin": origin}
 
@@ -113,15 +132,29 @@ def _status_score(row: dict[str, Any]) -> tuple[str, float | None, str]:
 def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name: str = "") -> dict[str, Any]:
     by_no: dict[int, dict[str, Any]] = {}
 
-    # 01 月度 YOY：同月同比，主口径为 room_revenue。
-    monthly = sections.get("hotel_monthly") or []
-    current = _latest(monthly, "period_month")
-    current_month = str(current.get("period_month") or "")[:7]
-    previous_month = ""
-    if re.fullmatch(r"\d{4}-\d{2}", current_month):
-        previous_month = f"{int(current_month[:4]) - 1:04d}-{current_month[5:]}"
-    previous = next((row for row in monthly if str(row.get("period_month") or "")[:7] == previous_month), {})
-    cur_revenue, prev_revenue = _n(current.get("room_revenue")), _n(previous.get("room_revenue"))
+    # 01 jl02：最新快照提供本日/本月/本年；同月去年快照提供去年同期。
+    performance = sections.get("hotel_performance_daily") or []
+    latest_stamp = max((str(row.get("snapshot_time") or "")[:19] for row in performance), default="")
+    current_rows = [row for row in performance
+                    if str(row.get("snapshot_time") or "")[:19] == latest_stamp
+                    and row.get("room_type_id") in (None, "")] if latest_stamp else []
+    latest_day = latest_stamp[:10]
+    previous_year = str(int(latest_day[:4]) - 1) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", latest_day) else ""
+    exact_previous = [row for row in performance
+                      if str(row.get("snapshot_time") or "")[:4] == previous_year
+                      and str(row.get("snapshot_time") or "")[5:10] == latest_day[5:10]]
+    previous_candidates = exact_previous or [row for row in performance
+                                              if str(row.get("snapshot_time") or "")[:4] == previous_year
+                                              and str(row.get("snapshot_time") or "")[5:10] <= latest_day[5:10]]
+    previous_stamp = max((str(row.get("snapshot_time") or "")[:19] for row in previous_candidates), default="")
+    previous_rows = [row for row in previous_candidates
+                     if str(row.get("snapshot_time") or "")[:19] == previous_stamp
+                     and row.get("room_type_id") in (None, "")]
+    current_by_metric = {str(row.get("metric_name") or ""): row for row in current_rows}
+    previous_by_metric = {str(row.get("metric_name") or ""): row for row in previous_rows}
+    revenue_name = next((name for name in current_by_metric if name == "房费"), "房费")
+    cur_revenue = _n(current_by_metric.get(revenue_name, {}).get("value_month"))
+    prev_revenue = _n(previous_by_metric.get(revenue_name, {}).get("value_month"))
     yoy = None if cur_revenue is None or prev_revenue in (None, 0) else (cur_revenue - prev_revenue) / prev_revenue
     ratio = status = None
     if yoy is None:
@@ -134,17 +167,55 @@ def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name
         status, ratio = "success", .6
     else:
         status = "pending_rule"  # 0%–20% 和“持平”区间原文未冻结。
+    performance_records = []
+    for metric_name, row in current_by_metric.items():
+        current_value = _n(row.get("value_month"))
+        prior_value = _n(previous_by_metric.get(metric_name, {}).get("value_month"))
+        metric_yoy = None if current_value is None or prior_value in (None, 0) else (current_value - prior_value) / prior_value
+        performance_records.append({"metric_name": metric_name, "value_day": _n(row.get("value_day")),
+                                    "value_month": current_value, "value_year": _n(row.get("value_year")),
+                                    "previous_value": prior_value, "yoy": metric_yoy})
     by_no[1] = _item(1, ITEMS[0][1], 10, True, status=status, ratio=ratio, fields=[
-        _field("本期月份", current_month or None), _field("本期房费", cur_revenue),
-        _field("去年同期月份", previous_month or None), _field("去年同期房费", prev_revenue),
-        _field("房费 YOY", yoy, "（本期－去年同期）÷去年同期", "公式计算"),
-    ], note="去年同期为0、持平及增长0%–20%按规则手册保持待确认。")
+        _field("本期值", cur_revenue, "房费 value_month"),
+        _field("去年同期值", prev_revenue, "去年同期快照的房费 value_month"),
+        _field("YOY", yoy, "（本期值－去年同期值）÷去年同期值", "公式计算"),
+        _field("本项原始得分", round(10 * ratio, 2) if ratio is not None else None, "未折算得分", "规则计算"),
+        _field("取数状态", "已取到" if current_rows else "未取到"),
+    ], note="本日、本月、本年使用 jl02 最新快照；YOY 使用去年同期快照。")
+    by_no[1]["records"] = performance_records
 
-    by_no[2] = _item(2, ITEMS[1][1], 8, True, status="missing", fields=[
-        _field("低效房型口径", "最近一个月出租率 < 60%"),
-        _field("数据状态", "缺少房型级出租率/RevPAR")], note="商品房型映射不能替代房型经营数据。")
+    room_rows = sections.get("room_type_performance_daily") or []
+    grouped_rooms: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in room_rows:
+        room_name = str(row.get("room_type_name") or row.get("room_name") or "").strip()
+        room_id = str(row.get("room_type_id") or "").strip()
+        if not room_name or not room_id:
+            continue
+        record = grouped_rooms.setdefault((room_id, room_name), {"room_type_id": room_id, "room_type_name": room_name})
+        metric = str(row.get("metric_name") or "").strip().lower()
+        if metric in {"出租率", "入住率"}:
+            target = "occupancy"
+        elif metric in {"revpar", "revpar值"}:
+            target = "revpar"
+        else:
+            continue
+        record[f"{target}_day"] = _n(row.get("value_day"))
+        record[f"{target}_month"] = _n(row.get("value_month"))
+        record[f"{target}_year"] = _n(row.get("value_year"))
+    room_records = list(grouped_rooms.values())
+    low_rooms = [row for row in room_records if row.get("occupancy_month") is not None and row["occupancy_month"] < 60]
+    room_count = len(room_records) or None
+    low_count = len(low_rooms) if room_records else None
+    low_ratio = None if not room_count else low_count / room_count
+    by_no[2] = _item(2, ITEMS[1][1], 8, True, status="success" if room_records else "missing", fields=[
+        _field("低效房型数", low_count, "近30天出租率低于60%的房型数", "条件统计"),
+        _field("在售房型数", room_count, "最新快照全部在售房型", "去重统计"),
+        _field("低效房型占比", low_ratio, "低效房型数 ÷ 在售房型数", "公式计算"),
+        _field("低效房型清单", "、".join(row["room_type_name"] for row in low_rooms) or None),
+    ], note="当日使用 value_day；近30天使用 value_month；低效房型为近30天出租率 < 60%。")
+    by_no[2]["records"] = room_records
 
-    exposure = sections.get("exposure_daily") or []
+    exposure = _latest_distinct_days(sections.get("exposure_daily") or [])
     total, non_ad, ad = (_sum(exposure, key) for key in ("total_exposure", "non_ad_exposure", "ad_exposure"))
     ad_ratio = None if total in (None, 0) or ad is None else ad / total
     if total is None:
@@ -169,7 +240,16 @@ def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name
     by_no[3] = _item(3, ITEMS[2][1], 4, True, status=exp_status, ratio=exp_score, fields=daily_fields)
 
     funnel_rows = sections.get("ota_funnel") or []
-    funnel = _latest(_daily_rows(funnel_rows), "business_date")
+    daily_funnel = _latest_distinct_days(_daily_rows([row for row in funnel_rows if str(row.get("platform") or "").lower() == "meituan"]))
+    latest_funnel = daily_funnel[-1] if daily_funnel else {}
+    funnel = {key: _sum_keys(daily_funnel, key) for key in ("exposure", "peer_exposure", "views", "peer_views", "paid_orders", "peer_paid_orders")}
+    funnel["exposure_to_view_rate"] = None if funnel.get("exposure") in (None, 0) else (funnel.get("views") or 0) / funnel["exposure"]
+    funnel["payment_conversion_rate"] = None if funnel.get("views") in (None, 0) else (funnel.get("paid_orders") or 0) / funnel["views"]
+    for key in ("peer_exposure_to_view_rate", "peer_payment_conversion_rate"):
+        values = [_n(row.get(key)) for row in daily_funnel if _n(row.get(key)) is not None]
+        funnel[key] = sum(values) / len(values) if values else None
+    for key in ("exposure_rank", "views_rank", "paid_orders_rank", "exposure_to_view_rate_rank", "payment_conversion_rate_rank"):
+        funnel[key] = latest_funnel.get(key)
     comparisons = []
     for value_key, peer_key in (("exposure", "peer_exposure"), ("views", "peer_views"),
                                 ("exposure_to_view_rate", "peer_exposure_to_view_rate"),
@@ -189,15 +269,15 @@ def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name
                           note="四个子项等权；任一同行均值缺失或为0时不擅自重分配15分。")
 
     users = _latest(sections.get("user_source_monthly") or [], "period_month", "snapshot_time")
+    display_month = str(users.get("period_month") or date.today().strftime("%Y-%m"))[:7]
     by_no[5] = _item(5, ITEMS[4][1], 0, False, status="success" if users else "missing", fields=[
-        _field("统计月份", users.get("period_month")), _field("本地占比", _pct_value(users.get("local_user_pct"))),
+        _field("统计月份", display_month), _field("本地占比", _pct_value(users.get("local_user_pct"))),
         _field("异地占比", _pct_value(users.get("nonlocal_user_pct"))),
         _field("新客占比", _pct_value(users.get("new_user_pct"))),
         _field("老客占比", _pct_value(users.get("returning_user_pct"))),
     ], note="只展示，不参与总分。")
 
-    hos_rows = _daily_rows([row for row in funnel_rows if _n(row.get("hos_score")) is not None])
-    hos_rows = sorted(hos_rows, key=lambda x: str(x.get("business_date") or ""))[-30:]
+    hos_rows = _latest_distinct_days(_daily_rows([row for row in funnel_rows if str(row.get("platform") or "").lower() == "meituan" and _n(row.get("hos_score")) is not None]))
     hos_values = [_n(row.get("hos_score")) for row in hos_rows]
     hos_avg = sum(v for v in hos_values if v is not None) / len(hos_values) if hos_values else None
     latest_hos = hos_rows[-1] if hos_rows else {}
@@ -257,7 +337,7 @@ def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name
 
     products = sections.get("products") or []
     room_names = sorted({str(r.get("room_type_name") or "").strip() for r in products if r.get("room_type_name")})
-    room_fields = [_field(name, len(name), "字符数；卖点词库待提供", "字符数计算") for name in room_names]
+    room_fields = [_field(name, len(name), "", "字符数计算") for name in room_names]
     room_status = "missing" if not room_names else ("success" if any(len(name) < 5 for name in room_names) else "pending_rule")
     room_ratio = 0.0 if room_names and any(len(name) < 5 for name in room_names) else None
     by_no[11] = _item(11, ITEMS[10][1], 4, True, status=room_status, ratio=room_ratio, fields=room_fields,
@@ -271,6 +351,7 @@ def build_visual_diagnosis(sections: dict[str, list[dict[str, Any]]], hotel_name
                                   f"流失金额 {row.get('competitor_loss_amount')}; 流失房型 {row.get('lost_room_types_text') or '暂无'}; 关注 {row.get('follow_status')}"))
     by_no[12] = _item(12, ITEMS[11][1], 0, False, status="success" if losses else "missing", fields=loss_fields,
                            note="只展示，不参与总分；follow_status 1=已关注，0=未关注。")
+    by_no[12]["records"] = losses
 
     overviews = sections.get("review_overviews") or []
     rep_fields = []

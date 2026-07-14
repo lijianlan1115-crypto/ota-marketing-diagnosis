@@ -12,9 +12,20 @@ from marketing_diagnosis.visual_diagnosis import build_visual_diagnosis
 
 TEMPLATE_PATH = Path(__file__).with_name("templates") / "customer_report_v24.html"
 
+EXTRA_STYLE = """
+<style>
+.metric-row>div>span,.video-summary-card>span{display:block;margin-top:5px;color:var(--muted);font-size:10px;line-height:1.35}
+.formula-compact{font-size:10px!important;line-height:1.3;color:var(--muted)!important;font-weight:500!important}
+.record-table{width:100%;border-collapse:collapse;min-width:760px}.record-table th,.record-table td{padding:10px 12px;border-bottom:1px solid #e7eeeb;text-align:left;vertical-align:middle}.record-table th{background:#f7faf9;color:#53616b;font-size:12px}.record-table td{font-size:13px}.record-table tr.is-low{background:#fff5f2}.record-table .room-name,.record-table .hotel-name{font-weight:800;color:#26343d}
+.name-foundation{display:grid;grid-template-columns:minmax(260px,2fr) minmax(180px,1fr) minmax(180px,1fr);gap:10px}.name-foundation>div{padding:15px;border:1px solid #e3ebe8;border-radius:10px;background:#f8fbfa}.name-foundation small{display:block;color:var(--muted);font-weight:700}.name-foundation strong{display:block;margin-top:7px;font-size:17px;line-height:1.45}.name-foundation span{display:block;margin-top:5px;color:var(--muted);font-size:10px}
+.hos-summary .metric-row{margin-top:0}.hos-date-range{font-size:12px;color:var(--muted);margin:-3px 0 9px}.axis-label{font-size:9px}
+@media(max-width:760px){.name-foundation{grid-template-columns:1fr}.record-table{min-width:680px}}
+</style>
+"""
+
 DESCRIPTIONS = {
-    1: "展示本期与去年同期月度经营数据，并计算房费同比 YOY。",
-    2: "展示各房型 RevPAR、出租率及低效房型占比。",
+    1: "展示酒店本日、本月、本年经营指标，并计算本期与去年同期 YOY。",
+    2: "按房型展示当日及近30天出租率、RevPAR与低效房型占比。",
     3: "展示整体曝光、非广告曝光、广告曝光及每日广告曝光占比。",
     4: "展示流量、转化、同行均值及各项同行排名。",
     5: "展示本地/异地、新客/老客用户结构，本项只展示不计分。",
@@ -39,7 +50,7 @@ DESCRIPTIONS = {
 }
 
 PERIODS = {
-    1: "本月与去年同期", 2: "近30天", 3: "近30天", 4: "近30天",
+    1: "本日 / 本月 / 本年", 2: "当日 / 近30天", 3: "近30天", 4: "近30天",
     5: "最新月份", 6: "最多近30天", 7: "近一个月", 8: "当日",
     9: "近30天/本月", 10: "最新快照", 11: "最新快照", 12: "最新月份",
     13: "最新快照", 14: "最新快照", 15: "最新快照", 16: "最新快照",
@@ -114,6 +125,25 @@ def _metric_cards(item: dict[str, Any], limit: int = 5) -> str:
     ) + "</div>"
 
 
+def _pct_display(value: Any) -> str:
+    number = _n(value)
+    if number is None:
+        return "暂无数据"
+    if abs(number) <= 1:
+        number *= 100
+    return f"{number:.2f}%"
+
+
+def _records_table(headers: list[str], rows: list[list[str]], row_classes: list[str] | None = None) -> str:
+    if not rows:
+        rows = [["暂无数据"] + ["—"] * (len(headers) - 1)]
+    body = []
+    for index, row in enumerate(rows):
+        cls = (row_classes or [])[index] if row_classes and index < len(row_classes) else ""
+        body.append(f"<tr class='{_e(cls)}'>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>")
+    return "<div class='table-scroll'><table class='record-table'><thead><tr>" + "".join(f"<th>{_e(head)}</th>" for head in headers) + "</tr></thead><tbody>" + "".join(body) + "</tbody></table></div>"
+
+
 def _trend_svg(item: dict[str, Any]) -> str:
     points = []
     for field in (item.get("fields") or [])[4:]:
@@ -147,8 +177,54 @@ def _trend_svg(item: dict[str, Any]) -> str:
 
 def _result_area(item: dict[str, Any]) -> str:
     no = int(item.get("standard_item_id") or 0)
+    if no == 1:
+        rows = []
+        for record in item.get("records") or []:
+            rows.append([
+                f"<span class='field-name'>{_e(record.get('metric_name'))}</span>",
+                _e(_value("本日", record.get("value_day"))), _e(_value("本月", record.get("value_month"))),
+                _e(_value("本年", record.get("value_year"))), _e(_value("去年同期", record.get("previous_value"))),
+                _e(_value("YOY", record.get("yoy"))),
+            ])
+        return _metric_cards(item, 5) + _records_table(["经营指标", "本日", "本月", "本年", "去年同期值", "YOY"], rows)
+    if no == 2:
+        rows, classes = [], []
+        for record in item.get("records") or []:
+            low = _n(record.get("occupancy_month")) is not None and float(record["occupancy_month"]) < 60
+            classes.append("is-low" if low else "")
+            rows.append([
+                f"<span class='room-name'>{_e(record.get('room_type_name'))}</span>",
+                _e(_pct_display(record.get("occupancy_day"))), _e(_value("RevPAR", record.get("revpar_day"))),
+                _e(_pct_display(record.get("occupancy_month"))), _e(_value("RevPAR", record.get("revpar_month"))),
+                "<span class='status-badge disabled'>低效</span>" if low else "<span class='status-badge ok'>正常</span>",
+            ])
+        return _metric_cards(item, 4) + _records_table(["房型", "当日出租率", "当日 RevPAR", "近30天出租率", "近30天 RevPAR", "判定"], rows, classes)
     if no == 6:
-        return f"<div class='visual-grid two'><div class='viz-card'><h4>近30天 HOS 趋势</h4>{_trend_svg(item)}</div><div class='viz-card'><h4>统计结果</h4>{_metric_cards(item, 4)}</div></div>"
+        date_range = _field(item, "展示范围").get("value") or "暂无日期"
+        return f"<div class='visual-grid two'><div class='viz-card'><h4>最多近30天 HOS 趋势</h4><div class='hos-date-range'>{_e(date_range)}</div>{_trend_svg(item)}</div><div class='viz-card hos-summary'><h4>统计结果</h4>{_metric_cards(item, 4)}</div></div>"
+    if no == 10:
+        name = _field(item, "酒店展示名称").get("value")
+        suffix = _field(item, "检测到的后缀").get("value")
+        hotword = _field(item, "热门商圈词命中").get("value")
+        return ("<div class='name-foundation'>"
+                f"<div><small>酒店展示名称</small><strong>{_e(_value('', name))}</strong></div>"
+                f"<div><small>门店后缀</small><strong>{_e(_value('', suffix))}</strong><span>名称末尾括号内文字</span></div>"
+                f"<div><small>热门商圈词命中</small><strong>{_e(_value('', hotword))}</strong></div></div>")
+    if no == 11:
+        rows = [[f"<span class='room-name'>{_e(field.get('label'))}</span>", _e(_value("字符数", field.get("value")))] for field in item.get("fields") or []]
+        return _records_table(["房型名称", "字符数"], rows)
+    if no == 12:
+        rows = []
+        for record in item.get("records") or []:
+            followed = str(record.get("follow_status") or "") == "1"
+            rows.append([
+                f"<span class='hotel-name'>{_e(record.get('competitor_hotel_name') or '未命名竞对')}</span>",
+                _e(_value("订单数", record.get("competitor_loss_order_count"))),
+                _e(_value("流失金额", record.get("competitor_loss_amount"))),
+                _e(record.get("lost_room_types_text") or "暂无"),
+                "<span class='status-badge ok'>已关注</span>" if followed else "<span class='status-badge neutral'>未关注</span>",
+            ])
+        return _records_table(["流失酒店", "流失订单数", "流失金额", "流失房型", "关注状态"], rows)
     if no == 21:
         cards = []
         for field in item.get("fields") or []:
@@ -276,7 +352,7 @@ def _source_counts(result: dict[str, Any]) -> tuple[int, int]:
 
 def build_html(result: dict[str, Any]) -> str:
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
-    head = template.split("</head>", 1)[0] + "</head>"
+    head = template.split("</head>", 1)[0] + EXTRA_STYLE + "</head>"
     visual = result.get("visual_diagnosis") or build_visual_diagnosis({}, str(result.get("hotel_name") or ""))
     items = visual.get("items") or []
     item_map = {int(item.get("standard_item_id") or 0): item for item in items}
