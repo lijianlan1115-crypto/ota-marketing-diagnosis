@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from marketing_diagnosis.reporting_v10 import build_html, build_markdown, write_reports
+from marketing_diagnosis.reporting_v11 import build_html, build_markdown, write_reports
 
 __all__ = ["build_html", "build_markdown", "write_reports"]
