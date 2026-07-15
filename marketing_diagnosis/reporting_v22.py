@@ -15,8 +15,12 @@ _RULE_ONE_PATTERN = re.compile(
     r"(<article\b[^>]*id=(['\"])rule-1\2[^>]*>)(.*?)(</article>)",
     re.DOTALL | re.IGNORECASE,
 )
-_SUBTOTAL_ROW_PATTERN = re.compile(
-    r"<tr\b[^>]*>.*?<span\b[^>]*class=(['\"])[^'\"]*\bfield-name\b[^'\"]*\1[^>]*>\s*小计\s*</span>.*?</tr>",
+_TABLE_ROW_PATTERN = re.compile(
+    r"<tr\b[^>]*>.*?</tr>",
+    re.DOTALL | re.IGNORECASE,
+)
+_SUBTOTAL_FIELD_PATTERN = re.compile(
+    r"<span\b[^>]*class=(['\"])[^'\"]*\bfield-name\b[^'\"]*\1[^>]*>\s*小计\s*</span>",
     re.DOTALL | re.IGNORECASE,
 )
 
@@ -27,11 +31,21 @@ def _remove_scope_selector(html_text: str) -> str:
 
 
 def _remove_item_one_subtotal(html_text: str) -> str:
-    """Hide only the '小计' record from item 01's operating-metric table."""
+    """Hide only the '小计' record from item 01's operating-metric table.
+
+    Each ``<tr>...</tr>`` is inspected independently. This prevents the cleanup
+    from starting at an earlier row such as ``房费`` and consuming multiple rows
+    before it reaches the ``小计`` label.
+    """
 
     def replace_article(match: re.Match[str]) -> str:
         opening, quote, content, closing = match.groups()
-        cleaned = _SUBTOTAL_ROW_PATTERN.sub("", content, count=1)
+
+        def replace_row(row_match: re.Match[str]) -> str:
+            row = row_match.group(0)
+            return "" if _SUBTOTAL_FIELD_PATTERN.search(row) else row
+
+        cleaned = _TABLE_ROW_PATTERN.sub(replace_row, content)
         return opening + cleaned + closing
 
     return _RULE_ONE_PATTERN.sub(replace_article, html_text, count=1)
