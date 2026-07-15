@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 import re
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,36 @@ def _safe_segment(value: Any, fallback: str) -> str:
     text = str(value or fallback).strip().lower()
     text = re.sub(r"[^a-z0-9._-]+", "-", text)
     return text.strip("-._") or fallback
+
+
+def _json_safe(value: Any) -> Any:
+    """Convert a runtime result into values accepted by JSON/OpenClaw bridges."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+
+    # NumPy scalar values and similar objects usually expose item().
+    item_method = getattr(value, "item", None)
+    if callable(item_method):
+        try:
+            scalar = item_method()
+            if scalar is not value:
+                return _json_safe(scalar)
+        except (TypeError, ValueError):
+            pass
+
+    return str(value)
 
 
 def _source_selection_result() -> dict[str, Any]:
@@ -198,7 +229,11 @@ class S14OperationDiagnosis:
         })
         skill_result["feishu_message"] = build_feishu_reply(skill_result)
         skill_result["feishu_card"] = build_feishu_card_reply(skill_result)
-        return skill_result
+
+        # OpenClaw serializes the complete return object before the model/channel
+        # selects feishu_message or feishu_card. Normalize every nested value so
+        # report links are not lost because of one Decimal/date/NumPy scalar.
+        return _json_safe(skill_result)
 
     def _resolve_dsn(self) -> str | None:
         env_name = self.config.get("db_dsn_env") or "S14_DB_DSN"
