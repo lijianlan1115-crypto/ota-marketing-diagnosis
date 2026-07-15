@@ -11,6 +11,10 @@ _SCOPE_SELECT_PATTERN = re.compile(
     r"<select\b[^>]*class=(['\"])[^'\"]*\bscope-select\b[^'\"]*\1[^>]*>.*?</select>",
     re.DOTALL | re.IGNORECASE,
 )
+_SCOPE_STYLE_PATTERN = re.compile(
+    r"\.scope-select\s*\{[^{}]*\}",
+    re.DOTALL | re.IGNORECASE,
+)
 _RULE_ONE_PATTERN = re.compile(
     r"(<article\b[^>]*id=(['\"])rule-1\2[^>]*>)(.*?)(</article>)",
     re.DOTALL | re.IGNORECASE,
@@ -26,8 +30,15 @@ _SUBTOTAL_FIELD_PATTERN = re.compile(
 
 
 def _remove_scope_selector(html_text: str) -> str:
-    """Remove the customer-facing report scope selector and keep export actions."""
-    return _SCOPE_SELECT_PATTERN.sub("", html_text, count=1)
+    """Remove the report scope selector and its now-unused CSS rule.
+
+    Removing the style rule as well keeps generated HTML free of the
+    ``scope-select`` marker, so source-level validation does not confuse an
+    unused CSS selector with a visible form control.
+    """
+
+    cleaned = _SCOPE_SELECT_PATTERN.sub("", html_text, count=1)
+    return _SCOPE_STYLE_PATTERN.sub("", cleaned)
 
 
 def _remove_item_one_subtotal(html_text: str) -> str:
