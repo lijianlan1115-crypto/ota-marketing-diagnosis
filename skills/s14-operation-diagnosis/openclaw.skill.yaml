@@ -1,7 +1,7 @@
 id: s14-operation-diagnosis
 skill_id: s14-operation-diagnosis
 name: S14 OTA Operation Diagnosis
-version: 0.4.0
+version: 0.5.0
 status: preview
 summary: Generate report-only OTA operation diagnosis reports from hotel PMS, OTA, reputation, promotion, competitor, and nearby-event data.
 description: Independent OpenClaw Skill wrapper for S14 hotel OTA operation diagnosis. Business logic lives in marketing_diagnosis; this skill only provides discovery, routing, input/output, and safety metadata.
@@ -33,8 +33,8 @@ triggers:
 inputs:
   data_source_mode:
     type: enum
-    enum: [database, excel_upload]
-    default: database
+    enum: [source_selection, database, excel_pending, excel_upload]
+    default: source_selection
   hotel_id:
     type: string
     default: puyue
@@ -43,7 +43,7 @@ inputs:
     required: false
   platform:
     type: enum
-    enum: [multi, meituan, ctrip, fliggy]
+    enum: [multi]
     default: multi
   period_start:
     type: date
@@ -62,14 +62,20 @@ inputs:
     default: 5000
 
 outputs:
+  status:
+    type: text
   report_url:
     type: url
+    required: false
   report_file_path:
     type: file_path
+    required: false
   report_json:
     type: file_path
+    required: false
   report_markdown:
     type: file_path
+    required: false
   feishu_message:
     type: text
   feishu_card:
