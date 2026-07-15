@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -26,13 +27,35 @@ CUSTOMER_CLEAN_STYLE = """
 """
 
 
+def _customer_display_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Swap only the customer-facing item numbers 21 and 23.
+
+    Business data and report.json keep their original identifiers. In the HTML
+    presentation, automatic order becomes item 21 and homepage video becomes
+    item 23, while item 22 remains the manual crown entry.
+    """
+    display = deepcopy(result or {})
+    visual = display.get("visual_diagnosis") or {}
+    items = visual.get("items") or []
+
+    for item in items:
+        number = int(item.get("standard_item_id") or 0)
+        if number == 21:
+            item["standard_item_id"] = 23
+        elif number == 23:
+            item["standard_item_id"] = 21
+
+    items.sort(key=lambda item: int(item.get("standard_item_id") or 0))
+    return display
+
+
 def build_html(result: dict[str, Any]) -> str:
-    html_text = reporting_v12.build_html(result)
+    html_text = reporting_v12.build_html(_customer_display_result(result))
     return html_text.replace("</head>", CUSTOMER_CLEAN_STYLE + "</head>", 1)
 
 
 def build_markdown(result: dict[str, Any]) -> str:
-    return reporting_v12.build_markdown(result)
+    return reporting_v12.build_markdown(_customer_display_result(result))
 
 
 def write_reports(result: dict[str, Any], output_dir: str | Path) -> dict[str, str]:
@@ -42,4 +65,10 @@ def write_reports(result: dict[str, Any], output_dir: str | Path) -> dict[str, s
     return paths
 
 
-__all__ = ["build_html", "build_markdown", "write_reports"]
+__all__ = [
+    "CUSTOMER_CLEAN_STYLE",
+    "_customer_display_result",
+    "build_html",
+    "build_markdown",
+    "write_reports",
+]
