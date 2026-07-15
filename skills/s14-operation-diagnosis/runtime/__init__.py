@@ -15,6 +15,7 @@ DEFAULT_REPORT_ROOT = Path("/var/lib/ota-marketing-diagnosis/reports")
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from marketing_diagnosis.customer_excel_result import enrich_customer_excel_result
 from marketing_diagnosis.data_v2 import normalize_dataset
 from marketing_diagnosis.db_loader_v4 import load_mysql_dsn_dataset
 from marketing_diagnosis.excel_loader import load_excel_dataset
@@ -226,6 +227,8 @@ class S14OperationDiagnosis:
 
         normalized = normalize_dataset(raw_dataset)
         result = process(normalized)
+        if mode == "excel_upload":
+            result = enrich_customer_excel_result(result, raw_dataset)
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
         report_dir = self._report_dir(prepared, run_id)
         skill_result = {
