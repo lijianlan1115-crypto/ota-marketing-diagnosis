@@ -84,15 +84,20 @@ def _reorder_nav(html_text: str) -> str:
     return html_text[:start] + "".join(ordered) + html_text[end:]
 
 
+def _summary_row_pattern(source_number: int) -> re.Pattern[str]:
+    # Tempered matching prevents one row search from consuming neighboring rows.
+    return re.compile(
+        rf"<tr data-status='[^']*' data-title='[^']*'>"
+        rf"(?:(?!</tr>).)*?<a href='#rule-{source_number}'>"
+        rf"(?:(?!</tr>).)*?</tr>",
+        re.DOTALL,
+    )
+
+
 def _reorder_summary(html_text: str) -> str:
     matches: dict[int, re.Match[str]] = {}
     for source_number, _ in _TAIL_DISPLAY_ORDER:
-        match = re.search(
-            rf"<tr data-status='[^']*' data-title='[^']*'>.*?"
-            rf"<a href='#rule-{source_number}'>.*?</tr>",
-            html_text,
-            re.DOTALL,
-        )
+        match = _summary_row_pattern(source_number).search(html_text)
         if match:
             matches[source_number] = match
     if len(matches) != 3:
