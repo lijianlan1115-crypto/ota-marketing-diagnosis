@@ -10,7 +10,7 @@ from typing import Any
 
 from marketing_diagnosis.data_v2 import normalize_dataset
 from marketing_diagnosis.excel_loader import load_excel_dataset
-from marketing_diagnosis.db_loader_v3 import load_database_dataset, load_mysql_dsn_dataset
+from marketing_diagnosis.db_loader_v4 import load_database_dataset, load_mysql_dsn_dataset
 from marketing_diagnosis.reporting_v2 import write_reports
 from marketing_diagnosis.rules_v3 import process
 
@@ -56,12 +56,12 @@ def _run(raw_dataset, args):
 
 def command_excel(args):
     raw_dataset = load_excel_dataset(args.excel)
-    print(json.dumps(_run(raw_dataset, args), ensure_ascii=False, indent=2))
+    print(json.dumps(_run(raw_dataset, args), ensure_ascii=False, indent=2, default=str))
 
 
 def command_config(args):
     raw_dataset = load_database_dataset(args.config)
-    print(json.dumps(_run(raw_dataset, args), ensure_ascii=False, indent=2))
+    print(json.dumps(_run(raw_dataset, args), ensure_ascii=False, indent=2, default=str))
 
 
 def command_db(args):
@@ -77,7 +77,7 @@ def command_db(args):
         period_start=period_start,
         period_end=period_end,
     )
-    print(json.dumps(_run(raw_dataset, args), ensure_ascii=False, indent=2))
+    print(json.dumps(_run(raw_dataset, args), ensure_ascii=False, indent=2, default=str))
 
 
 def _add_common_args(parser):
