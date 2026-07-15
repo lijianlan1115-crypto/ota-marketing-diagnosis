@@ -269,7 +269,7 @@ def _source_selection_card() -> dict[str, Any]:
                     "text": {
                         "tag": "lark_md",
                         "content": (
-                            "本次按已经映射好的字段执行**整体诊断**，不再选择渠道。\n\n"
+                            "本次按已经映射好的字段执行**整体诊断**。\n\n"
                             "请选择从服务器数据库读取，或随后上传 Excel。"
                         ),
                     },
