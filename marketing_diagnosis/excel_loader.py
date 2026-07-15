@@ -5,6 +5,10 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from marketing_diagnosis.customer_excel_loader import (
+    is_customer_excel_template,
+    load_customer_excel_workbook,
+)
 from marketing_diagnosis.data import section_for_sheet
 
 
@@ -21,11 +25,8 @@ def _rows(sheet) -> list[dict[str, Any]]:
     return result
 
 
-def load_excel_dataset(path: str | Path) -> dict[str, list[dict[str, Any]]]:
-    workbook_path = Path(path)
-    if not workbook_path.exists():
-        raise FileNotFoundError(f"Excel file not found: {workbook_path}")
-    workbook = load_workbook(workbook_path, data_only=True, read_only=True)
+def _load_legacy_workbook(workbook) -> dict[str, list[dict[str, Any]]]:
+    """Keep the original one-sheet-per-section Excel behavior unchanged."""
     dataset: dict[str, list[dict[str, Any]]] = {}
     for sheet_name in workbook.sheetnames:
         section = section_for_sheet(sheet_name)
@@ -33,3 +34,20 @@ def load_excel_dataset(path: str | Path) -> dict[str, list[dict[str, Any]]]:
             continue
         dataset.setdefault(section, []).extend(_rows(workbook[sheet_name]))
     return dataset
+
+
+def load_excel_dataset(path: str | Path) -> dict[str, list[dict[str, Any]]]:
+    workbook_path = Path(path)
+    if not workbook_path.exists():
+        raise FileNotFoundError(f"Excel file not found: {workbook_path}")
+
+    workbook = load_workbook(workbook_path, data_only=True, read_only=True)
+    try:
+        # New customer template: multiple Chinese data blocks can live in one
+        # worksheet. Detection is based on its fixed control headers and does
+        # not affect the original English/legacy workbook layout.
+        if is_customer_excel_template(workbook):
+            return load_customer_excel_workbook(workbook)
+        return _load_legacy_workbook(workbook)
+    finally:
+        workbook.close()
