@@ -5,11 +5,13 @@ import re
 from pathlib import Path
 from typing import Any
 
-from marketing_diagnosis import reporting_v9
+from marketing_diagnosis import reporting_v8, reporting_v9
 
 
-# Customer-facing display order. Keep automatic order after item 20.
-_CONFIG_NUMBERS = (15, 16, 17, 18, 19, 20, 23)
+# Items 15-20 stay in the compact configuration summary. Item 23 is rendered
+# as an independent card after items 21 and 22, so the page follows the strict
+# numeric order 15 ... 20, 21, 22, 23.
+_CONFIG_NUMBERS = (15, 16, 17, 18, 19, 20)
 _STATUS_META = {
     "success": ("已形成结果", "open"),
     "zero": ("真实为0", "closed"),
@@ -86,7 +88,6 @@ def _config_group(items: dict[int, dict[str, Any]]) -> str:
     total_score = 0.0
     total_base = 0.0
 
-    # Always render in business item-number order, independent of source row order.
     for no in _CONFIG_NUMBERS:
         item = items.get(no) or {}
         status_key = str(item.get("data_status") or "missing")
@@ -111,7 +112,7 @@ def _config_group(items: dict[int, dict[str, Any]]) -> str:
     source_item = items.get(15) or {}
     return (
         "<article class='diagnosis-card config-status-group' id='config-status-group'><div class='card-top'>"
-        "<div class='rule-no config-group-no'>15–20 / 23</div>"
+        "<div class='rule-no config-group-no'>15–20</div>"
         "<div class='card-title'><h3>配置状态汇总</h3><p>按编号顺序展示各配置项的开通状态和得分。</p></div>"
         "<div class='card-tags'><div class='title-meta-item title-period'><small>统计周期</small><strong>当前配置快照</strong></div>"
         f"<div class='title-meta-item title-score'><small>当前得分</small><div class='title-score-value'><strong>{total_score:g}分</strong><span>合计{total_base:g}分</span></div></div></div></div>"
@@ -131,25 +132,47 @@ def _config_group(items: dict[int, dict[str, Any]]) -> str:
     )
 
 
-def _replace_config_group(html_text: str, result: dict[str, Any]) -> str:
+def _items(result: dict[str, Any]) -> dict[int, dict[str, Any]]:
     visual = result.get("visual_diagnosis") or {}
-    items = {
+    return {
         int(item.get("standard_item_id") or 0): item
         for item in visual.get("items") or []
     }
+
+
+def _replace_config_group(html_text: str, result: dict[str, Any]) -> str:
+    items = _items(result)
     if not all(number in items for number in _CONFIG_NUMBERS):
         return html_text
 
-    replacement = _config_group(items)
     pattern = re.compile(
         r"<article class='diagnosis-card config-status-group' id='config-status-group'>.*?</article>",
         re.DOTALL,
     )
-    return pattern.sub(lambda _: replacement, html_text, count=1)
+    return pattern.sub(lambda _: _config_group(items), html_text, count=1)
+
+
+def _insert_item_23_after_22(html_text: str, result: dict[str, Any]) -> str:
+    items = _items(result)
+    item_23 = items.get(23)
+    if not item_23 or "id='rule-23'" in html_text:
+        return html_text
+
+    card_23 = reporting_v8._card(item_23)
+    pattern = re.compile(
+        r"(<article class='diagnosis-card'[^>]*id='rule-22'>.*?</article>)",
+        re.DOTALL,
+    )
+    return pattern.sub(lambda match: match.group(1) + card_23, html_text, count=1)
+
+
+def _apply_numeric_tail_order(html_text: str, result: dict[str, Any]) -> str:
+    html_text = _replace_config_group(html_text, result)
+    return _insert_item_23_after_22(html_text, result)
 
 
 def build_html(result: dict[str, Any]) -> str:
-    return _replace_config_group(reporting_v9.build_html(result), result)
+    return _apply_numeric_tail_order(reporting_v9.build_html(result), result)
 
 
 def build_markdown(result: dict[str, Any]) -> str:
@@ -160,10 +183,17 @@ def write_reports(result: dict[str, Any], output_dir: str | Path) -> dict[str, s
     paths = reporting_v9.write_reports(result, output_dir)
     html_path = Path(paths["report_html"])
     html_path.write_text(
-        _replace_config_group(html_path.read_text(encoding="utf-8"), result),
+        _apply_numeric_tail_order(html_path.read_text(encoding="utf-8"), result),
         encoding="utf-8",
     )
     return paths
 
 
-__all__ = ["_CONFIG_NUMBERS", "_config_group", "build_html", "build_markdown", "write_reports"]
+__all__ = [
+    "_CONFIG_NUMBERS",
+    "_apply_numeric_tail_order",
+    "_config_group",
+    "build_html",
+    "build_markdown",
+    "write_reports",
+]
