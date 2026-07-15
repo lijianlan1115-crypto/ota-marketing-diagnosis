@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from copy import deepcopy
+import re
 from pathlib import Path
 from typing import Any
 
@@ -26,36 +26,107 @@ CUSTOMER_CLEAN_STYLE = """
 </style>
 """
 
+# Internal source IDs stay unchanged so database logic and manual-input scripts
+# continue to work. Only customer-visible numbering/order is changed:
+# source 23 automatic order -> display 21
+# source 21 homepage video  -> display 22
+# source 22 hotel crown     -> display 23
+_TAIL_DISPLAY_ORDER = ((23, 21), (21, 22), (22, 23))
 
-def _customer_display_result(result: dict[str, Any]) -> dict[str, Any]:
-    """Swap only the customer-facing item numbers 21 and 23.
 
-    Business data and report.json keep their original identifiers. In the HTML
-    presentation, automatic order becomes item 21 and homepage video becomes
-    item 23, while item 22 remains the manual crown entry.
-    """
-    display = deepcopy(result or {})
-    visual = display.get("visual_diagnosis") or {}
-    items = visual.get("items") or []
+def _replace_first_number(text: str, source_number: int, display_number: int) -> str:
+    return re.sub(
+        rf"(<td>{source_number:02d}</td>)",
+        f"<td>{display_number:02d}</td>",
+        text,
+        count=1,
+    )
 
-    for item in items:
-        number = int(item.get("standard_item_id") or 0)
-        if number == 21:
-            item["standard_item_id"] = 23
-        elif number == 23:
-            item["standard_item_id"] = 21
 
-    items.sort(key=lambda item: int(item.get("standard_item_id") or 0))
-    return display
+def _renumber_card(html_text: str, source_number: int, display_number: int) -> str:
+    pattern = re.compile(
+        rf"(<article class='diagnosis-card'[^>]*id='rule-{source_number}'>.*?<div class='rule-no'>)"
+        rf"{source_number:02d}(</div>)",
+        re.DOTALL,
+    )
+    return pattern.sub(
+        lambda match: match.group(1) + f"{display_number:02d}" + match.group(2),
+        html_text,
+        count=1,
+    )
+
+
+def _reorder_nav(html_text: str) -> str:
+    matches: dict[int, re.Match[str]] = {}
+    for source_number, _ in _TAIL_DISPLAY_ORDER:
+        match = re.search(
+            rf"<a href='#rule-{source_number}'><span>{source_number:02d}</span>.*?</a>",
+            html_text,
+            re.DOTALL,
+        )
+        if match:
+            matches[source_number] = match
+    if len(matches) != 3:
+        return html_text
+
+    ordered: list[str] = []
+    for source_number, display_number in _TAIL_DISPLAY_ORDER:
+        entry = matches[source_number].group(0)
+        entry = entry.replace(
+            f"<span>{source_number:02d}</span>",
+            f"<span>{display_number:02d}</span>",
+            1,
+        )
+        ordered.append(entry)
+
+    start = min(match.start() for match in matches.values())
+    end = max(match.end() for match in matches.values())
+    return html_text[:start] + "".join(ordered) + html_text[end:]
+
+
+def _reorder_summary(html_text: str) -> str:
+    matches: dict[int, re.Match[str]] = {}
+    for source_number, _ in _TAIL_DISPLAY_ORDER:
+        match = re.search(
+            rf"<tr data-status='[^']*' data-title='[^']*'>.*?"
+            rf"<a href='#rule-{source_number}'>.*?</tr>",
+            html_text,
+            re.DOTALL,
+        )
+        if match:
+            matches[source_number] = match
+    if len(matches) != 3:
+        return html_text
+
+    ordered: list[str] = []
+    for source_number, display_number in _TAIL_DISPLAY_ORDER:
+        row = matches[source_number].group(0)
+        row = _replace_first_number(row, source_number, display_number)
+        ordered.append(row)
+
+    start = min(match.start() for match in matches.values())
+    end = max(match.end() for match in matches.values())
+    return html_text[:start] + "".join(ordered) + html_text[end:]
+
+
+def _apply_customer_tail_order(html_text: str) -> str:
+    # Automatic order is already shown as row 21 inside the configuration table.
+    # The two standalone cards retain their original internal anchors while their
+    # visible numbers become 22 (video) and 23 (hotel crown).
+    html_text = _renumber_card(html_text, 21, 22)
+    html_text = _renumber_card(html_text, 22, 23)
+    html_text = _reorder_nav(html_text)
+    return _reorder_summary(html_text)
 
 
 def build_html(result: dict[str, Any]) -> str:
-    html_text = reporting_v12.build_html(_customer_display_result(result))
+    html_text = reporting_v12.build_html(result)
+    html_text = _apply_customer_tail_order(html_text)
     return html_text.replace("</head>", CUSTOMER_CLEAN_STYLE + "</head>", 1)
 
 
 def build_markdown(result: dict[str, Any]) -> str:
-    return reporting_v12.build_markdown(_customer_display_result(result))
+    return reporting_v12.build_markdown(result)
 
 
 def write_reports(result: dict[str, Any], output_dir: str | Path) -> dict[str, str]:
@@ -67,7 +138,8 @@ def write_reports(result: dict[str, Any], output_dir: str | Path) -> dict[str, s
 
 __all__ = [
     "CUSTOMER_CLEAN_STYLE",
-    "_customer_display_result",
+    "_TAIL_DISPLAY_ORDER",
+    "_apply_customer_tail_order",
     "build_html",
     "build_markdown",
     "write_reports",
