@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from marketing_diagnosis.data_v3 import normalize_dataset
+from marketing_diagnosis.data_v4 import normalize_dataset
 from marketing_diagnosis.excel_loader_v2 import load_excel_package
 from marketing_diagnosis.db_loader_v8 import load_database_dataset, load_mysql_dsn_dataset
 from marketing_diagnosis.reporting_v2 import write_reports
