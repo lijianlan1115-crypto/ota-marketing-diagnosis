@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from marketing_diagnosis.data_v2 import normalize_dataset
-from marketing_diagnosis.excel_loader import load_excel_dataset
+from marketing_diagnosis.data_v3 import normalize_dataset
+from marketing_diagnosis.excel_loader_v2 import load_excel_package
 from marketing_diagnosis.db_loader_v8 import load_database_dataset, load_mysql_dsn_dataset
 from marketing_diagnosis.reporting_v2 import write_reports
 from marketing_diagnosis.rules_v3 import process
@@ -37,6 +37,9 @@ def _period(args) -> tuple[str, str]:
 
 def _run(raw_dataset, args):
     normalized = normalize_dataset(raw_dataset)
+    normalized["hotel_name"] = args.hotel_name
+    normalized["hotel_id"] = args.hotel_id
+    normalized["platform"] = args.platform
     result = process(normalized)
     period_start, period_end = _period(args)
     report_dir = _report_dir(args.output, args.hotel_id, args.platform, period_start, period_end)
@@ -55,7 +58,21 @@ def _run(raw_dataset, args):
 
 
 def command_excel(args):
-    raw_dataset = load_excel_dataset(args.excel)
+    raw_dataset, meta = load_excel_package(
+        args.excel,
+        period_start=args.period_start or None,
+        period_end=args.period_end or None,
+    )
+    if meta.get("hotel_id"):
+        args.hotel_id = meta["hotel_id"]
+    if meta.get("hotel_name"):
+        args.hotel_name = meta["hotel_name"]
+    if meta.get("platform"):
+        args.platform = meta["platform"]
+    if not args.period_start and meta.get("period_start"):
+        args.period_start = meta["period_start"]
+    if not args.period_end and meta.get("period_end"):
+        args.period_end = meta["period_end"]
     print(json.dumps(_run(raw_dataset, args), ensure_ascii=False, indent=2, default=str))
 
 
