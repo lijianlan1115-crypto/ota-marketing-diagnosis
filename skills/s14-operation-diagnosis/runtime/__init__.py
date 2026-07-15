@@ -29,6 +29,107 @@ def _safe_segment(value: Any, fallback: str) -> str:
     return text.strip("-._") or fallback
 
 
+def _source_selection_result() -> dict[str, Any]:
+    message = "请选择本次数据来源：数据库 / 上传Excel。"
+    card = {
+        "msg_type": "interactive",
+        "card": {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "template": "blue",
+                "title": {
+                    "tag": "plain_text",
+                    "content": "S14诊断｜请选择数据来源",
+                },
+            },
+            "elements": [
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": (
+                            "本次按已经映射好的字段执行**整体诊断**。\n\n"
+                            "请选择从服务器数据库读取，或随后上传 Excel。"
+                        ),
+                    },
+                },
+                {
+                    "tag": "action",
+                    "actions": [
+                        {
+                            "tag": "button",
+                            "type": "primary",
+                            "text": {"tag": "plain_text", "content": "数据库"},
+                            "value": {
+                                "action": "s14_source",
+                                "source": "database",
+                            },
+                        },
+                        {
+                            "tag": "button",
+                            "type": "default",
+                            "text": {"tag": "plain_text", "content": "上传Excel"},
+                            "value": {
+                                "action": "s14_source",
+                                "source": "excel",
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
+    }
+    return {
+        "skill_id": SKILL_ID,
+        "status": "awaiting_source",
+        "platform": "multi",
+        "data_source": "pending",
+        "feishu_message": message,
+        "feishu_card": card,
+    }
+
+
+def _excel_pending_result() -> dict[str, Any]:
+    message = (
+        "数据来源：Excel\n"
+        "请在当前群聊中直接发送 .xlsx 或 .xlsm 文件，无需再次@机器人。"
+    )
+    card = {
+        "msg_type": "interactive",
+        "card": {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "template": "turquoise",
+                "title": {
+                    "tag": "plain_text",
+                    "content": "S14诊断｜等待Excel附件",
+                },
+            },
+            "elements": [
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": (
+                            "**数据来源：Excel**\n\n"
+                            "请在当前群聊中直接发送 `.xlsx` 或 `.xlsm` 文件，"
+                            "**无需再次@机器人**。"
+                        ),
+                    },
+                }
+            ],
+        },
+    }
+    return {
+        "skill_id": SKILL_ID,
+        "status": "awaiting_excel",
+        "platform": "multi",
+        "data_source": "excel_pending",
+        "feishu_message": message,
+        "feishu_card": card,
+    }
+
+
 class S14OperationDiagnosis:
     def __init__(self, config: dict[str, Any] | None = None):
         self.config = config or {}
@@ -36,6 +137,15 @@ class S14OperationDiagnosis:
     def execute(self, inputs: dict[str, Any]) -> dict[str, Any]:
         prepared = self._prepare_inputs(inputs or {})
         mode = prepared["data_source_mode"]
+
+        # OpenClaw may invoke the Skill directly from trigger metadata instead of
+        # executing scripts/s14_feishu_entry.py. These two modes keep that path
+        # deterministic, JSON-serializable, and free from accidental DB runs.
+        if mode == "source_selection":
+            return _source_selection_result()
+        if mode == "excel_pending":
+            return _excel_pending_result()
+
         if mode == "excel_upload":
             excel_path = prepared.get("input_excel_path")
             if not excel_path:
@@ -106,11 +216,11 @@ class S14OperationDiagnosis:
             or str(DEFAULT_REPORT_ROOT)
         )
         return {
-            "data_source_mode": inputs.get("data_source_mode") or "database",
+            "data_source_mode": inputs.get("data_source_mode") or "source_selection",
             "input_excel_path": inputs.get("input_excel_path"),
             "hotel_id": inputs.get("hotel_id") or "puyue",
             "hotel_name": inputs.get("hotel_name"),
-            "platform": inputs.get("platform") or "multi",
+            "platform": "multi",
             "period_start": inputs.get("period_start") or str(start),
             "period_end": inputs.get("period_end") or str(today),
             "period_days": period_days,
