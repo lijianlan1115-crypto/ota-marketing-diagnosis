@@ -161,6 +161,30 @@ def _excel_pending_result() -> dict[str, Any]:
     }
 
 
+def _apply_excel_context(prepared: dict[str, Any], raw_dataset: dict[str, Any]) -> None:
+    """Use basic information embedded in the customer workbook.
+
+    This helper is called only from ``excel_upload`` mode. Database mode and
+    all Feishu response/card behavior remain unchanged.
+    """
+    context = raw_dataset.pop("__excel_context__", None)
+    if not isinstance(context, dict):
+        return
+
+    for key in ("hotel_id", "hotel_name", "period_start", "period_end"):
+        value = context.get(key)
+        if value not in (None, ""):
+            prepared[key] = value
+
+    try:
+        start = date.fromisoformat(str(prepared.get("period_start"))[:10])
+        end = date.fromisoformat(str(prepared.get("period_end"))[:10])
+        if end >= start:
+            prepared["period_days"] = (end - start).days + 1
+    except (TypeError, ValueError):
+        pass
+
+
 class S14OperationDiagnosis:
     def __init__(self, config: dict[str, Any] | None = None):
         self.config = config or {}
@@ -182,6 +206,7 @@ class S14OperationDiagnosis:
             if not excel_path:
                 raise ValueError("S14 excel_upload mode requires input_excel_path")
             raw_dataset = load_excel_dataset(excel_path)
+            _apply_excel_context(prepared, raw_dataset)
             data_source = "excel_upload"
         elif mode == "database":
             dsn = self._resolve_dsn()
