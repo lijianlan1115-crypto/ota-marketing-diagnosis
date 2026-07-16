@@ -47,15 +47,17 @@ def _date_parts(value: Any, points: list[dict[str, Any]]) -> tuple[str, str]:
         return start.strip() or "—", end.strip() or "—"
     if points:
         return str(points[0]["date"]), str(points[-1]["date"])
-    fallback = str(_field({}, "") or "—")
-    return fallback, fallback
+    return "—", "—"
 
 
 def _information_points(item: dict[str, Any]) -> list[dict[str, Any]]:
     points: list[dict[str, Any]] = []
     for record in item.get("daily_records") or []:
         day = str(record.get("business_date") or record.get("date") or "")[:10]
-        value = _number(record.get("content_score") or record.get("information_score"))
+        raw_value = record.get("content_score")
+        if raw_value in (None, ""):
+            raw_value = record.get("information_score")
+        value = _number(raw_value)
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) or value is None:
             continue
         rank = record.get("content_score_rank")
