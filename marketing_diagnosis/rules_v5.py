@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from marketing_diagnosis.review_yesterday_v45 import patch_yesterday_review_count
 from marketing_diagnosis.rules_v4 import process as _base_process
 from marketing_diagnosis.visual_diagnosis_v18 import build_visual_diagnosis
 
@@ -11,10 +12,12 @@ def process(data: dict[str, Any]) -> dict[str, Any]:
 
     result = _base_process(data)
     sections = data.get("sections") or {}
-    result["visual_diagnosis"] = build_visual_diagnosis(
+    visual = build_visual_diagnosis(
         sections,
         str(data.get("hotel_name") or ""),
     )
+    patch_yesterday_review_count(visual, sections)
+    result["visual_diagnosis"] = visual
     return result
 
 
