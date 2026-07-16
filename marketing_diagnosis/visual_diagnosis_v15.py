@@ -3,10 +3,12 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from marketing_diagnosis.visual_diagnosis import _n
 from marketing_diagnosis.visual_diagnosis_v13 import (
     build_visual_diagnosis as _base_build_visual_diagnosis,
 )
 from marketing_diagnosis.visual_diagnosis_v14 import (
+    _latest_rows_by_day,
     _patch_authoritative_flow,
     _recalculate_totals,
 )
@@ -21,6 +23,73 @@ def _item(result: dict[str, Any], number: int) -> dict[str, Any] | None:
         ),
         None,
     )
+
+
+def _safe_div(numerator: Any, denominator: Any) -> float | None:
+    top, bottom = _n(numerator), _n(denominator)
+    if top is None or bottom in (None, 0):
+        return None
+    return top / bottom
+
+
+def _flow_daily_records(
+    sections: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """Build the original daily flow table rows without changing scoring.
+
+    The authoritative FLOW selectors already enforce Meituan daily grain, canonical
+    metric codes and latest snapshot per business date. This helper only merges
+    those selected values into one display record per date.
+    """
+
+    all_rows = list(sections.get("ota_funnel") or [])
+    by_day: dict[str, dict[str, Any]] = {}
+    specifications = (
+        ("exposure", ("exposure", "peer_exposure")),
+        ("views", ("views", "peer_views")),
+        ("paid_orders", ("paid_orders", "peer_paid_orders")),
+        (
+            "exposure_to_view_rate",
+            ("exposure_to_view_rate", "peer_exposure_to_view_rate"),
+        ),
+        (
+            "payment_conversion_rate",
+            ("payment_conversion_rate", "peer_payment_conversion_rate"),
+        ),
+    )
+
+    for target, keys in specifications:
+        for row in _latest_rows_by_day(all_rows, target):
+            day = str(row.get("business_date") or "")[:10]
+            if not day:
+                continue
+            record = by_day.setdefault(day, {"business_date": day})
+            for key in keys:
+                value = row.get(key)
+                if value not in (None, ""):
+                    record[key] = value
+
+    records: list[dict[str, Any]] = []
+    for day in sorted(by_day):
+        record = by_day[day]
+        record.setdefault(
+            "exposure_to_view_rate",
+            _safe_div(record.get("views"), record.get("exposure")),
+        )
+        record.setdefault(
+            "peer_exposure_to_view_rate",
+            _safe_div(record.get("peer_views"), record.get("peer_exposure")),
+        )
+        record.setdefault(
+            "payment_conversion_rate",
+            _safe_div(record.get("paid_orders"), record.get("views")),
+        )
+        record.setdefault(
+            "peer_payment_conversion_rate",
+            _safe_div(record.get("peer_paid_orders"), record.get("peer_views")),
+        )
+        records.append(record)
+    return records[-30:]
 
 
 def _restore_flow_layout(
@@ -66,10 +135,13 @@ def build_visual_diagnosis(
     original_note = str(original_item.get("note") or "")
 
     _patch_authoritative_flow(result, sections)
+    flow_item = _item(result, 4)
+    if flow_item is not None:
+        flow_item["daily_records"] = _flow_daily_records(sections)
     _restore_flow_layout(result, original_fields, original_note)
     _recalculate_totals(result)
-    result["rule_version"] = "2026-07-15-v15-flow-layout-fallback"
+    result["rule_version"] = "2026-07-16-v16-flow-daily-table"
     return result
 
 
-__all__ = ["build_visual_diagnosis"]
+__all__ = ["_flow_daily_records", "build_visual_diagnosis"]
