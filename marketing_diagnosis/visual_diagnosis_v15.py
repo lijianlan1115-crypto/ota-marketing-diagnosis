@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from marketing_diagnosis.performance_yoy_v37 import patch_performance_yoy
 from marketing_diagnosis.visual_diagnosis import _n
 from marketing_diagnosis.visual_diagnosis_v13 import (
     build_visual_diagnosis as _base_build_visual_diagnosis,
@@ -257,6 +258,7 @@ def build_visual_diagnosis(
     hotel_name: str = "",
 ) -> dict[str, Any]:
     result = _base_build_visual_diagnosis(sections, hotel_name)
+    patch_performance_yoy(result, sections)
 
     original_item = _item(result, 4) or {}
     original_fields = deepcopy(list(original_item.get("fields") or []))
@@ -269,7 +271,7 @@ def build_visual_diagnosis(
     _restore_flow_layout(result, original_fields, original_note)
     _attach_information_history(result, sections)
     _recalculate_totals(result)
-    result["rule_version"] = "2026-07-16-v17-information-history"
+    result["rule_version"] = "2026-07-16-v18-business-date-yoy"
     return result
 
 
