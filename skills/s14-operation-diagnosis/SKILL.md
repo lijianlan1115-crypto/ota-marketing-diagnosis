@@ -33,6 +33,31 @@ Preferred input fields:
 - `period_days`: default `30`
 - `input_excel_path`: required only for `excel_upload`
 - `limit`: optional row limit for database extraction
+- `manual_room_type_names`: optional list or delimiter-separated text containing user-entered room type names
+- `request_text`, `message_text`, `voice_text`, or `transcript`: optional Feishu text / voice transcription; when the text contains `房型名称：...`, extract the names for item 11
+- `manual_input_operator`: optional user identifier for the manual entry
+
+## Manual room-name rule
+
+Item 11 is a mandatory manual-input score. Do not silently use database product names as a substitute.
+
+- Accept direct page input, Feishu text, or voice-transcribed text.
+- Recommended Feishu format: `房型名称：五人战队套房、电竞双床房`.
+- Every supplied room type name must contain more than five non-whitespace characters and at least one selling-point expression.
+- If every name passes, item 11 scores 100% of its four points.
+- If any name fails, or no manual names are supplied, item 11 scores zero and remains in the total-score denominator.
+- The generated HTML may provide a local instant calculator. Local browser calculation does not replace a formally regenerated report.
+
+## Low-efficiency room rule
+
+Item 02 must always form a score and display the calculation.
+
+- Source: `hotel_puyue.jl11_room_type_classification`.
+- Filter: `section=summary`.
+- Use the near-30-day fields `room_count`, `room_nights`, `occupancy_rate`, `room_revenue`, `average_room_price`, and `revpar`.
+- Low-efficiency room type: near-month `occupancy_rate < 60%`.
+- Low-efficiency ratio: low-efficiency room type count divided by all distinct on-sale room types.
+- Missing source rows score zero instead of removing item 02 from the score denominator.
 
 ## Outputs
 
