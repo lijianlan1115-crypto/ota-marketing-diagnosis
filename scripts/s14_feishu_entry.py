@@ -19,6 +19,13 @@ STATE_DIR = Path(os.environ.get("S14_STATE_DIR", "/tmp/s14_state"))
 STATE_TTL_SECONDS = int(os.environ.get("S14_SOURCE_STATE_TTL_SECONDS", "600"))
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from marketing_diagnosis.room_name_manual_v43 import (
+    parse_room_type_names_from_text,
+)
+
 TRIGGERS = (
     "S14诊断",
     "S14 诊断",
@@ -176,7 +183,36 @@ def _hotel(text: str) -> tuple[str, str | None]:
     return "puyue", "璞悦"
 
 
-def _request_context(text: str) -> dict[str, Any]:
+def _manual_names(text: str, state: dict[str, Any] | None = None) -> list[str]:
+    names = parse_room_type_names_from_text(text)
+    if names:
+        return names
+    stored = (state or {}).get("manual_room_type_names")
+    return [str(value).strip() for value in stored or [] if str(value).strip()]
+
+
+def _state_extra(
+    state: dict[str, Any] | None,
+    names: list[str],
+    sender_id: str | None,
+) -> dict[str, Any]:
+    return {
+        "manual_room_type_names": names or list((state or {}).get("manual_room_type_names") or []),
+        "manual_input_operator": sender_id or (state or {}).get("manual_input_operator"),
+        "manual_input_recorded_at": (
+            datetime.now().isoformat(timespec="seconds")
+            if names
+            else (state or {}).get("manual_input_recorded_at")
+        ),
+    }
+
+
+def _request_context(
+    text: str,
+    *,
+    manual_room_type_names: list[str] | None = None,
+    sender_id: str | None = None,
+) -> dict[str, Any]:
     today = datetime.now().date()
     days = 30
     match = re.search(r"最近\s*(\d+)\s*天", text)
@@ -187,25 +223,47 @@ def _request_context(text: str) -> dict[str, Any]:
     return {
         "hotel_id": hotel_id,
         "hotel_name": hotel_name,
-        # 当前报告按已经映射好的字段整体诊断，不再询问或区分OTA渠道。
         "platform": "multi",
         "period_start": str(start),
         "period_end": str(today),
         "period_days": days,
+        "request_text": text,
+        "manual_room_type_names": manual_room_type_names or [],
+        "manual_input_source": "飞书文本或语音转写人工输入",
+        "manual_input_operator": sender_id,
     }
 
 
-def _run_database(text: str = "") -> dict[str, Any]:
+def _run_database(
+    text: str = "",
+    *,
+    manual_room_type_names: list[str] | None = None,
+    sender_id: str | None = None,
+) -> dict[str, Any]:
     S14OperationDiagnosis = _load_skill_class()
-    context = _request_context(text)
+    context = _request_context(
+        text,
+        manual_room_type_names=manual_room_type_names,
+        sender_id=sender_id,
+    )
     return S14OperationDiagnosis(_config()).execute(
         {**context, "data_source_mode": "database", "dry_run": True}
     )
 
 
-def _run_excel(excel_path: str, text: str = "") -> dict[str, Any]:
+def _run_excel(
+    excel_path: str,
+    text: str = "",
+    *,
+    manual_room_type_names: list[str] | None = None,
+    sender_id: str | None = None,
+) -> dict[str, Any]:
     S14OperationDiagnosis = _load_skill_class()
-    context = _request_context(text)
+    context = _request_context(
+        text,
+        manual_room_type_names=manual_room_type_names,
+        sender_id=sender_id,
+    )
     return S14OperationDiagnosis(_config()).execute(
         {
             **context,
@@ -251,17 +309,19 @@ def _is_template_request(text: str) -> bool:
     )
 
 
-def _source_selection_card() -> dict[str, Any]:
+def _source_selection_card(manual_names: list[str] | None = None) -> dict[str, Any]:
+    manual_note = (
+        f"\n\n已记录人工房型名称：**{'、'.join(manual_names)}**"
+        if manual_names
+        else "\n\n第11项为人工输入项；可发送：`房型名称：五人战队套房、电竞双床房`。"
+    )
     return {
         "msg_type": "interactive",
         "card": {
             "config": {"wide_screen_mode": True},
             "header": {
                 "template": "blue",
-                "title": {
-                    "tag": "plain_text",
-                    "content": "S14诊断｜请选择数据来源",
-                },
+                "title": {"tag": "plain_text", "content": "S14诊断｜请选择数据来源"},
             },
             "elements": [
                 {
@@ -271,6 +331,7 @@ def _source_selection_card() -> dict[str, Any]:
                         "content": (
                             "本次按已经映射好的字段执行**整体诊断**。\n\n"
                             "请选择从服务器数据库读取，或随后上传 Excel。"
+                            + manual_note
                         ),
                     },
                 },
@@ -281,19 +342,13 @@ def _source_selection_card() -> dict[str, Any]:
                             "tag": "button",
                             "type": "primary",
                             "text": {"tag": "plain_text", "content": "数据库"},
-                            "value": {
-                                "action": "s14_source",
-                                "source": "database",
-                            },
+                            "value": {"action": "s14_source", "source": "database"},
                         },
                         {
                             "tag": "button",
                             "type": "default",
                             "text": {"tag": "plain_text", "content": "上传Excel"},
-                            "value": {
-                                "action": "s14_source",
-                                "source": "excel",
-                            },
+                            "value": {"action": "s14_source", "source": "excel"},
                         },
                     ],
                 },
@@ -302,17 +357,19 @@ def _source_selection_card() -> dict[str, Any]:
     }
 
 
-def _waiting_excel_card() -> dict[str, Any]:
+def _waiting_excel_card(manual_names: list[str] | None = None) -> dict[str, Any]:
+    manual_note = (
+        f"\n\n已记录人工房型名称：**{'、'.join(manual_names)}**"
+        if manual_names
+        else "\n\n尚未提供人工房型名称时，第11项将按0分计入总分。"
+    )
     return {
         "msg_type": "interactive",
         "card": {
             "config": {"wide_screen_mode": True},
             "header": {
                 "template": "turquoise",
-                "title": {
-                    "tag": "plain_text",
-                    "content": "S14诊断｜等待Excel附件",
-                },
+                "title": {"tag": "plain_text", "content": "S14诊断｜等待Excel附件"},
             },
             "elements": [
                 {
@@ -324,6 +381,7 @@ def _waiting_excel_card() -> dict[str, Any]:
                             "请在当前群聊中直接发送 `.xlsx` 或 `.xlsm` 文件，"
                             "**无需再次@机器人**。\n\n"
                             "系统按当前群聊和当前用户关联，等待状态10分钟内有效。"
+                            + manual_note
                         ),
                     },
                 }
@@ -353,19 +411,17 @@ def _prepend_source(payload: Any, source_label: str, output_format: str) -> Any:
 
 
 def _result_payload(result: dict[str, Any], source_label: str, output_format: str) -> Any:
-    payload = (
-        result.get("feishu_card")
-        if output_format == "card"
-        else result.get("feishu_message")
-    )
+    payload = result.get("feishu_card") if output_format == "card" else result.get("feishu_message")
     return _prepend_source(payload, source_label, output_format)
 
 
 def _normalize_choice(value: str) -> str | None:
     normalized = str(value or "").strip().lower().replace(" ", "")
-    if normalized in {item.lower().replace(" ", "") for item in DATABASE_CHOICES}:
+    database_values = {item.lower().replace(" ", "") for item in DATABASE_CHOICES}
+    excel_values = {item.lower().replace(" ", "") for item in EXCEL_CHOICES}
+    if normalized in database_values or any(normalized.startswith(item) for item in database_values):
         return "database"
-    if normalized in {item.lower().replace(" ", "") for item in EXCEL_CHOICES}:
+    if normalized in excel_values or any(normalized.startswith(item) for item in excel_values):
         return "excel"
     return None
 
@@ -379,14 +435,23 @@ def _handle_source_choice(
     output_format: str,
 ) -> Any:
     choice = _normalize_choice(source)
+    old_state = _get_flow_state(chat_id, sender_id) or {}
+    names = _manual_names(text, old_state)
+    extra = _state_extra(old_state, names, sender_id)
+
     if choice == "database":
         _set_flow_state(
             "running_database",
             chat_id=chat_id,
             sender_id=sender_id,
+            extra=extra,
         )
         try:
-            result = _run_database(text)
+            result = _run_database(
+                text,
+                manual_room_type_names=extra.get("manual_room_type_names"),
+                sender_id=sender_id,
+            )
             _clear_flow_state(chat_id, sender_id)
             return _result_payload(result, "数据库", output_format)
         except Exception:
@@ -394,6 +459,7 @@ def _handle_source_choice(
                 "awaiting_source",
                 chat_id=chat_id,
                 sender_id=sender_id,
+                extra=extra,
             )
             raise
 
@@ -402,18 +468,28 @@ def _handle_source_choice(
             "awaiting_excel",
             chat_id=chat_id,
             sender_id=sender_id,
+            extra=extra,
         )
         return (
-            _waiting_excel_card()
+            _waiting_excel_card(extra.get("manual_room_type_names"))
             if output_format == "card"
             else "数据来源：Excel\n请直接发送Excel附件，无需再次@机器人。等待状态10分钟内有效。"
         )
 
     return (
-        _source_selection_card()
+        _source_selection_card(names)
         if output_format == "card"
         else "请选择本次数据来源：数据库 / 上传Excel。当前报告不再区分渠道。"
     )
+
+
+def _manual_input_ack(names: list[str], state: dict[str, Any]) -> str:
+    next_step = {
+        "awaiting_source": "请继续选择“数据库”或“上传Excel”。",
+        "awaiting_excel": "请继续发送Excel附件。",
+        "manual_ready": "请发送“S14诊断”，再选择数据来源。",
+    }.get(str(state.get("state") or ""), "请发送“S14诊断”继续。")
+    return f"已记录人工房型名称：{'、'.join(names)}。{next_step}"
 
 
 def main() -> int:
@@ -449,9 +525,11 @@ def main() -> int:
                 )
             )
 
+        state = _get_flow_state(chat_id, sender_id) or {}
+        parsed_names = parse_room_type_names_from_text(args.text)
+
         if args.excel:
             identity_supplied = bool(chat_id or sender_id)
-            state = _get_flow_state(chat_id, sender_id) or {}
             if identity_supplied and state.get("state") != "awaiting_excel":
                 message = "请先发送“S14诊断”，选择“上传Excel”后再发送附件。"
                 return _print(
@@ -460,19 +538,10 @@ def main() -> int:
                         "card": {
                             "header": {
                                 "template": "orange",
-                                "title": {
-                                    "tag": "plain_text",
-                                    "content": "S14诊断｜尚未选择Excel",
-                                },
+                                "title": {"tag": "plain_text", "content": "S14诊断｜尚未选择Excel"},
                             },
                             "elements": [
-                                {
-                                    "tag": "div",
-                                    "text": {
-                                        "tag": "lark_md",
-                                        "content": message,
-                                    },
-                                }
+                                {"tag": "div", "text": {"tag": "lark_md", "content": message}}
                             ],
                         },
                     }
@@ -484,28 +553,36 @@ def main() -> int:
             if path.suffix.lower() not in {".xlsx", ".xlsm"}:
                 return _print("请上传 .xlsx 或 .xlsm 格式的 S14 Excel 文件。")
             _save_excel_state(chat_id, str(path))
-            result = _run_excel(str(path), args.text)
+            names = parsed_names or list(state.get("manual_room_type_names") or [])
+            result = _run_excel(
+                str(path),
+                args.text,
+                manual_room_type_names=names,
+                sender_id=sender_id,
+            )
             _clear_flow_state(chat_id, sender_id)
             return _print(_result_payload(result, "Excel", args.format))
 
         if args.text and any(token in args.text for token in TRIGGERS):
-            _set_flow_state(
+            old_names = list(state.get("manual_room_type_names") or [])
+            names = parsed_names or old_names
+            new_state = _set_flow_state(
                 "awaiting_source",
                 chat_id=chat_id,
                 sender_id=sender_id,
+                extra=_state_extra(state, names, sender_id),
             )
             return _print(
-                _source_selection_card()
+                _source_selection_card(new_state.get("manual_room_type_names"))
                 if args.format == "card"
                 else "请选择本次数据来源：数据库 / 上传Excel。当前报告不再区分渠道。"
             )
 
-        state = _get_flow_state(chat_id, sender_id) or {}
         choice = _normalize_choice(args.text)
         if choice and state.get("state") == "awaiting_source":
             return _print(
                 _handle_source_choice(
-                    choice,
+                    args.text,
                     chat_id=chat_id,
                     sender_id=sender_id,
                     text=args.text,
@@ -513,15 +590,34 @@ def main() -> int:
                 )
             )
 
+        if parsed_names:
+            next_state = str(state.get("state") or "manual_ready")
+            if next_state not in {"awaiting_source", "awaiting_excel"}:
+                next_state = "manual_ready"
+            saved = _set_flow_state(
+                next_state,
+                chat_id=chat_id,
+                sender_id=sender_id,
+                extra=_state_extra(state, parsed_names, sender_id),
+            )
+            return _print(_manual_input_ack(parsed_names, saved))
+
         if args.text and "复用Excel" in args.text:
             excel = _load_excel_state(chat_id)
             if not excel:
                 return _print("没有可复用的 Excel，请重新上传。")
-            result = _run_excel(excel, args.text)
+            names = list(state.get("manual_room_type_names") or [])
+            result = _run_excel(
+                excel,
+                args.text,
+                manual_room_type_names=names,
+                sender_id=sender_id,
+            )
             return _print(_result_payload(result, "Excel", args.format))
 
         return _print(
             "收到。需要生成 S14 OTA 诊断报告时，请发送「S14诊断」；"
+            "人工房型名称可发送「房型名称：五人战队套房、电竞双床房」；"
             "需要 Excel 填报模板时，请发送「Excel模板」。"
         )
     except Exception as exc:
