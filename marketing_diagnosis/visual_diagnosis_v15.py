@@ -92,6 +92,134 @@ def _flow_daily_records(
     return records[-30:]
 
 
+def _is_daily_meituan(row: dict[str, Any]) -> bool:
+    platform = str(row.get("platform") or "").strip().lower()
+    period = str(row.get("period_type") or row.get("stats_period_type") or "").strip().lower()
+    platform_ok = platform in {"meituan", "美团", "美团酒店"}
+    period_ok = not period or period in {"日", "daily", "day", "当日"}
+    return platform_ok and period_ok
+
+
+def _information_daily_records(
+    sections: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """Keep the latest information-score snapshot for each date, at most 30 days.
+
+    This function only supplies report-display history. Item 08's existing score,
+    status and rule calculation remain untouched.
+    """
+
+    selected: dict[str, tuple[tuple[str, int], dict[str, Any]]] = {}
+    for index, row in enumerate(sections.get("ota_funnel") or []):
+        if not _is_daily_meituan(row):
+            continue
+        value = _n(row.get("content_score"))
+        day = str(row.get("business_date") or "")[:10]
+        if value is None or not day:
+            continue
+        order_key = (str(row.get("snapshot_time") or ""), index)
+        current = selected.get(day)
+        if current is None or order_key >= current[0]:
+            selected[day] = (
+                order_key,
+                {
+                    "business_date": day,
+                    "content_score": value,
+                    "content_score_rank": row.get("content_score_rank"),
+                },
+            )
+    return [selected[day][1] for day in sorted(selected)[-30:]]
+
+
+def _attach_information_history(
+    result: dict[str, Any],
+    sections: dict[str, list[dict[str, Any]]],
+) -> None:
+    item = _item(result, 8)
+    if item is None:
+        return
+
+    records = _information_daily_records(sections)
+    item["daily_records"] = records
+    if not records:
+        return
+
+    values = [float(record["content_score"]) for record in records]
+    start = records[0]["business_date"]
+    end = records[-1]["business_date"]
+    latest = records[-1]
+    latest_rank = latest.get("content_score_rank")
+    average = sum(values) / len(values)
+
+    item["fields"] = [
+        {
+            "label": "展示范围",
+            "value": f"{start} 至 {end}",
+            "note": "按业务日期去重后最多展示近30天",
+            "origin": "区间统计",
+        },
+        {
+            "label": "是否有信息分",
+            "value": "有",
+            "note": "统计周期内存在有效信息分记录",
+            "origin": "条件判断",
+        },
+        {
+            "label": "有效数据天数",
+            "value": len(records),
+            "note": "按业务日期去重后的信息分记录数",
+            "origin": "区间统计",
+        },
+        {
+            "label": "近30天平均分",
+            "value": average,
+            "note": "有效日信息分合计除以有效数据天数",
+            "origin": "公式计算",
+        },
+        {
+            "label": "最新信息分",
+            "value": latest["content_score"],
+            "note": "最近一个有信息分日期的数据",
+            "origin": "最新记录",
+        },
+        {
+            "label": "最新同行排名",
+            "value": latest_rank,
+            "note": "存在同行排名时展示，不参与本项评分",
+            "origin": "最新记录",
+        },
+        {
+            "label": "统计日期",
+            "value": end,
+            "note": "兼容原信息分展示字段",
+            "origin": "最新记录",
+        },
+        {
+            "label": "信息分",
+            "value": latest["content_score"],
+            "note": "兼容原信息分展示字段",
+            "origin": "最新记录",
+        },
+        *[
+            {
+                "label": record["business_date"],
+                "value": record["content_score"],
+                "note": (
+                    f"同行排名 {record['content_score_rank']}"
+                    if record.get("content_score_rank") not in (None, "")
+                    else "暂无同行排名"
+                ),
+                "origin": "日数据",
+            }
+            for record in records
+        ],
+    ]
+    item["note"] = (
+        "页面按业务日期展示最多近30天信息分趋势；同日多次快照仅保留最新一条。"
+        "本项原有评分逻辑不变。"
+    )
+
+
 def _restore_flow_layout(
     result: dict[str, Any],
     original_fields: list[dict[str, Any]],
@@ -139,9 +267,14 @@ def build_visual_diagnosis(
     if flow_item is not None:
         flow_item["daily_records"] = _flow_daily_records(sections)
     _restore_flow_layout(result, original_fields, original_note)
+    _attach_information_history(result, sections)
     _recalculate_totals(result)
-    result["rule_version"] = "2026-07-16-v16-flow-daily-table"
+    result["rule_version"] = "2026-07-16-v17-information-history"
     return result
 
 
-__all__ = ["_flow_daily_records", "build_visual_diagnosis"]
+__all__ = [
+    "_flow_daily_records",
+    "_information_daily_records",
+    "build_visual_diagnosis",
+]
