@@ -60,9 +60,7 @@ def _latest_summary_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [selected[name][1] for name in sorted(selected)]
 
 
-def _score_ratio(low_ratio: float | None) -> float | None:
-    if low_ratio is None:
-        return None
+def _score_ratio(low_ratio: float) -> float:
     if low_ratio < 0.10:
         return 1.0
     if low_ratio <= 0.30:
@@ -70,14 +68,22 @@ def _score_ratio(low_ratio: float | None) -> float | None:
     return 0.0
 
 
+def _apply_score(item: dict[str, Any], score_ratio: float) -> None:
+    item["participates_in_score"] = True
+    item["score_ratio"] = score_ratio
+    item["item_score"] = round(float(item.get("base_score") or 8) * score_ratio, 2)
+    item["data_status"] = "success" if score_ratio > 0 else "zero"
+
+
 def patch_room_type_summary(
     result: dict[str, Any],
     sections: dict[str, list[dict[str, Any]]],
 ) -> None:
-    """Replace item 02 with JL11 ``section=summary`` near-30-day values.
+    """Replace item 02 with JL11 near-30-day values and always form a score.
 
-    Excel and legacy JL01 rows are left unchanged because they do not carry the
-    JL11 ``section=summary`` marker.
+    Low-efficiency rooms are room types whose near-30-day occupancy rate is below
+    60%. The denominator is every distinct on-sale room type in ``section=summary``.
+    Missing JL11 rows are scored zero instead of dropping item 02 from the total.
     """
 
     item = _item(result, 2)
@@ -85,9 +91,6 @@ def patch_room_type_summary(
         return
 
     rows = _latest_summary_rows(list(sections.get("room_type_performance_daily") or []))
-    if not rows:
-        return
-
     records: list[dict[str, Any]] = []
     for row in rows:
         occupancy = _n(row.get("occupancy_rate"))
@@ -106,27 +109,25 @@ def patch_room_type_summary(
             }
         )
 
-    valid_records = [record for record in records if record["occupancy_points"] is not None]
-    low_records = [record for record in valid_records if record["is_low"]]
-    low_ratio = len(low_records) / len(valid_records) if valid_records else None
-    score_ratio = _score_ratio(low_ratio)
+    total_room_types = len(records)
+    low_records = [record for record in records if record["is_low"]]
+    missing_occupancy = [
+        record for record in records if record["occupancy_points"] is None
+    ]
+    low_ratio = len(low_records) / total_room_types if total_room_types else None
 
-    item["data_status"] = (
-        "missing" if score_ratio is None else "success" if score_ratio > 0 else "zero"
-    )
-    item["score_ratio"] = score_ratio
-    item["item_score"] = (
-        round(float(item.get("base_score") or 0) * score_ratio, 2)
-        if score_ratio is not None
-        else None
-    )
+    if low_ratio is None:
+        _apply_score(item, 0.0)
+    else:
+        _apply_score(item, _score_ratio(low_ratio))
+
     item["records"] = records
     item["fields"] = [
         {
-            "label": "房型数",
-            "value": len(records),
+            "label": "全部在售房型数",
+            "value": total_room_types,
             "origin": "按room_type_name去重",
-            "note": "section=summary中的不同房型数量",
+            "note": "section=summary中的全部不同房型数量",
         },
         {
             "label": "房间总数",
@@ -136,31 +137,45 @@ def patch_room_type_summary(
         },
         {
             "label": "低效房型数",
-            "value": len(low_records) if valid_records else None,
+            "value": len(low_records),
             "origin": "条件统计",
-            "note": "近30天occupancy_rate低于60%的房型数",
+            "note": "最近一个月occupancy_rate低于60%的房型数量",
         },
         {
             "label": "低效房型占比",
             "value": low_ratio,
             "origin": "公式计算",
-            "note": "低效房型数÷有出租率数据的房型数",
+            "note": "低效房型数÷全部在售房型数",
         },
         {
             "label": "低效房型清单",
             "value": "、".join(record["room_type_name"] for record in low_records) or None,
             "origin": "条件统计",
-            "note": "occupancy_rate低于60%的房型",
+            "note": "最近一个月出租率低于60%的房型",
+        },
+        {
+            "label": "出租率缺失房型数",
+            "value": len(missing_occupancy),
+            "origin": "数据质量检查",
+            "note": "仍计入全部在售房型数，但不判定为低效房型",
         },
     ]
     item["source_table"] = SOURCE_TABLE
     item["source_fields"] = SOURCE_FIELDS
-    item["note"] = (
-        "全部数据直接取hotel_puyue.jl11_room_type_classification中section=summary的近30天汇总值；"
-        "按room_type_name展示room_count、room_nights、occupancy_rate、room_revenue、"
-        "average_room_price和revpar。低效房型为出租率低于60%；低效房型占比<10%得满分，"
-        "10%至30%得60%，超过30%得0分。"
-    )
+
+    if not records:
+        item["note"] = (
+            "本项必须评分：未取得jl11_room_type_classification中section=summary记录，"
+            "按0分计入总分。低效房型定义为最近一个月出租率<60%；"
+            "低效房型占比=低效房型数÷全部在售房型数。"
+        )
+    else:
+        item["note"] = (
+            "本项必须评分。全部数据取hotel_puyue.jl11_room_type_classification中"
+            "section=summary的近30天汇总值；低效房型为最近一个月出租率<60%；"
+            "低效房型占比=低效房型数÷全部在售房型数。占比<10%得满分，"
+            "10%至30%得60%，超过30%得0分。"
+        )
 
 
 __all__ = [
