@@ -5,7 +5,7 @@ from typing import Any
 from marketing_diagnosis.promotion_performance_v46 import patch_promotion_performance
 from marketing_diagnosis.review_yesterday_v45 import patch_yesterday_review_count
 from marketing_diagnosis.rules_v4 import process as _base_process
-from marketing_diagnosis.visual_diagnosis_v19 import build_visual_diagnosis
+from marketing_diagnosis.visual_diagnosis_v20 import build_visual_diagnosis
 
 
 def process(data: dict[str, Any]) -> dict[str, Any]:
