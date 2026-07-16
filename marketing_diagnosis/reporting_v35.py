@@ -9,22 +9,11 @@ from marketing_diagnosis import reporting_v34
 
 CLEAN_REPORT_STYLE = """
 <style>
-/* Source/audit text is retained in report.json but not shown in the customer page. */
+/* Generic field notes are hidden; removed audit blocks are not referenced here. */
 .metric-row>div>span,
 .source-cards>div>span,
 .promotion-metric-v34>span,
 .reputation-metric-v32>span{
-  display:none!important;
-}
-
-/* Defensive fallback for reports generated through an older renderer layer. */
-.performance-v25-summary,
-.performance-v28-summary,
-.field-standard-note,
-.output-fields-panel,
-.performance-v25-caption,
-.performance-v28-caption,
-.room-source-caption-v30{
   display:none!important;
 }
 </style>
@@ -60,7 +49,7 @@ def _class_start_pattern(tag: str, class_name: str) -> re.Pattern[str]:
 def _remove_balanced_elements(html_text: str, tag: str, class_name: str) -> str:
     """Remove every balanced element carrying ``class_name``.
 
-    Regex alone is unsafe for nested ``div`` blocks.  This lightweight scanner
+    Regex alone is unsafe for nested ``div`` blocks. This lightweight scanner
     counts matching open/close tags so the complete UI block is removed without
     touching the following table or card.
     """
