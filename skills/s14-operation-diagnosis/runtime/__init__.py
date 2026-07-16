@@ -20,7 +20,11 @@ from marketing_diagnosis.data_v2 import normalize_dataset
 from marketing_diagnosis.db_loader_v9 import load_mysql_dsn_dataset
 from marketing_diagnosis.excel_loader import load_excel_dataset
 from marketing_diagnosis.reporting_v2 import write_reports
-from marketing_diagnosis.rules_v4 import process
+from marketing_diagnosis.room_name_manual_v43 import (
+    normalize_room_type_names,
+    parse_room_type_names_from_text,
+)
+from marketing_diagnosis.rules_v5 import process
 
 from .feishu_adapter import build_feishu_card_reply, build_feishu_reply
 
@@ -59,6 +63,58 @@ def _json_safe(value: Any) -> Any:
             pass
 
     return str(value)
+
+
+def _manual_room_names(inputs: dict[str, Any]) -> list[str]:
+    explicit = (
+        inputs.get("manual_room_type_names")
+        or inputs.get("room_type_names")
+        or inputs.get("manual_room_names")
+    )
+    names = normalize_room_type_names(explicit)
+    if names:
+        return names
+
+    for key in (
+        "request_text",
+        "message_text",
+        "voice_text",
+        "transcript",
+        "text",
+    ):
+        names = parse_room_type_names_from_text(inputs.get(key))
+        if names:
+            return names
+    return []
+
+
+def _manual_room_source(inputs: dict[str, Any], names: list[str]) -> str:
+    if not names:
+        return "用户手动输入（未提供）"
+    if inputs.get("voice_text") or inputs.get("transcript"):
+        return "飞书语音转写人工输入"
+    if inputs.get("request_text") or inputs.get("message_text") or inputs.get("text"):
+        return "飞书文本人工输入"
+    return str(inputs.get("manual_input_source") or "网页/接口人工输入")
+
+
+def _inject_manual_room_names(
+    normalized: dict[str, Any],
+    prepared: dict[str, Any],
+) -> None:
+    names = list(prepared.get("manual_room_type_names") or [])
+    if not names:
+        return
+    sections = normalized.setdefault("sections", {})
+    sections.setdefault("manual_inputs", []).append(
+        {
+            "room_type_names": names,
+            "input_source": prepared.get("manual_input_source"),
+            "source_table": prepared.get("manual_input_source"),
+            "operator": prepared.get("manual_input_operator"),
+            "recorded_at": prepared.get("manual_input_recorded_at"),
+        }
+    )
 
 
 def _source_selection_result() -> dict[str, Any]:
@@ -226,6 +282,7 @@ class S14OperationDiagnosis:
             raise ValueError(f"unsupported S14 data_source_mode: {mode}")
 
         normalized = normalize_dataset(raw_dataset)
+        _inject_manual_room_names(normalized, prepared)
         result = process(normalized)
         if mode == "excel_upload":
             result = enrich_customer_excel_result(result, raw_dataset)
@@ -242,6 +299,7 @@ class S14OperationDiagnosis:
             "period_end": prepared.get("period_end"),
             "period_days": prepared.get("period_days"),
             "data_source": data_source,
+            "manual_room_type_names": prepared.get("manual_room_type_names"),
             "report_dir": str(report_dir),
             "approval_required": False,
             "dry_run": True,
@@ -278,6 +336,7 @@ class S14OperationDiagnosis:
             or os.environ.get("S14_REPORT_OUTPUT_DIR")
             or str(DEFAULT_REPORT_ROOT)
         )
+        manual_names = _manual_room_names(inputs)
         return {
             "data_source_mode": inputs.get("data_source_mode") or "source_selection",
             "input_excel_path": inputs.get("input_excel_path"),
@@ -287,6 +346,10 @@ class S14OperationDiagnosis:
             "period_start": inputs.get("period_start") or str(start),
             "period_end": inputs.get("period_end") or str(today),
             "period_days": period_days,
+            "manual_room_type_names": manual_names,
+            "manual_input_source": _manual_room_source(inputs, manual_names),
+            "manual_input_operator": inputs.get("manual_input_operator") or inputs.get("sender_id"),
+            "manual_input_recorded_at": inputs.get("manual_input_recorded_at") or datetime.now().isoformat(timespec="seconds"),
             "output_root": output_root,
             "public_base_url": inputs.get("public_base_url") or self.config.get("public_base_url") or os.environ.get("S14_PUBLIC_BASE_URL"),
             "dry_run": True,
