@@ -45,19 +45,20 @@ class RoomTypeClassificationTests(unittest.TestCase):
         self.assertEqual([row["room_type_name"] for row in selected], ["双床房", "大床房"])
         self.assertEqual(next(row for row in selected if row["room_type_name"] == "大床房")["occupancy_rate"], 0.75)
 
-    def test_item_02_uses_fixed_jl11_fields_and_near_30_day_score(self):
+    def test_item_02_uses_all_on_sale_room_types_as_denominator(self):
         result = self._result()
         sections = {
             "room_type_performance_daily": [
                 self._row("低效房", 0.50),
                 self._row("正常房", 0.80),
+                self._row("出租率缺失房", None),
             ]
         }
         patch_room_type_summary(result, sections)
         item = result["items"][0]
 
         self.assertEqual(item["source_table"], "hotel_puyue.jl11_room_type_classification")
-        self.assertEqual(len(item["records"]), 2)
+        self.assertEqual(len(item["records"]), 3)
         low = next(record for record in item["records"] if record["room_type_name"] == "低效房")
         self.assertTrue(low["is_low"])
         self.assertEqual(low["room_count"], 5)
@@ -65,7 +66,21 @@ class RoomTypeClassificationTests(unittest.TestCase):
         self.assertEqual(low["room_revenue"], 18000)
         self.assertEqual(low["average_room_price"], 200)
         self.assertEqual(low["revpar"], 120)
+
+        fields = {field["label"]: field["value"] for field in item["fields"]}
+        self.assertEqual(fields["全部在售房型数"], 3)
+        self.assertEqual(fields["低效房型数"], 1)
+        self.assertAlmostEqual(fields["低效房型占比"], 1 / 3)
         self.assertEqual(item["item_score"], 0)
+
+    def test_missing_jl11_rows_are_mandatory_zero(self):
+        result = self._result()
+        patch_room_type_summary(result, {})
+        item = result["items"][0]
+        self.assertEqual(item["item_score"], 0)
+        self.assertEqual(item["score_ratio"], 0)
+        self.assertEqual(item["data_status"], "zero")
+        self.assertIn("按0分计入总分", item["note"])
 
     def test_report_has_only_near_30_day_columns(self):
         result = self._result()
