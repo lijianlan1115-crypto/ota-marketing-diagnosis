@@ -4,7 +4,7 @@ import os
 from typing import Any
 
 from marketing_diagnosis import db_loader as base
-from marketing_diagnosis import db_loader_v9 as previous
+from marketing_diagnosis import db_loader_v9_legacy as previous
 
 
 DEFAULT_MYSQL_TABLES = {
