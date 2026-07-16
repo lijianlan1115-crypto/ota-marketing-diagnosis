@@ -48,6 +48,7 @@ def _json_safe(value: Any) -> Any:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
 
+    # NumPy scalar values and similar objects usually expose item().
     item_method = getattr(value, "item", None)
     if callable(item_method):
         try:
@@ -193,6 +194,9 @@ class S14OperationDiagnosis:
         prepared = self._prepare_inputs(inputs or {})
         mode = prepared["data_source_mode"]
 
+        # OpenClaw may invoke the Skill directly from trigger metadata instead of
+        # executing scripts/s14_feishu_entry.py. These two modes keep that path
+        # deterministic, JSON-serializable, and free from accidental DB runs.
         if mode == "source_selection":
             return _source_selection_result()
         if mode == "excel_pending":
@@ -253,6 +257,10 @@ class S14OperationDiagnosis:
         })
         skill_result["feishu_message"] = build_feishu_reply(skill_result)
         skill_result["feishu_card"] = build_feishu_card_reply(skill_result)
+
+        # OpenClaw serializes the complete return object before the model/channel
+        # selects feishu_message or feishu_card. Normalize every nested value so
+        # report links are not lost because of one Decimal/date/NumPy scalar.
         return _json_safe(skill_result)
 
     def _resolve_dsn(self) -> str | None:
