@@ -18,7 +18,7 @@ class PerformanceTableScrollV55Tests(unittest.TestCase):
 
         rendered = enable_performance_table_scroll(html)
 
-        self.assertIn("performance-detail-scroll-v55", rendered)
+        self.assertIn("<div class='performance-detail-scroll-v55'>", rendered)
         self.assertIn("overflow-x:auto", rendered)
         self.assertIn("width:940px!important", rendered)
         self.assertIn("position:sticky", rendered)
@@ -33,7 +33,10 @@ class PerformanceTableScrollV55Tests(unittest.TestCase):
         )
         once = enable_performance_table_scroll(html)
         twice = enable_performance_table_scroll(once)
-        self.assertEqual(twice.count("performance-detail-scroll-v55"), 2)
+        self.assertEqual(
+            twice.count("<div class='performance-detail-scroll-v55'>"),
+            1,
+        )
         self.assertEqual(twice.count("PERFORMANCE_TABLE_SCROLL_V55"), 1)
 
 
