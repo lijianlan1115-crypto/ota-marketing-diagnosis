@@ -15,6 +15,11 @@ MANUAL_ROOM_STYLE = """
 .manual-room-input-v31,.manual-room-result-v31{padding:16px;border:1px solid #dfe8e5;border-radius:12px;background:#f8fbfa;position:relative}
 .manual-room-input-v31 h4,.manual-room-result-v31 h4{margin:0 0 8px;color:#26343d;font-size:16px}
 .manual-room-input-v31 p{margin:0 0 12px;color:var(--muted);font-size:12px;line-height:1.6}
+.manual-room-count-row-v53{display:flex;gap:8px;align-items:center;margin:0 0 12px;padding:10px;border:1px solid #dfe8e5;border-radius:9px;background:#fff;position:relative;z-index:6}
+.manual-room-count-row-v53 label{color:#596773;font-size:12px;font-weight:800;white-space:nowrap}
+.manual-room-count-input-v53{box-sizing:border-box;width:90px;height:38px;padding:0 10px;border:1px solid #cfdad6;border-radius:7px;background:#fff;color:#26343d;font:inherit;outline:none}
+.manual-room-count-input-v53:focus{border-color:#16845b;box-shadow:0 0 0 3px rgba(22,132,91,.10)}
+.manual-room-set-count-v53{height:38px;padding:0 14px;border:1px solid #c8e2d6;border-radius:7px;background:#e8f4ef;color:#176747;font-weight:800;cursor:pointer;position:relative;z-index:7;pointer-events:auto;touch-action:manipulation}
 .manual-room-fields-v52{display:flex;flex-direction:column;gap:9px}
 .manual-room-field-v52{display:grid;grid-template-columns:62px minmax(0,1fr) 54px;gap:8px;align-items:center}
 .manual-room-field-v52 label{color:#596773;font-size:12px;font-weight:800;white-space:nowrap}
@@ -26,7 +31,7 @@ MANUAL_ROOM_STYLE = """
 .manual-room-button-v31{background:#16845b;color:#fff}
 .manual-room-add-v52{background:#e8f4ef;color:#176747;border:1px solid #c8e2d6}
 .manual-room-button-v31:hover{background:#116f4c}
-.manual-room-add-v52:hover{background:#dcefe7}
+.manual-room-add-v52:hover,.manual-room-set-count-v53:hover{background:#dcefe7}
 .manual-room-hint-v31{display:block;margin-top:10px;color:var(--muted);font-size:11px;line-height:1.5}
 .manual-room-table-v31{width:100%;border-collapse:collapse;background:#fff}
 .manual-room-table-v31 th,.manual-room-table-v31 td{padding:9px 11px;border-bottom:1px solid #e3ebe8;text-align:left;line-height:1.35;height:auto}
@@ -38,7 +43,7 @@ MANUAL_ROOM_STYLE = """
 .room-type-card-v30 .room-summary-v30>div:first-child small{font-size:0}
 .room-type-card-v30 .room-summary-v30>div:first-child small::after{content:'全部在售房型数';font-size:12px}
 @media(max-width:1050px){.manual-room-panel-v31{grid-template-columns:1fr}}
-@media(max-width:560px){.manual-room-field-v52{grid-template-columns:52px minmax(0,1fr)}.manual-room-remove-v52{grid-column:2;justify-self:end}}
+@media(max-width:560px){.manual-room-count-row-v53{align-items:flex-start;flex-wrap:wrap}.manual-room-field-v52{grid-template-columns:52px minmax(0,1fr)}.manual-room-remove-v52{grid-column:2;justify-self:end}}
 </style>
 """
 
@@ -115,9 +120,9 @@ def _rows_html(records: list[dict[str, Any]]) -> str:
     return "".join(rows)
 
 
-def _input_rows_html(records: list[dict[str, Any]], minimum: int = 4) -> str:
+def _input_rows_html(records: list[dict[str, Any]], minimum: int = 1) -> str:
     names = [str(record.get("room_type_name") or "").strip() for record in records]
-    total = max(minimum, len(names))
+    total = max(minimum, len(names), 1)
     rows: list[str] = []
     for index in range(total):
         value = names[index] if index < len(names) else ""
@@ -141,13 +146,14 @@ def _manual_room_card(item: dict[str, Any]) -> str:
     status_text = "已形成结果" if passed else "真实为0"
     status_class = "ok" if passed else "disabled"
     note_class = "" if passed else " is-zero"
+    initial_count = max(1, len(records))
 
     return (
         f"<article class='diagnosis-card manual-room-card-v31' data-status='{'success' if passed else 'zero'}' "
         f"data-title='{reporting_v8._e(item.get('item_name'))}' id='rule-11'>"
         "<div class='card-top'><div class='rule-no'>11</div>"
         "<div class='card-title'><h3>房型名称卖点优化</h3>"
-        "<p>每个输入框填写一个房型名称；全部填写后统一即时计算，也支持飞书文本或语音转写后生成正式评分。</p></div>"
+        "<p>每个输入框填写一个房型名称；输入框数量可自定义，全部填写后统一即时计算。</p></div>"
         "<div class='card-tags'>"
         "<div class='title-meta-item title-period'><small>统计口径</small><strong>人工输入</strong></div>"
         f"<div class='title-meta-item title-score {'ok' if passed else 'zero'}'><small>当前得分</small>"
@@ -157,7 +163,13 @@ def _manual_room_card(item: dict[str, Any]) -> str:
         "</div></div>"
         "<div class='result-area'><div class='manual-room-panel-v31'>"
         "<div class='manual-room-input-v31'><h4>手动输入房型名称</h4>"
-        "<p>默认提供4个单行输入框，每个框只填一个完整房型名称。房型超过4个时点击“新增房型”。</p>"
+        "<p>先设置需要的输入框数量，每个框只填一个完整房型名称；也可以随时新增或删除。</p>"
+        "<div class='manual-room-count-row-v53'>"
+        "<label>输入框数量</label>"
+        f"<input type='number' min='1' max='100' value='{initial_count}' class='manual-room-count-input-v53' inputmode='numeric'>"
+        "<button type='button' class='manual-room-set-count-v53' "
+        "onclick='return window.S14ManualRoomSetCount ? window.S14ManualRoomSetCount(this) : false;'>设置数量</button>"
+        "</div>"
         f"<div class='manual-room-fields-v52'>{_input_rows_html(records)}</div>"
         "<div class='manual-room-actions-v31'>"
         "<button type='button' class='manual-room-add-v52' "
@@ -165,7 +177,7 @@ def _manual_room_card(item: dict[str, Any]) -> str:
         "<button type='button' class='manual-room-button-v31' "
         "onclick='return window.S14ManualRoomCalculate ? window.S14ManualRoomCalculate(this) : false;'>即时计算</button>"
         "</div>"
-        "<span class='manual-room-hint-v31'>填写完成后点击“即时计算”，系统会统一计算字符数、卖点表达及本项得分。网页试算不写回正式总分。</span>"
+        "<span class='manual-room-hint-v31'>数量可设置为1至100；填写完成后点击“即时计算”，统一计算字符数、卖点表达及本项得分。网页试算不写回正式总分。</span>"
         "</div>"
         "<div class='manual-room-result-v31'><h4>评分明细</h4>"
         "<div class='table-scroll'><table class='manual-room-table-v31'><thead><tr>"
@@ -183,8 +195,8 @@ def _script() -> str:
     script = r"""
 <script>
 (function(){
-  if(window.__s14ManualRoomV52Bound) return;
-  window.__s14ManualRoomV52Bound=true;
+  if(window.__s14ManualRoomV53Bound) return;
+  window.__s14ManualRoomV53Bound=true;
   const terms=__TERMS__;
   const splitPattern=/[\n\r,，、;；|]+/;
   const cleanName=(value)=>String(value||'')
@@ -194,6 +206,11 @@ def _script() -> str:
   const escapeHtml=(value)=>String(value||'').replace(/[&<>"']/g,(char)=>({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[char]));
+  const clampCount=(value)=>{
+    const number=parseInt(value,10);
+    if(!Number.isFinite(number)) return 1;
+    return Math.min(100,Math.max(1,number));
+  };
   const splitNames=(value)=>{
     const seen=new Set();
     return String(value||'').split(splitPattern).map(cleanName).filter((name)=>{
@@ -209,8 +226,11 @@ def _script() -> str:
       if(label) label.textContent='房型'+(index+1);
       if(input) input.placeholder='请输入第'+(index+1)+'个房型名称';
     });
+    const card=container.closest('.manual-room-card-v31');
+    const countInput=card&&card.querySelector('.manual-room-count-input-v53');
+    if(countInput) countInput.value=Math.max(1,container.querySelectorAll('.manual-room-field-v52').length);
   };
-  const appendRow=(container,value='')=>{
+  const appendRow=(container,value='',focus=true)=>{
     const row=document.createElement('div');
     row.className='manual-room-field-v52';
     row.innerHTML='<label></label><input type="text" class="manual-room-name-input-v52" autocomplete="off" spellcheck="false"><button type="button" class="manual-room-remove-v52">删除</button>';
@@ -218,7 +238,7 @@ def _script() -> str:
     if(input) input.value=value;
     container.appendChild(row);
     renumber(container);
-    if(input) input.focus();
+    if(input&&focus) input.focus();
     return row;
   };
   const collectNames=(card)=>{
@@ -231,14 +251,23 @@ def _script() -> str:
     });
     return names;
   };
-  const rebuildInputs=(card,names)=>{
+  const rebuildInputs=(card,names,requestedCount)=>{
     const container=card.querySelector('.manual-room-fields-v52');
     if(!container) return;
+    const currentCount=container.querySelectorAll('.manual-room-field-v52').length;
+    const total=Math.max(1,clampCount(requestedCount||currentCount),names.length);
     container.innerHTML='';
-    const total=Math.max(4,names.length);
-    for(let index=0;index<total;index++) appendRow(container,names[index]||'');
-    const first=container.querySelector('.manual-room-name-input-v52');
-    if(first) first.blur();
+    for(let index=0;index<total;index++) appendRow(container,names[index]||'',false);
+    renumber(container);
+  };
+  const setCount=(button)=>{
+    const card=button.closest('.manual-room-card-v31');
+    if(!card) return false;
+    const countInput=card.querySelector('.manual-room-count-input-v53');
+    const requested=clampCount(countInput&&countInput.value);
+    const names=collectNames(card);
+    rebuildInputs(card,names,requested);
+    return false;
   };
   const calculate=(button)=>{
     const card=button.closest('.manual-room-card-v31');
@@ -247,9 +276,10 @@ def _script() -> str:
     const scoreNode=card.querySelector('.manual-room-score-v31');
     const statusNode=card.querySelector('.manual-room-status-v31');
     const noteNode=card.querySelector('.manual-room-score-note-v31');
+    const countInput=card.querySelector('.manual-room-count-input-v53');
     if(!body) return false;
     const names=collectNames(card);
-    rebuildInputs(card,names);
+    rebuildInputs(card,names,clampCount(countInput&&countInput.value));
     const records=names.map((name)=>{
       const count=name.replace(/\s+/g,'').length;
       const sellingPoint=terms.find((term)=>name.includes(term))||'';
@@ -271,10 +301,11 @@ def _script() -> str:
     return false;
   };
   window.S14ManualRoomCalculate=calculate;
+  window.S14ManualRoomSetCount=setCount;
   window.S14ManualRoomAdd=(button)=>{
     const card=button.closest('.manual-room-card-v31');
     const container=card&&card.querySelector('.manual-room-fields-v52');
-    if(container) appendRow(container,'');
+    if(container) appendRow(container,'',true);
     return false;
   };
   window.S14ManualRoomRemove=(button)=>{
@@ -295,10 +326,19 @@ def _script() -> str:
   document.addEventListener('click',(event)=>{
     const calculateButton=event.target.closest('.manual-room-button-v31');
     if(calculateButton){event.preventDefault();calculate(calculateButton);return;}
+    const setCountButton=event.target.closest('.manual-room-set-count-v53');
+    if(setCountButton){event.preventDefault();setCount(setCountButton);return;}
     const addButton=event.target.closest('.manual-room-add-v52');
     if(addButton){event.preventDefault();window.S14ManualRoomAdd(addButton);return;}
     const removeButton=event.target.closest('.manual-room-remove-v52');
     if(removeButton){event.preventDefault();window.S14ManualRoomRemove(removeButton);}
+  });
+  document.addEventListener('keydown',(event)=>{
+    if(event.key!=='Enter'||!event.target.matches('.manual-room-count-input-v53')) return;
+    event.preventDefault();
+    const card=event.target.closest('.manual-room-card-v31');
+    const button=card&&card.querySelector('.manual-room-set-count-v53');
+    if(button) setCount(button);
   });
 })();
 </script>
