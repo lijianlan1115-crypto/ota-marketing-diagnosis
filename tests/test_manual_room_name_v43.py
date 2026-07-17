@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import unittest
 
-from marketing_diagnosis.reporting_v31 import _manual_room_card, _script
+from marketing_diagnosis.reporting_v31 import (
+    _input_rows_html,
+    _manual_room_card,
+    _script,
+)
 from marketing_diagnosis.room_name_manual_v43 import (
     normalize_room_type_names,
     parse_room_type_names_from_text,
@@ -96,24 +100,35 @@ class ManualRoomNameTests(unittest.TestCase):
         self.assertEqual(item["records"][0]["character_count"], 5)
         self.assertFalse(item["records"][0]["passed"])
 
-    def test_report_contains_no_wrap_input_and_scoring_details(self):
+    def test_four_independent_inputs_are_rendered_by_default(self):
+        html = _input_rows_html([])
+        self.assertEqual(html.count("manual-room-name-input-v52"), 4)
+        self.assertIn("房型1", html)
+        self.assertIn("房型4", html)
+        self.assertIn("请输入第4个房型名称", html)
+
+    def test_report_contains_multiple_inputs_and_working_controls(self):
         result = self._result()
         patch_manual_room_name_score(
             result,
             {"manual_inputs": [{"room_type_names": ["五人战队套房"]}]},
         )
         html = _manual_room_card(result["items"][0])
-        self.assertIn("manual-room-textarea-v31", html)
-        self.assertIn("wrap='off'", html)
+        self.assertEqual(html.count("manual-room-name-input-v52"), 4)
+        self.assertIn("+ 新增房型", html)
         self.assertIn("即时计算", html)
+        self.assertIn("S14ManualRoomCalculate", html)
         self.assertIn("卖点表达", html)
         self.assertIn("五人战队套房", html)
         self.assertIn("4分", html)
+        self.assertNotIn("manual-room-textarea-v31", html)
 
         script = _script()
-        self.assertIn("completeRoom", script)
-        self.assertIn("textarea.value=names.join", script)
-        self.assertNotIn("split(/[\\n\\r,，、;；|]+/)", script)
+        self.assertIn("window.S14ManualRoomCalculate=calculate", script)
+        self.assertIn("window.S14ManualRoomAdd", script)
+        self.assertIn("window.S14ManualRoomRemove", script)
+        self.assertIn("document.addEventListener('click'", script)
+        self.assertIn("Math.max(4,names.length)", script)
 
 
 if __name__ == "__main__":
