@@ -35,14 +35,16 @@ def _item(result: dict[str, Any], number: int) -> dict[str, Any] | None:
 def _latest_performance_row(
     sections: dict[str, list[dict[str, Any]]],
 ) -> dict[str, Any]:
+    """Select the newest eligible RUNNING promotion row only."""
+
     rows = [
         row
         for row in list(sections.get("promotion_finance") or [])
         if isinstance(row, dict)
+        and str(row.get("promotion_status") or "").strip().upper() == "RUNNING"
         and (
             "spend_amount" in row
             or "booking_order_amount" in row
-            or "promotion_status" in row
             or "promotion_performance_30d"
             in str(row.get("source_table") or row.get("__source_table") or "")
         )
@@ -66,7 +68,13 @@ def _score_ratio(
     spend_amount: float | None,
     roi: float | None,
 ) -> float:
-    if promotion_status != "RUNNING":
+    """Mandatory score after eligibility filtering.
+
+    ``promotion_status`` remains as a defensive argument for compatibility, but
+    the database and section selectors already restrict records to RUNNING.
+    """
+
+    if str(promotion_status or "").strip().upper() != "RUNNING":
         return 0.0
     if spend_amount is None or spend_amount <= 1000:
         return 0.0
@@ -83,7 +91,7 @@ def patch_promotion_performance(
     result: dict[str, Any],
     sections: dict[str, list[dict[str, Any]]],
 ) -> None:
-    """Replace item 09 with the mandatory 30-day promotion performance rule."""
+    """Replace item 09 with mandatory ROI scoring for eligible RUNNING data."""
 
     item = _item(result, 9)
     if item is None:
@@ -108,7 +116,7 @@ def patch_promotion_performance(
     item["source_table"] = SOURCE_TABLE
     item["source_fields"] = SOURCE_FIELDS + [
         "ROI=booking_order_amount/spend_amount",
-        "promotion_status=RUNNING",
+        "filter: promotion_status=RUNNING",
     ]
     item["promotion_performance"] = {
         "promotion_status": status or None,
@@ -116,54 +124,40 @@ def patch_promotion_performance(
         "booking_order_amount": booking_amount,
         "roi": roi,
     }
+    # promotion_status is used only for backend filtering and is intentionally
+    # not exposed as a customer-facing HTML metric.
     item["fields"] = [
-        {
-            "label": "推广状态",
-            "value": status or None,
-            "origin": "数据库原值",
-            "note": "仅promotion_status=RUNNING时视为生效",
-        },
         {
             "label": "近30天推广投入",
             "value": spend,
             "origin": "数据库原值",
-            "note": "spend_amount；投入金额必须大于1000元才进入ROI评分",
+            "note": "投入金额必须大于1000元才进入ROI评分",
         },
         {
             "label": "预订订单金额（元）",
             "value": booking_amount,
             "origin": "数据库原值",
-            "note": "booking_order_amount",
+            "note": "近30天预订订单金额",
         },
         {
             "label": "ROI",
             "value": roi,
             "origin": "公式计算",
-            "note": "booking_order_amount ÷ spend_amount",
+            "note": "预订订单金额÷推广投入",
         },
     ]
 
     if not row:
-        item["note"] = (
-            "本项必须评分：未取得meituan_ota_promotion_performance_30d记录，"
-            "按0分计入总分。"
-        )
-    elif status != "RUNNING":
-        item["note"] = (
-            f"本项必须评分：promotion_status={status or '空'}，未处于RUNNING状态，"
-            "按0分计入总分。"
-        )
+        item["note"] = "本项必须评分：未取得有效推广记录，按0分计入总分。"
     elif spend is None:
-        item["note"] = "本项必须评分：spend_amount缺失，按0分计入总分。"
+        item["note"] = "本项必须评分：推广投入缺失，按0分计入总分。"
     elif spend <= 1000:
         item["note"] = (
             f"本项必须评分：近30天推广投入为{spend:g}元，未超过1000元，"
             "按0分计入总分。"
         )
     elif booking_amount is None:
-        item["note"] = (
-            "本项必须评分：booking_order_amount缺失，无法计算ROI，按0分计入总分。"
-        )
+        item["note"] = "本项必须评分：预订订单金额缺失，无法计算ROI，按0分计入总分。"
     elif roi > 10:
         item["note"] = f"ROI={roi:.2f}>10，评分比例100%，本项得{base_score:g}分。"
     elif roi >= 5:
