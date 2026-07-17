@@ -9,13 +9,13 @@ from marketing_diagnosis import reporting_v8, reporting_v33
 
 PROMOTION_STYLE = """
 <style>
-.promotion-grid-v34{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:12px}
+.promotion-grid-v34{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:12px}
 .promotion-metric-v34{padding:16px;border:1px solid #dfe8e5;border-radius:12px;background:#f8fbfa;min-height:86px}
 .promotion-metric-v34.is-roi{background:#eef6ff;border-color:#c8ddf7}
 .promotion-metric-v34 small{display:block;color:var(--muted);font-size:12px;font-weight:800;line-height:1.35}
 .promotion-metric-v34 strong{display:block;margin-top:9px;color:#26343d;font-size:22px;line-height:1.2}
 .promotion-metric-v34 span{display:block;margin-top:6px;color:var(--muted);font-size:10px;line-height:1.45}
-@media(max-width:1050px){.promotion-grid-v34{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.promotion-grid-v34{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.promotion-grid-v34{grid-template-columns:1fr}}
 </style>
 """
@@ -39,7 +39,13 @@ def _item(result: dict[str, Any], number: int) -> dict[str, Any] | None:
 
 
 def _cards(item: dict[str, Any]) -> str:
-    fields = list(item.get("fields") or [])
+    # promotion_status is an internal database filter only. Even when an older
+    # result still contains that field, do not expose it in customer HTML.
+    fields = [
+        field
+        for field in list(item.get("fields") or [])
+        if str(field.get("label") or "") != "推广状态"
+    ]
     cards: list[str] = []
     for field in fields:
         label = str(field.get("label") or "")
@@ -66,7 +72,7 @@ def _promotion_card(item: dict[str, Any]) -> str:
         f"data-title='{reporting_v8._e(item.get('item_name'))}' id='rule-9'>"
         "<div class='card-top'><div class='rule-no'>09</div>"
         "<div class='card-title'><h3>推广数据</h3>"
-        "<p>使用近30天推广投入与预订订单金额计算ROI；仅RUNNING状态生效，本项必须评分。</p></div>"
+        "<p>使用近30天推广投入与预订订单金额计算ROI，本项必须评分。</p></div>"
         "<div class='card-tags'>"
         "<div class='title-meta-item title-period'><small>统计周期</small><strong>近30天</strong></div>"
         f"<div class='title-meta-item title-score {'ok' if score > 0 else 'zero'}'><small>当前得分</small>"
