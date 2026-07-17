@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from marketing_diagnosis.performance_trend_v54 import build_performance_trend_periods
+from marketing_diagnosis.performance_trend_v54 import (
+    _growth,
+    build_performance_trend_periods,
+)
 from marketing_diagnosis.reporting_v37 import _detail_table, _performance_card
 
 
@@ -86,10 +89,20 @@ class PerformanceTrendV54Tests(unittest.TestCase):
         adr = next(metric for metric in july["metrics"] if metric["key"] == "adr")
         self.assertEqual(revenue["current"], 69076.50)
         self.assertEqual(revenue["previous"], 66719.96)
-        self.assertAlmostEqual(revenue["yoy"], 69076.50 / 66719.96 - 1)
+        self.assertAlmostEqual(
+            revenue["yoy"],
+            (69076.50 - 66719.96) / 66719.96,
+        )
         self.assertEqual(adr["current"], 148.23)
         self.assertNotEqual(revenue["current"], 999999)
         self.assertNotEqual(adr["current"], 999)
+
+    def test_yoy_growth_uses_difference_divided_by_prior_year(self):
+        self.assertAlmostEqual(_growth(120, 100), 0.20)
+        self.assertAlmostEqual(_growth(80, 100), -0.20)
+        self.assertEqual(_growth(100, 100), 0.0)
+        self.assertIsNone(_growth(100, 0))
+        self.assertIsNone(_growth(None, 100))
 
     def test_each_metric_header_is_one_cell_like_the_sample(self):
         periods = build_performance_trend_periods(self._rows(), "2026-07-16")
