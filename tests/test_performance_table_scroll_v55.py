@@ -22,12 +22,12 @@ class PerformanceTableScrollV55Tests(unittest.TestCase):
 
         self.assertIn("<div class='performance-detail-scroll-v55'>", rendered)
         self.assertIn("overflow-x:auto", rendered)
-        self.assertIn("width:940px!important", rendered)
+        self.assertIn("min-width:940px!important", rendered)
         self.assertIn("position:sticky", rendered)
         self.assertIn("房费（元）", rendered)
         self.assertIn("69,076.50 / 66,719.96", rendered)
 
-    def test_chart_and_detail_panels_keep_equal_fixed_desktop_height(self):
+    def test_chart_is_stacked_above_full_width_detail_table(self):
         rendered = enable_performance_table_scroll(
             "<html><head></head><body>"
             "<div class='performance-trend-layout-v54'>"
@@ -37,28 +37,31 @@ class PerformanceTableScrollV55Tests(unittest.TestCase):
             "</section></div></body></html>"
         )
 
-        self.assertIn("align-items:stretch!important", rendered)
-        self.assertIn("grid-auto-rows:1fr", rendered)
-        self.assertIn(".performance-chart-v54,\n.performance-detail-v54", rendered)
-        self.assertIn("height:600px!important", rendered)
-        self.assertIn("min-height:600px!important", rendered)
-        self.assertIn("max-height:600px!important", rendered)
-        self.assertIn("flex:1 1 0", rendered)
-        self.assertIn("height:0", rendered)
+        self.assertIn("grid-template-columns:minmax(0,1fr)!important", rendered)
+        self.assertIn("grid-auto-rows:auto!important", rendered)
+        self.assertIn("gap:20px!important", rendered)
+        self.assertIn("align-items:start!important", rendered)
+        self.assertIn("width:100%", rendered)
+        self.assertIn("height:auto!important", rendered)
+        self.assertNotIn("height:600px!important", rendered)
+        self.assertNotIn("grid-template-columns:minmax(520px", rendered)
 
-    def test_detail_table_uses_compact_rows_instead_of_filling_panel_height(self):
+    def test_chart_keeps_readable_height_and_table_rows_stay_compact(self):
         rendered = enable_performance_table_scroll(
             "<html><head></head><body>"
+            "<div class='performance-trend-layout-v54'>"
+            "<section class='performance-chart-v54'></section>"
+            "<section class='performance-detail-v54'>"
             "<table class='performance-detail-table-v54'></table>"
-            "</body></html>"
+            "</section></div></body></html>"
         )
 
-        self.assertIn("height:auto!important", rendered)
-        self.assertIn("min-height:0!important", rendered)
+        self.assertIn("height:430px!important", rendered)
+        self.assertIn("min-height:430px!important", rendered)
         self.assertIn("height:82px!important", rendered)
         self.assertIn("height:92px!important", rendered)
         self.assertIn("padding:12px 9px!important", rendered)
-        self.assertNotIn("height:calc((100% - 118px) / 3)", rendered)
+        self.assertIn("width:100%!important", rendered)
 
     def test_rewrite_is_idempotent(self):
         html = (
@@ -72,7 +75,7 @@ class PerformanceTableScrollV55Tests(unittest.TestCase):
             twice.count("<div class='performance-detail-scroll-v55'>"),
             1,
         )
-        self.assertEqual(twice.count("PERFORMANCE_TABLE_SCROLL_V57"), 1)
+        self.assertEqual(twice.count("PERFORMANCE_TABLE_SCROLL_V58"), 1)
 
 
 if __name__ == "__main__":
