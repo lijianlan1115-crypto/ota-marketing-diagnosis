@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from marketing_diagnosis.performance_trend_v54 import attach_performance_trend
 from marketing_diagnosis.performance_yoy_v37 import _score_from_month_ratio
 from marketing_diagnosis.visual_diagnosis import _n
 
@@ -219,6 +220,10 @@ def patch_performance_yoy(
         "过夜房出租率(扣自用房)、间夜数、房费、平均房价、出租率、RevPar、现付账房费；"
         "分别展示日度、月度、年度及对应同期值，YOY=同期÷本期。"
     )
+
+    # Customer trend view: previous two complete natural months plus current MTD.
+    # This is display-only data and does not change the existing score calculation.
+    attach_performance_trend(item, rows, current_day)
 
 
 __all__ = ["CATEGORY", "METRIC_ORDER", "patch_performance_yoy"]
