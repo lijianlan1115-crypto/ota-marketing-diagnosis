@@ -100,24 +100,32 @@ class ManualRoomNameTests(unittest.TestCase):
         self.assertEqual(item["records"][0]["character_count"], 5)
         self.assertFalse(item["records"][0]["passed"])
 
-    def test_four_independent_inputs_are_rendered_by_default(self):
+    def test_input_count_defaults_to_one_and_can_be_requested(self):
         html = _input_rows_html([])
-        self.assertEqual(html.count("manual-room-name-input-v52"), 4)
+        self.assertEqual(html.count("manual-room-name-input-v52"), 1)
         self.assertIn("房型1", html)
-        self.assertIn("房型4", html)
-        self.assertIn("请输入第4个房型名称", html)
+        self.assertNotIn("房型2", html)
 
-    def test_report_contains_multiple_inputs_and_working_controls(self):
+        html = _input_rows_html([], minimum=6)
+        self.assertEqual(html.count("manual-room-name-input-v52"), 6)
+        self.assertIn("房型6", html)
+        self.assertIn("请输入第6个房型名称", html)
+
+    def test_report_contains_custom_count_and_working_controls(self):
         result = self._result()
         patch_manual_room_name_score(
             result,
             {"manual_inputs": [{"room_type_names": ["五人战队套房"]}]},
         )
         html = _manual_room_card(result["items"][0])
-        self.assertEqual(html.count("manual-room-name-input-v52"), 4)
+        self.assertEqual(html.count("manual-room-name-input-v52"), 1)
+        self.assertIn("输入框数量", html)
+        self.assertIn("manual-room-count-input-v53", html)
+        self.assertIn("设置数量", html)
         self.assertIn("+ 新增房型", html)
         self.assertIn("即时计算", html)
         self.assertIn("S14ManualRoomCalculate", html)
+        self.assertIn("S14ManualRoomSetCount", html)
         self.assertIn("卖点表达", html)
         self.assertIn("五人战队套房", html)
         self.assertIn("4分", html)
@@ -125,10 +133,12 @@ class ManualRoomNameTests(unittest.TestCase):
 
         script = _script()
         self.assertIn("window.S14ManualRoomCalculate=calculate", script)
+        self.assertIn("window.S14ManualRoomSetCount=setCount", script)
         self.assertIn("window.S14ManualRoomAdd", script)
         self.assertIn("window.S14ManualRoomRemove", script)
         self.assertIn("document.addEventListener('click'", script)
-        self.assertIn("Math.max(4,names.length)", script)
+        self.assertIn("Math.min(100,Math.max(1,number))", script)
+        self.assertNotIn("Math.max(4,names.length)", script)
 
 
 if __name__ == "__main__":
