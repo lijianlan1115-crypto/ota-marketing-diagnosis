@@ -7,20 +7,25 @@ from marketing_diagnosis import reporting_v37 as upstream
 
 
 PERFORMANCE_TABLE_SCROLL_STYLE = """
-<style>/* PERFORMANCE_TABLE_SCROLL_V57 */
+<style>/* PERFORMANCE_TABLE_SCROLL_V58 */
 .performance-trend-layout-v54{
-  align-items:stretch!important;
-  grid-auto-rows:1fr;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-auto-rows:auto!important;
+  gap:20px!important;
+  align-items:start!important;
 }
 .performance-chart-v54,
 .performance-detail-v54{
   box-sizing:border-box;
   display:flex;
   flex-direction:column;
+  width:100%;
+  max-width:100%;
   min-width:0;
-  height:600px!important;
-  min-height:600px!important;
-  max-height:600px!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
   padding:18px;
   border:1px solid #dfe8e5;
   border-radius:14px;
@@ -32,23 +37,24 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
   flex:0 0 auto;
 }
 .performance-chart-v54 .performance-svg-wrap-v54{
-  flex:1 1 0;
-  width:100%;
-  height:0;
-  min-height:0;
+  flex:0 0 auto;
   display:flex;
   align-items:center;
+  width:100%;
+  height:430px!important;
+  min-height:430px!important;
+  overflow:hidden;
 }
 .performance-chart-v54 .performance-svg-v54{
   display:block;
   width:100%;
-  height:100%;
+  height:100%!important;
   min-height:0!important;
 }
 .performance-detail-v54 .performance-detail-scroll-v55{
-  flex:1 1 0;
-  height:0;
-  min-height:0;
+  flex:0 0 auto;
+  height:auto!important;
+  min-height:0!important;
 }
 .performance-detail-scroll-v55{
   display:block;
@@ -62,7 +68,7 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
   -webkit-overflow-scrolling:touch;
 }
 .performance-detail-scroll-v55 .performance-detail-table-v54{
-  width:940px!important;
+  width:100%!important;
   min-width:940px!important;
   height:auto!important;
   min-height:0!important;
@@ -102,23 +108,10 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
 .performance-detail-scroll-v55 .performance-detail-table-v54 td:not(:first-child){
   min-width:180px!important;
 }
-@media(max-width:1180px){
-  .performance-trend-layout-v54{
-    grid-auto-rows:auto;
-  }
-  .performance-chart-v54,
-  .performance-detail-v54{
-    height:auto!important;
-    min-height:0!important;
-    max-height:none!important;
-  }
+@media(max-width:680px){
   .performance-chart-v54 .performance-svg-wrap-v54{
-    height:auto;
-    min-height:420px;
-  }
-  .performance-detail-v54 .performance-detail-scroll-v55{
-    height:auto;
-    min-height:0;
+    height:360px!important;
+    min-height:360px!important;
   }
 }
 </style>
@@ -131,7 +124,7 @@ _TABLE_PATTERN = re.compile(
 
 
 def enable_performance_table_scroll(html_text: str) -> str:
-    """Keep every operating-data column visible with compact detail rows."""
+    """Stack the operating chart above a complete horizontally scrollable table."""
 
     if "performance-detail-scroll-v55" not in html_text:
         html_text = _TABLE_PATTERN.sub(
@@ -139,7 +132,7 @@ def enable_performance_table_scroll(html_text: str) -> str:
             html_text,
             count=1,
         )
-    if "PERFORMANCE_TABLE_SCROLL_V57" not in html_text:
+    if "PERFORMANCE_TABLE_SCROLL_V58" not in html_text:
         html_text = html_text.replace(
             "</head>",
             PERFORMANCE_TABLE_SCROLL_STYLE + "</head>",
