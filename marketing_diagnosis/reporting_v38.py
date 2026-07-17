@@ -7,9 +7,10 @@ from marketing_diagnosis import reporting_v37 as upstream
 
 
 PERFORMANCE_TABLE_SCROLL_STYLE = """
-<style>/* PERFORMANCE_TABLE_SCROLL_V55 */
+<style>/* PERFORMANCE_TABLE_SCROLL_V56 */
 .performance-trend-layout-v54{
   align-items:stretch!important;
+  grid-auto-rows:1fr;
 }
 .performance-chart-v54,
 .performance-detail-v54{
@@ -17,26 +18,36 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
   display:flex;
   flex-direction:column;
   min-width:0;
-  height:100%;
-  min-height:570px;
+  height:600px!important;
+  min-height:600px!important;
+  max-height:600px!important;
   padding:18px;
   border:1px solid #dfe8e5;
   border-radius:14px;
   background:#fff;
   overflow:hidden;
 }
+.performance-chart-v54 .performance-chart-head-v54,
+.performance-detail-v54 .performance-detail-head-v54{
+  flex:0 0 auto;
+}
 .performance-chart-v54 .performance-svg-wrap-v54{
-  flex:1 1 auto;
+  flex:1 1 0;
+  width:100%;
+  height:0;
   min-height:0;
   display:flex;
   align-items:center;
 }
 .performance-chart-v54 .performance-svg-v54{
+  display:block;
   width:100%;
-  min-height:360px;
+  height:100%;
+  min-height:0!important;
 }
 .performance-detail-v54 .performance-detail-scroll-v55{
-  flex:1 1 auto;
+  flex:1 1 0;
+  height:0;
   min-height:0;
 }
 .performance-detail-scroll-v55{
@@ -54,7 +65,19 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
   width:940px!important;
   min-width:940px!important;
   height:100%!important;
+  min-height:100%!important;
   table-layout:fixed!important;
+}
+.performance-detail-scroll-v55 .performance-detail-table-v54 thead tr{
+  height:118px;
+}
+.performance-detail-scroll-v55 .performance-detail-table-v54 tbody tr{
+  height:calc((100% - 118px) / 3);
+}
+.performance-detail-scroll-v55 .performance-detail-table-v54 th,
+.performance-detail-scroll-v55 .performance-detail-table-v54 td{
+  box-sizing:border-box;
+  vertical-align:middle!important;
 }
 .performance-detail-scroll-v55 .performance-detail-table-v54 th:first-child,
 .performance-detail-scroll-v55 .performance-detail-table-v54 td:first-child{
@@ -63,6 +86,7 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
   z-index:3;
   width:190px!important;
   min-width:190px!important;
+  white-space:nowrap!important;
   background:#fff;
   box-shadow:8px 0 12px -12px rgba(30,45,40,.55);
 }
@@ -77,10 +101,19 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
   min-width:180px!important;
 }
 @media(max-width:1180px){
+  .performance-trend-layout-v54{
+    grid-auto-rows:auto;
+  }
   .performance-chart-v54,
   .performance-detail-v54{
+    height:auto!important;
+    min-height:570px!important;
+    max-height:none!important;
+  }
+  .performance-chart-v54 .performance-svg-wrap-v54,
+  .performance-detail-v54 .performance-detail-scroll-v55{
     height:auto;
-    min-height:0;
+    min-height:420px;
   }
 }
 </style>
@@ -101,7 +134,7 @@ def enable_performance_table_scroll(html_text: str) -> str:
             html_text,
             count=1,
         )
-    if "PERFORMANCE_TABLE_SCROLL_V55" not in html_text:
+    if "PERFORMANCE_TABLE_SCROLL_V56" not in html_text:
         html_text = html_text.replace(
             "</head>",
             PERFORMANCE_TABLE_SCROLL_STYLE + "</head>",
