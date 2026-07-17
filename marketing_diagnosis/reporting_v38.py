@@ -7,7 +7,38 @@ from marketing_diagnosis import reporting_v37 as upstream
 
 
 PERFORMANCE_TABLE_SCROLL_STYLE = """
-<style>
+<style>/* PERFORMANCE_TABLE_SCROLL_V55 */
+.performance-trend-layout-v54{
+  align-items:stretch!important;
+}
+.performance-chart-v54,
+.performance-detail-v54{
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  height:100%;
+  min-height:570px;
+  padding:18px;
+  border:1px solid #dfe8e5;
+  border-radius:14px;
+  background:#fff;
+  overflow:hidden;
+}
+.performance-chart-v54 .performance-svg-wrap-v54{
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
+  align-items:center;
+}
+.performance-chart-v54 .performance-svg-v54{
+  width:100%;
+  min-height:360px;
+}
+.performance-detail-v54 .performance-detail-scroll-v55{
+  flex:1 1 auto;
+  min-height:0;
+}
 .performance-detail-scroll-v55{
   display:block;
   width:100%;
@@ -22,6 +53,7 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
 .performance-detail-scroll-v55 .performance-detail-table-v54{
   width:940px!important;
   min-width:940px!important;
+  height:100%!important;
   table-layout:fixed!important;
 }
 .performance-detail-scroll-v55 .performance-detail-table-v54 th:first-child,
@@ -44,6 +76,13 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
 .performance-detail-scroll-v55 .performance-detail-table-v54 td:not(:first-child){
   min-width:180px!important;
 }
+@media(max-width:1180px){
+  .performance-chart-v54,
+  .performance-detail-v54{
+    height:auto;
+    min-height:0;
+  }
+}
 </style>
 """
 
@@ -54,7 +93,7 @@ _TABLE_PATTERN = re.compile(
 
 
 def enable_performance_table_scroll(html_text: str) -> str:
-    """Keep every operating-data column visible through horizontal scrolling."""
+    """Keep every operating-data column visible and align both panel heights."""
 
     if "performance-detail-scroll-v55" not in html_text:
         html_text = _TABLE_PATTERN.sub(
@@ -63,12 +102,11 @@ def enable_performance_table_scroll(html_text: str) -> str:
             count=1,
         )
     if "PERFORMANCE_TABLE_SCROLL_V55" not in html_text:
-        style = PERFORMANCE_TABLE_SCROLL_STYLE.replace(
-            "<style>",
-            "<style>/* PERFORMANCE_TABLE_SCROLL_V55 */",
+        html_text = html_text.replace(
+            "</head>",
+            PERFORMANCE_TABLE_SCROLL_STYLE + "</head>",
             1,
         )
-        html_text = html_text.replace("</head>", style + "</head>", 1)
     return html_text
 
 
