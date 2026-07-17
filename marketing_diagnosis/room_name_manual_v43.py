@@ -32,18 +32,81 @@ SELLING_POINT_TERMS = (
 )
 
 _MANUAL_SOURCE = "用户手动输入（网页/飞书文本或语音转写）"
-_SPLIT_PATTERN = re.compile(r"[\n\r,，、;；|]+")
+_STRONG_SPLIT_PATTERN = re.compile(r"[,，、;；|]+")
+_LIST_MARKER_PATTERN = re.compile(
+    r"^\s*(?:[-*•·●▪◦]+|\d{1,3}\s*[.、)）:：])\s*"
+)
+_COMPLETE_ROOM_NAME_PATTERN = re.compile(
+    r"(?:房|房间|客房|套房|大床|双床|单人间|双人间|三人间|四人间|五人间|多人间|榻榻米)"
+    r"(?:\s*[（(【\[].*?[）)】\]])?\s*$"
+)
 _PREFIX_PATTERN = re.compile(
     r"(?:房型名称|房型名|人工房型|在售房型)\s*(?:是|为|有|包括|如下|[:：])\s*(.+)",
     re.IGNORECASE | re.DOTALL,
 )
 
 
+def _clean_input_line(value: Any) -> str:
+    text = str(value or "").replace("\u200b", "").replace("\ufeff", "")
+    text = _LIST_MARKER_PATTERN.sub("", text, count=1).strip()
+    text = text.strip(" \t。.!！?？：:,，、;；|\"'“”‘’")
+    if not re.search(r"[0-9A-Za-z\u3400-\u9fff]", text):
+        return ""
+    return text
+
+
+def _looks_complete_room_name(value: str) -> bool:
+    return bool(_COMPLETE_ROOM_NAME_PATTERN.search(str(value or "").strip()))
+
+
+def _merge_wrapped_lines(value: str) -> list[str]:
+    """Merge hard line wraps while preserving intentional one-room-per-line input.
+
+    A newline is treated as a real room boundary only when the previous buffer
+    already looks like a complete room name (for example ending in 房/间/床/套房)
+    or the new line starts with an explicit list marker. Otherwise the line is
+    considered a wrapped continuation and is joined back without spaces.
+    """
+
+    lines = str(value or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    names: list[str] = []
+    buffer = ""
+
+    for raw_line in lines:
+        has_list_marker = bool(_LIST_MARKER_PATTERN.match(raw_line))
+        line = _clean_input_line(raw_line)
+        if not line:
+            continue
+
+        if not buffer:
+            buffer = line
+            continue
+
+        if has_list_marker or _looks_complete_room_name(buffer):
+            names.append(buffer)
+            buffer = line
+        else:
+            buffer += line
+
+    if buffer:
+        names.append(buffer)
+    return names
+
+
+def _split_manual_text(value: str) -> list[str]:
+    names: list[str] = []
+    for segment in _STRONG_SPLIT_PATTERN.split(str(value or "")):
+        names.extend(_merge_wrapped_lines(segment))
+    return names
+
+
 def normalize_room_type_names(value: Any) -> list[str]:
-    """Normalize a list/string of manually supplied room type names."""
+    """Normalize manually supplied names without splitting wrapped long names."""
 
     if value in (None, ""):
         return []
+
+    raw_values: list[Any]
     if isinstance(value, str):
         text = value.strip()
         if not text:
@@ -51,16 +114,21 @@ def normalize_room_type_names(value: Any) -> list[str]:
         match = _PREFIX_PATTERN.search(text)
         if match:
             text = match.group(1).strip()
-        values: Iterable[Any] = _SPLIT_PATTERN.split(text)
+        raw_values = _split_manual_text(text)
     elif isinstance(value, (list, tuple, set)):
-        values = value
+        raw_values = []
+        for item in value:
+            if isinstance(item, str):
+                raw_values.extend(normalize_room_type_names(item))
+            else:
+                raw_values.append(item)
     else:
-        values = [value]
+        raw_values = [value]
 
     names: list[str] = []
     seen: set[str] = set()
-    for raw in values:
-        name = str(raw or "").strip().strip("。.!！?？：:")
+    for raw in raw_values:
+        name = _clean_input_line(raw)
         if not name or name in seen:
             continue
         seen.add(name)
@@ -136,13 +204,7 @@ def patch_manual_room_name_score(
     result: dict[str, Any],
     sections: dict[str, list[dict[str, Any]]],
 ) -> None:
-    """Make item 11 an always-scored manual-input item.
-
-    The rule is all-or-nothing: every supplied room type name must contain more
-    than five non-whitespace characters and at least one selling-point term.
-    Missing manual input is scored as zero so the item never drops out of the
-    connected score denominator.
-    """
+    """Make item 11 an always-scored manual-input item."""
 
     item = _item(result, 11)
     if item is None:
