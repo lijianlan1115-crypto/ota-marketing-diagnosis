@@ -7,7 +7,7 @@ from marketing_diagnosis import reporting_v37 as upstream
 
 
 PERFORMANCE_TABLE_SCROLL_STYLE = """
-<style>/* PERFORMANCE_TABLE_SCROLL_V56 */
+<style>/* PERFORMANCE_TABLE_SCROLL_V57 */
 .performance-trend-layout-v54{
   align-items:stretch!important;
   grid-auto-rows:1fr;
@@ -64,19 +64,21 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
 .performance-detail-scroll-v55 .performance-detail-table-v54{
   width:940px!important;
   min-width:940px!important;
-  height:100%!important;
-  min-height:100%!important;
+  height:auto!important;
+  min-height:0!important;
   table-layout:fixed!important;
 }
 .performance-detail-scroll-v55 .performance-detail-table-v54 thead tr{
-  height:118px;
+  height:82px!important;
 }
 .performance-detail-scroll-v55 .performance-detail-table-v54 tbody tr{
-  height:calc((100% - 118px) / 3);
+  height:92px!important;
 }
 .performance-detail-scroll-v55 .performance-detail-table-v54 th,
 .performance-detail-scroll-v55 .performance-detail-table-v54 td{
   box-sizing:border-box;
+  height:auto!important;
+  padding:12px 9px!important;
   vertical-align:middle!important;
 }
 .performance-detail-scroll-v55 .performance-detail-table-v54 th:first-child,
@@ -107,13 +109,16 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
   .performance-chart-v54,
   .performance-detail-v54{
     height:auto!important;
-    min-height:570px!important;
+    min-height:0!important;
     max-height:none!important;
   }
-  .performance-chart-v54 .performance-svg-wrap-v54,
-  .performance-detail-v54 .performance-detail-scroll-v55{
+  .performance-chart-v54 .performance-svg-wrap-v54{
     height:auto;
     min-height:420px;
+  }
+  .performance-detail-v54 .performance-detail-scroll-v55{
+    height:auto;
+    min-height:0;
   }
 }
 </style>
@@ -126,7 +131,7 @@ _TABLE_PATTERN = re.compile(
 
 
 def enable_performance_table_scroll(html_text: str) -> str:
-    """Keep every operating-data column visible and align both panel heights."""
+    """Keep every operating-data column visible with compact detail rows."""
 
     if "performance-detail-scroll-v55" not in html_text:
         html_text = _TABLE_PATTERN.sub(
@@ -134,7 +139,7 @@ def enable_performance_table_scroll(html_text: str) -> str:
             html_text,
             count=1,
         )
-    if "PERFORMANCE_TABLE_SCROLL_V56" not in html_text:
+    if "PERFORMANCE_TABLE_SCROLL_V57" not in html_text:
         html_text = html_text.replace(
             "</head>",
             PERFORMANCE_TABLE_SCROLL_STYLE + "</head>",
