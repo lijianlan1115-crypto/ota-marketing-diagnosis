@@ -27,7 +27,7 @@ class PerformanceTableScrollV55Tests(unittest.TestCase):
         self.assertIn("房费（元）", rendered)
         self.assertIn("69,076.50 / 66,719.96", rendered)
 
-    def test_chart_and_detail_panels_use_equal_fixed_desktop_height(self):
+    def test_chart_and_detail_panels_keep_equal_fixed_desktop_height(self):
         rendered = enable_performance_table_scroll(
             "<html><head></head><body>"
             "<div class='performance-trend-layout-v54'>"
@@ -45,9 +45,20 @@ class PerformanceTableScrollV55Tests(unittest.TestCase):
         self.assertIn("max-height:600px!important", rendered)
         self.assertIn("flex:1 1 0", rendered)
         self.assertIn("height:0", rendered)
-        self.assertIn("height:100%!important", rendered)
-        self.assertIn("min-height:100%!important", rendered)
-        self.assertIn("height:calc((100% - 118px) / 3)", rendered)
+
+    def test_detail_table_uses_compact_rows_instead_of_filling_panel_height(self):
+        rendered = enable_performance_table_scroll(
+            "<html><head></head><body>"
+            "<table class='performance-detail-table-v54'></table>"
+            "</body></html>"
+        )
+
+        self.assertIn("height:auto!important", rendered)
+        self.assertIn("min-height:0!important", rendered)
+        self.assertIn("height:82px!important", rendered)
+        self.assertIn("height:92px!important", rendered)
+        self.assertIn("padding:12px 9px!important", rendered)
+        self.assertNotIn("height:calc((100% - 118px) / 3)", rendered)
 
     def test_rewrite_is_idempotent(self):
         html = (
@@ -61,7 +72,7 @@ class PerformanceTableScrollV55Tests(unittest.TestCase):
             twice.count("<div class='performance-detail-scroll-v55'>"),
             1,
         )
-        self.assertEqual(twice.count("PERFORMANCE_TABLE_SCROLL_V56"), 1)
+        self.assertEqual(twice.count("PERFORMANCE_TABLE_SCROLL_V57"), 1)
 
 
 if __name__ == "__main__":
