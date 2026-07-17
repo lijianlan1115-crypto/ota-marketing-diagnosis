@@ -81,11 +81,17 @@ def _format_range(start: date, end: date) -> str:
 
 
 def _growth(current: Any, previous: Any) -> float | None:
+    """Return YOY growth as (current - previous) / previous.
+
+    The returned value is a decimal ratio. For example, 0.0353 is rendered as
+    +3.53%. Missing values and a zero prior-year value are not calculable.
+    """
+
     current_number = _number(current)
     previous_number = _number(previous)
     if current_number is None or previous_number in (None, 0):
         return None
-    return current_number / previous_number - 1
+    return (current_number - previous_number) / previous_number
 
 
 def _latest_rows_within(
@@ -119,9 +125,9 @@ def build_performance_trend_periods(
     """Build two complete natural months plus current month-to-date from JL02.
 
     Only rows where ``category=总营业指标`` and ``room_type_id`` is empty are
-    accepted.  Every displayed current/prior value is read directly from the
-    matching row's ``value_month`` field.  Display YOY uses the common growth
-    formula ``current / previous - 1``; the existing diagnosis score remains
+    accepted. Every displayed current/prior value is read directly from the
+    matching row's ``value_month`` field. Display YOY uses
+    ``(current - previous) / previous``; the existing diagnosis score remains
     untouched and continues to use its previously confirmed rule.
     """
 
