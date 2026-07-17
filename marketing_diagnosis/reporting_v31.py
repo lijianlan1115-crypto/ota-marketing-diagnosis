@@ -15,7 +15,7 @@ MANUAL_ROOM_STYLE = """
 .manual-room-input-v31,.manual-room-result-v31{padding:16px;border:1px solid #dfe8e5;border-radius:12px;background:#f8fbfa}
 .manual-room-input-v31 h4,.manual-room-result-v31 h4{margin:0 0 8px;color:#26343d;font-size:16px}
 .manual-room-input-v31 p{margin:0 0 10px;color:var(--muted);font-size:12px;line-height:1.6}
-.manual-room-textarea-v31{box-sizing:border-box;width:100%;min-height:150px;padding:12px;border:1px solid #cfdad6;border-radius:9px;background:#fff;color:#26343d;font:inherit;line-height:1.55;resize:vertical}
+.manual-room-textarea-v31{box-sizing:border-box;width:100%;min-height:150px;padding:12px;border:1px solid #cfdad6;border-radius:9px;background:#fff;color:#26343d;font:inherit;line-height:1.55;resize:vertical;white-space:pre;overflow-x:auto;overflow-y:auto;word-break:normal}
 .manual-room-actions-v31{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
 .manual-room-button-v31{padding:9px 16px;border:0;border-radius:8px;background:#16845b;color:#fff;font-weight:800;cursor:pointer}
 .manual-room-hint-v31{color:var(--muted);font-size:11px;line-height:1.5}
@@ -130,11 +130,11 @@ def _manual_room_card(item: dict[str, Any]) -> str:
         "</div></div>"
         "<div class='result-area'><div class='manual-room-panel-v31'>"
         "<div class='manual-room-input-v31'><h4>手动输入房型名称</h4>"
-        "<p>每行填写一个房型，也可以用逗号或顿号分隔。严格大于5个字且命中卖点表达才通过；任一房型不通过，整项为0分。</p>"
-        f"<textarea class='manual-room-textarea-v31' placeholder='例如：\n五人战队套房\n电竞双床房'>{reporting_v8._e(names)}</textarea>"
+        "<p>建议使用逗号、顿号或分号分隔房型。粘贴长名称产生的断行会自动拼回；完整以房、间、床或套房结尾的行仍可作为独立房型。</p>"
+        f"<textarea class='manual-room-textarea-v31' wrap='off' spellcheck='false' placeholder='例如：五人战队套房、电竞双床房'>{reporting_v8._e(names)}</textarea>"
         "<div class='manual-room-actions-v31'>"
         "<button type='button' class='manual-room-button-v31'>即时计算</button>"
-        "<span class='manual-room-hint-v31'>网页计算只影响当前页面试算；正式总分请在飞书发送“房型名称：……”后重新生成报告。</span>"
+        "<span class='manual-room-hint-v31'>点击后会先自动合并误换行，再计算字符数和卖点。网页试算不写回正式总分。</span>"
         "</div></div>"
         "<div class='manual-room-result-v31'><h4>评分明细</h4>"
         "<div class='table-scroll'><table class='manual-room-table-v31'><thead><tr>"
@@ -153,10 +153,36 @@ def _script() -> str:
 <script>
 (function(){{
   const terms={terms_json};
+  const strongSplit=/[,，、;；|]+/;
+  const listMarker=/^\s*(?:[-*•·●▪◦]+|\d{{1,3}}\s*[.、)）:：])\s*/;
+  const completeRoom=/(?:房|房间|客房|套房|大床|双床|单人间|双人间|三人间|四人间|五人间|多人间|榻榻米)(?:\s*[（(【\[].*?[）)】\]])?\s*$/;
+  const cleanLine=(raw)=>{{
+    const text=String(raw||'')
+      .replace(/[\u200b\ufeff]/g,'')
+      .replace(listMarker,'')
+      .trim()
+      .replace(/^[\s。.!！?？：:,，、;；|"'“”‘’]+|[\s。.!！?？：:,，、;；|"'“”‘’]+$/g,'');
+    return /[0-9A-Za-z\u3400-\u9fff]/.test(text)?text:'';
+  }};
   const splitNames=(text)=>{{
+    const collected=[];
+    String(text||'').replace(/\r\n?/g,'\n').split(strongSplit).forEach(segment=>{{
+      let buffer='';
+      segment.split('\n').forEach(raw=>{{
+        const marked=listMarker.test(raw);
+        const line=cleanLine(raw);
+        if(!line) return;
+        if(!buffer){{buffer=line;return;}}
+        if(marked||completeRoom.test(buffer)){{collected.push(buffer);buffer=line;}}
+        else{{buffer+=line;}}
+      }});
+      if(buffer) collected.push(buffer);
+    }});
     const seen=new Set();
-    return String(text||'').split(/[\\n\\r,，、;；|]+/).map(x=>x.trim()).filter(x=>{{
-      if(!x||seen.has(x)) return false; seen.add(x); return true;
+    return collected.map(cleanLine).filter(name=>{{
+      if(!name||seen.has(name)) return false;
+      seen.add(name);
+      return true;
     }});
   }};
   document.querySelectorAll('.manual-room-card-v31').forEach(card=>{{
@@ -169,8 +195,9 @@ def _script() -> str:
     if(!button||!textarea||!body) return;
     button.addEventListener('click',()=>{{
       const names=splitNames(textarea.value);
+      textarea.value=names.join('\n');
       const records=names.map(name=>{{
-        const count=name.replace(/\\s+/g,'').length;
+        const count=name.replace(/\s+/g,'').length;
         const sellingPoint=terms.find(term=>name.includes(term))||'';
         return {{name,count,sellingPoint,passed:count>5&&!!sellingPoint}};
       }});
