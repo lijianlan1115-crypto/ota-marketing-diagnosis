@@ -39,14 +39,14 @@ class PerformanceTableScrollV55Tests(unittest.TestCase):
 
         self.assertIn("grid-template-columns:minmax(0,1fr)!important", rendered)
         self.assertIn("grid-auto-rows:auto!important", rendered)
-        self.assertIn("gap:20px!important", rendered)
+        self.assertIn("gap:16px!important", rendered)
         self.assertIn("align-items:start!important", rendered)
         self.assertIn("width:100%", rendered)
         self.assertIn("height:auto!important", rendered)
         self.assertNotIn("height:600px!important", rendered)
         self.assertNotIn("grid-template-columns:minmax(520px", rendered)
 
-    def test_chart_keeps_readable_height_and_table_rows_stay_compact(self):
+    def test_chart_keeps_compact_height_and_table_rows_stay_compact(self):
         rendered = enable_performance_table_scroll(
             "<html><head></head><body>"
             "<div class='performance-trend-layout-v54'>"
@@ -56,8 +56,8 @@ class PerformanceTableScrollV55Tests(unittest.TestCase):
             "</section></div></body></html>"
         )
 
-        self.assertIn("height:430px!important", rendered)
-        self.assertIn("min-height:430px!important", rendered)
+        self.assertIn("height:360px!important", rendered)
+        self.assertIn("min-height:360px!important", rendered)
         self.assertIn("height:82px!important", rendered)
         self.assertIn("height:92px!important", rendered)
         self.assertIn("padding:12px 9px!important", rendered)
@@ -75,7 +75,7 @@ class PerformanceTableScrollV55Tests(unittest.TestCase):
             twice.count("<div class='performance-detail-scroll-v55'>"),
             1,
         )
-        self.assertEqual(twice.count("PERFORMANCE_TABLE_SCROLL_V58"), 1)
+        self.assertEqual(twice.count("PERFORMANCE_TABLE_SCROLL_V59"), 1)
 
 
 if __name__ == "__main__":
