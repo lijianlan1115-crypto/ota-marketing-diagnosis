@@ -7,12 +7,12 @@ from marketing_diagnosis import reporting_v37 as upstream
 
 
 PERFORMANCE_TABLE_SCROLL_STYLE = """
-<style>/* PERFORMANCE_TABLE_SCROLL_V58 */
+<style>/* PERFORMANCE_TABLE_SCROLL_V59 */
 .performance-trend-layout-v54{
   display:grid!important;
   grid-template-columns:minmax(0,1fr)!important;
   grid-auto-rows:auto!important;
-  gap:20px!important;
+  gap:16px!important;
   align-items:start!important;
 }
 .performance-chart-v54,
@@ -41,8 +41,8 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
   display:flex;
   align-items:center;
   width:100%;
-  height:430px!important;
-  min-height:430px!important;
+  height:360px!important;
+  min-height:360px!important;
   overflow:hidden;
 }
 .performance-chart-v54 .performance-svg-v54{
@@ -110,8 +110,8 @@ PERFORMANCE_TABLE_SCROLL_STYLE = """
 }
 @media(max-width:680px){
   .performance-chart-v54 .performance-svg-wrap-v54{
-    height:360px!important;
-    min-height:360px!important;
+    height:320px!important;
+    min-height:320px!important;
   }
 }
 </style>
@@ -132,7 +132,7 @@ def enable_performance_table_scroll(html_text: str) -> str:
             html_text,
             count=1,
         )
-    if "PERFORMANCE_TABLE_SCROLL_V58" not in html_text:
+    if "PERFORMANCE_TABLE_SCROLL_V59" not in html_text:
         html_text = html_text.replace(
             "</head>",
             PERFORMANCE_TABLE_SCROLL_STYLE + "</head>",
