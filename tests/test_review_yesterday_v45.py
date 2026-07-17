@@ -7,7 +7,7 @@ from marketing_diagnosis.db_loader_v9 import (
     _attach_yesterday_review_count,
     _yesterday_review_count,
 )
-from marketing_diagnosis.reporting_v32 import _reputation_card
+from marketing_diagnosis.reporting_v32 import _reputation_card, _yesterday_date
 from marketing_diagnosis.review_yesterday_v45 import patch_yesterday_review_count
 
 
@@ -91,9 +91,10 @@ class ReviewYesterdayTests(unittest.TestCase):
         )
         self.assertEqual(field["value"], 7)
         self.assertIn("2026-07-15", field["note"])
+        self.assertEqual(item["yesterday_review_date"], "2026-07-15")
         self.assertIn("review_time", item["source_fields"])
 
-    def test_report_displays_all_reputation_cards(self):
+    def test_report_displays_exact_yesterday_date(self):
         item = {
             "standard_item_id": 13,
             "item_name": "口碑分析",
@@ -103,6 +104,7 @@ class ReviewYesterdayTests(unittest.TestCase):
             "participates_in_score": True,
             "source_table": "hotel_puyue.meituan_ota_review_detail",
             "source_fields": ["review_time", "COUNT(*)"],
+            "yesterday_review_date": "2026-07-15",
             "fields": [
                 {"label": "美团评分", "value": 4.8},
                 {"label": "美团点评条数", "value": 2337},
@@ -122,7 +124,23 @@ class ReviewYesterdayTests(unittest.TestCase):
             "大众点评未回复点评数",
         ):
             self.assertIn(label, html)
-        self.assertIn("最新快照 / 昨日", html)
+        self.assertEqual(_yesterday_date(item), "2026-07-15")
+        self.assertIn("昨日新增点评数", html)
+        self.assertIn("（2026-07-15）", html)
+        self.assertIn("最新快照 / 2026-07-15", html)
+        self.assertNotIn("最新快照 / 昨日</strong>", html)
+
+    def test_report_can_recover_date_from_existing_field_note(self):
+        item = {
+            "fields": [
+                {
+                    "label": "昨日新增点评数",
+                    "value": 5,
+                    "note": "统计日期：2026/07/16；DATE(review_time)=昨日",
+                }
+            ]
+        }
+        self.assertEqual(_yesterday_date(item), "2026-07-16")
 
 
 if __name__ == "__main__":
