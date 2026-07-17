@@ -66,6 +66,7 @@ def _load_latest_promotion_performance(
         table,
         max(20, min(limit, 1000)),
         hotel_id=hotel_id,
+        extra_filters=[("promotion_status", "=", "RUNNING")],
         order_candidates=order_candidates,
     )
     if not rows:
@@ -73,6 +74,7 @@ def _load_latest_promotion_performance(
             **diag,
             "required_columns": sorted(required),
             "rows_used": 0,
+            "status_filter": "promotion_status=RUNNING",
         }
 
     source = rows[0]
@@ -98,10 +100,12 @@ def _load_latest_promotion_performance(
         **diag,
         "required_columns": sorted(required),
         "rows_used": 1,
+        "status_filter": "promotion_status=RUNNING",
         "selected_promotion_status": mapped.get("promotion_status"),
         "aggregation_rule": (
-            "use the latest row from meituan_ota_promotion_performance_30d; "
-            "spend_amount and booking_order_amount map directly"
+            "filter promotion_status=RUNNING first, then use the latest row from "
+            "meituan_ota_promotion_performance_30d; spend_amount and "
+            "booking_order_amount map directly"
         ),
     }
 
@@ -160,7 +164,8 @@ def load_mysql_dsn_dataset(
                 "rows": 1 if summary is not None else 0,
                 "rule": (
                     "item 09 uses hotel_puyue.meituan_ota_promotion_performance_30d; "
-                    "promotion_status, spend_amount and booking_order_amount map directly"
+                    "only promotion_status=RUNNING rows are eligible; spend_amount "
+                    "and booking_order_amount map directly"
                 ),
             }
         )
