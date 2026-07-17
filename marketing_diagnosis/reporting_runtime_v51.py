@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-from marketing_diagnosis import reporting_v39 as upstream
+from marketing_diagnosis import reporting_v40 as upstream
 
 
 CARD_RE = re.compile(
