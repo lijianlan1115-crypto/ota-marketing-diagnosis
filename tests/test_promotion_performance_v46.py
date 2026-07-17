@@ -7,6 +7,7 @@ from marketing_diagnosis.db_loader_v11 import (
     _load_latest_promotion_performance,
 )
 from marketing_diagnosis.promotion_performance_v46 import (
+    _latest_performance_row,
     _score_ratio,
     patch_promotion_performance,
 )
@@ -69,13 +70,14 @@ class PromotionPerformanceTests(unittest.TestCase):
             ]
         }
 
-    def test_table_and_loader_mapping(self):
+    def test_table_and_loader_mapping_filters_running(self):
         self.assertEqual(
             DEFAULT_MYSQL_TABLES["meituan_promotion_performance_30d"],
             "meituan_ota_promotion_performance_30d",
         )
+        cursor = _Cursor()
         row, diag = _load_latest_promotion_performance(
-            _Cursor(),
+            cursor,
             "meituan_ota_promotion_performance_30d",
             5000,
             "puyue",
@@ -84,6 +86,29 @@ class PromotionPerformanceTests(unittest.TestCase):
         self.assertEqual(row["spend_amount"], 2000)
         self.assertEqual(row["booking_order_amount"], 24000)
         self.assertEqual(diag["rows_used"], 1)
+        self.assertIn("promotion_status", cursor.sql)
+        self.assertIn("RUNNING", cursor.params)
+
+    def test_section_selector_uses_latest_running_not_latest_inactive(self):
+        sections = {
+            "promotion_finance": [
+                {
+                    "promotion_status": "RUNNING",
+                    "spend_amount": 2000,
+                    "booking_order_amount": 16000,
+                    "snapshot_time": "2026-07-16 10:00:00",
+                },
+                {
+                    "promotion_status": "PAUSED",
+                    "spend_amount": 5000,
+                    "booking_order_amount": 100000,
+                    "snapshot_time": "2026-07-16 12:00:00",
+                },
+            ]
+        }
+        row = _latest_performance_row(sections)
+        self.assertEqual(row["promotion_status"], "RUNNING")
+        self.assertEqual(row["booking_order_amount"], 16000)
 
     def test_score_boundaries(self):
         self.assertEqual(_score_ratio("RUNNING", 1000, 20), 0)
@@ -102,10 +127,10 @@ class PromotionPerformanceTests(unittest.TestCase):
         labels = [field["label"] for field in item["fields"]]
         self.assertEqual(
             labels,
-            ["推广状态", "近30天推广投入", "预订订单金额（元）", "ROI"],
+            ["近30天推广投入", "预订订单金额（元）", "ROI"],
         )
 
-    def test_missing_or_inactive_is_mandatory_zero(self):
+    def test_missing_inactive_or_low_spend_is_mandatory_zero(self):
         visual = self._visual()
         patch_promotion_performance(visual, {})
         item = visual["items"][0]
@@ -119,19 +144,30 @@ class PromotionPerformanceTests(unittest.TestCase):
         )
         self.assertEqual(visual["items"][0]["item_score"], 0)
 
-    def test_report_uses_near_30_day_labels(self):
+        visual = self._visual()
+        patch_promotion_performance(
+            visual,
+            self._sections(status="RUNNING", spend=600, booking=4521),
+        )
+        self.assertEqual(visual["items"][0]["item_score"], 0)
+        self.assertAlmostEqual(
+            visual["items"][0]["promotion_performance"]["roi"],
+            7.535,
+        )
+
+    def test_report_hides_promotion_status(self):
         visual = self._visual()
         patch_promotion_performance(visual, self._sections())
         html = _promotion_card(visual["items"][0])
         for text in (
             "近30天",
-            "推广状态",
             "近30天推广投入",
             "预订订单金额（元）",
             "ROI",
-            "RUNNING",
         ):
             self.assertIn(text, html)
+        self.assertNotIn("推广状态", html)
+        self.assertNotIn("RUNNING", html)
         self.assertNotIn("本月美团EBK订单金额", html)
         self.assertNotIn("待计算", html)
 
