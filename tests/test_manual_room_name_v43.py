@@ -80,7 +80,7 @@ class ManualRoomNameTests(unittest.TestCase):
             {
                 "manual_inputs": [
                     {
-                        "room_type_names": ["五人战队套房", "电竞双床房"],
+                        "room_type_names": ["五人战队套房", "豪华电竞双床房"],
                         "source_table": "飞书语音转写人工输入",
                     }
                 ]
