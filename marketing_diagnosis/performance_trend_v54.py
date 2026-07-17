@@ -5,6 +5,7 @@ from datetime import date
 from typing import Any
 
 
+CATEGORY = "总营业指标"
 DISPLAY_METRICS = (
     ("房费", "房费", "revenue"),
     ("平均房价", "ADR", "adr"),
@@ -41,6 +42,15 @@ def _date(value: Any) -> date | None:
 def _metric_name(value: Any) -> str:
     text = str(value or "").strip().replace(" ", "")
     return _METRIC_ALIASES.get(text.lower(), _METRIC_ALIASES.get(text, text))
+
+
+def _is_total_metric_row(row: dict[str, Any]) -> bool:
+    return (
+        str(row.get("category") or "").strip() == CATEGORY
+        and row.get("room_type_id") in (None, "")
+        and _metric_name(row.get("metric_name"))
+        in {source_name for source_name, _, _ in DISPLAY_METRICS}
+    )
 
 
 def _shift_month(value: date, months: int) -> date:
@@ -87,12 +97,12 @@ def _latest_rows_within(
     latest_day: date | None = None
 
     for index, row in enumerate(rows):
+        if not _is_total_metric_row(row):
+            continue
         business_day = _date(row.get("business_date"))
         if business_day is None or business_day < start or business_day > end:
             continue
         metric = _metric_name(row.get("metric_name"))
-        if metric not in {item[0] for item in DISPLAY_METRICS}:
-            continue
         latest_day = business_day if latest_day is None or business_day > latest_day else latest_day
         order_key = (business_day, str(row.get("snapshot_time") or ""), index)
         current = selected.get(metric)
@@ -106,12 +116,13 @@ def build_performance_trend_periods(
     rows: list[dict[str, Any]],
     latest_business_day: str | date | None,
 ) -> list[dict[str, Any]]:
-    """Build the previous two natural months plus current month-to-date.
+    """Build two complete natural months plus current month-to-date from JL02.
 
-    Each period uses the latest available JL02 row inside the period.  The
-    comparison period uses the same calendar range one year earlier.  Display
-    YOY follows the common growth formula ``current / previous - 1``; the
-    existing item score remains untouched by this report data helper.
+    Only rows where ``category=总营业指标`` and ``room_type_id`` is empty are
+    accepted.  Every displayed current/prior value is read directly from the
+    matching row's ``value_month`` field.  Display YOY uses the common growth
+    formula ``current / previous - 1``; the existing diagnosis score remains
+    untouched and continues to use its previously confirmed rule.
     """
 
     latest = latest_business_day if isinstance(latest_business_day, date) else _date(latest_business_day)
@@ -181,6 +192,7 @@ def attach_performance_trend(
 
 
 __all__ = [
+    "CATEGORY",
     "DISPLAY_METRICS",
     "attach_performance_trend",
     "build_performance_trend_periods",
