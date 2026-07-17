@@ -11,14 +11,23 @@ from marketing_diagnosis.room_name_manual_v43 import SELLING_POINT_TERMS
 
 MANUAL_ROOM_STYLE = """
 <style>
-.manual-room-panel-v31{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(520px,1.7fr);gap:16px;align-items:start}
-.manual-room-input-v31,.manual-room-result-v31{padding:16px;border:1px solid #dfe8e5;border-radius:12px;background:#f8fbfa}
+.manual-room-panel-v31{display:grid;grid-template-columns:minmax(420px,1.05fr) minmax(560px,1.7fr);gap:16px;align-items:start}
+.manual-room-input-v31,.manual-room-result-v31{padding:16px;border:1px solid #dfe8e5;border-radius:12px;background:#f8fbfa;position:relative}
 .manual-room-input-v31 h4,.manual-room-result-v31 h4{margin:0 0 8px;color:#26343d;font-size:16px}
-.manual-room-input-v31 p{margin:0 0 10px;color:var(--muted);font-size:12px;line-height:1.6}
-.manual-room-textarea-v31{box-sizing:border-box;width:100%;min-height:150px;padding:12px;border:1px solid #cfdad6;border-radius:9px;background:#fff;color:#26343d;font:inherit;line-height:1.55;resize:vertical;white-space:pre;overflow-x:auto;overflow-y:auto;word-break:normal}
-.manual-room-actions-v31{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
-.manual-room-button-v31{padding:9px 16px;border:0;border-radius:8px;background:#16845b;color:#fff;font-weight:800;cursor:pointer}
-.manual-room-hint-v31{color:var(--muted);font-size:11px;line-height:1.5}
+.manual-room-input-v31 p{margin:0 0 12px;color:var(--muted);font-size:12px;line-height:1.6}
+.manual-room-fields-v52{display:flex;flex-direction:column;gap:9px}
+.manual-room-field-v52{display:grid;grid-template-columns:62px minmax(0,1fr) 54px;gap:8px;align-items:center}
+.manual-room-field-v52 label{color:#596773;font-size:12px;font-weight:800;white-space:nowrap}
+.manual-room-name-input-v52{box-sizing:border-box;width:100%;height:42px;padding:0 11px;border:1px solid #cfdad6;border-radius:8px;background:#fff;color:#26343d;font:inherit;line-height:42px;white-space:nowrap;overflow-x:auto;outline:none}
+.manual-room-name-input-v52:focus{border-color:#16845b;box-shadow:0 0 0 3px rgba(22,132,91,.10)}
+.manual-room-remove-v52{height:34px;padding:0 8px;border:1px solid #e3c8c2;border-radius:7px;background:#fff5f2;color:#a04e3d;font-size:11px;font-weight:800;cursor:pointer;position:relative;z-index:4;pointer-events:auto}
+.manual-room-actions-v31{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;position:relative;z-index:5}
+.manual-room-button-v31,.manual-room-add-v52{min-height:42px;padding:9px 16px;border:0;border-radius:8px;font-weight:800;cursor:pointer;position:relative;z-index:6;pointer-events:auto;touch-action:manipulation}
+.manual-room-button-v31{background:#16845b;color:#fff}
+.manual-room-add-v52{background:#e8f4ef;color:#176747;border:1px solid #c8e2d6}
+.manual-room-button-v31:hover{background:#116f4c}
+.manual-room-add-v52:hover{background:#dcefe7}
+.manual-room-hint-v31{display:block;margin-top:10px;color:var(--muted);font-size:11px;line-height:1.5}
 .manual-room-table-v31{width:100%;border-collapse:collapse;background:#fff}
 .manual-room-table-v31 th,.manual-room-table-v31 td{padding:9px 11px;border-bottom:1px solid #e3ebe8;text-align:left;line-height:1.35;height:auto}
 .manual-room-table-v31 th{background:#f3f6f5;color:#596773;font-size:12px}
@@ -28,7 +37,8 @@ MANUAL_ROOM_STYLE = """
 .manual-room-score-note-v31.is-zero{background:#fff2ef;color:#8c4939}
 .room-type-card-v30 .room-summary-v30>div:first-child small{font-size:0}
 .room-type-card-v30 .room-summary-v30>div:first-child small::after{content:'全部在售房型数';font-size:12px}
-@media(max-width:900px){.manual-room-panel-v31{grid-template-columns:1fr}}
+@media(max-width:1050px){.manual-room-panel-v31{grid-template-columns:1fr}}
+@media(max-width:560px){.manual-room-field-v52{grid-template-columns:52px minmax(0,1fr)}.manual-room-remove-v52{grid-column:2;justify-self:end}}
 </style>
 """
 
@@ -105,9 +115,26 @@ def _rows_html(records: list[dict[str, Any]]) -> str:
     return "".join(rows)
 
 
+def _input_rows_html(records: list[dict[str, Any]], minimum: int = 4) -> str:
+    names = [str(record.get("room_type_name") or "").strip() for record in records]
+    total = max(minimum, len(names))
+    rows: list[str] = []
+    for index in range(total):
+        value = names[index] if index < len(names) else ""
+        rows.append(
+            "<div class='manual-room-field-v52'>"
+            f"<label>房型{index + 1}</label>"
+            f"<input type='text' class='manual-room-name-input-v52' value='{reporting_v8._e(value)}' "
+            f"placeholder='请输入第{index + 1}个房型名称' autocomplete='off' spellcheck='false'>"
+            "<button type='button' class='manual-room-remove-v52' "
+            "onclick='return window.S14ManualRoomRemove ? window.S14ManualRoomRemove(this) : false;'>删除</button>"
+            "</div>"
+        )
+    return "".join(rows)
+
+
 def _manual_room_card(item: dict[str, Any]) -> str:
     records = _records(item)
-    names = "\n".join(str(record.get("room_type_name") or "") for record in records)
     score = float(item.get("item_score") or 0)
     base_score = float(item.get("base_score") or 4)
     passed = score >= base_score and bool(records)
@@ -120,7 +147,7 @@ def _manual_room_card(item: dict[str, Any]) -> str:
         f"data-title='{reporting_v8._e(item.get('item_name'))}' id='rule-11'>"
         "<div class='card-top'><div class='rule-no'>11</div>"
         "<div class='card-title'><h3>房型名称卖点优化</h3>"
-        "<p>房型名称由用户手动输入；支持网页即时试算，也支持飞书文本或语音转写后生成正式评分。</p></div>"
+        "<p>每个输入框填写一个房型名称；全部填写后统一即时计算，也支持飞书文本或语音转写后生成正式评分。</p></div>"
         "<div class='card-tags'>"
         "<div class='title-meta-item title-period'><small>统计口径</small><strong>人工输入</strong></div>"
         f"<div class='title-meta-item title-score {'ok' if passed else 'zero'}'><small>当前得分</small>"
@@ -130,12 +157,16 @@ def _manual_room_card(item: dict[str, Any]) -> str:
         "</div></div>"
         "<div class='result-area'><div class='manual-room-panel-v31'>"
         "<div class='manual-room-input-v31'><h4>手动输入房型名称</h4>"
-        "<p>建议使用逗号、顿号或分号分隔房型。粘贴长名称产生的断行会自动拼回；完整以房、间、床或套房结尾的行仍可作为独立房型。</p>"
-        f"<textarea class='manual-room-textarea-v31' wrap='off' spellcheck='false' placeholder='例如：五人战队套房、电竞双床房'>{reporting_v8._e(names)}</textarea>"
+        "<p>默认提供4个单行输入框，每个框只填一个完整房型名称。房型超过4个时点击“新增房型”。</p>"
+        f"<div class='manual-room-fields-v52'>{_input_rows_html(records)}</div>"
         "<div class='manual-room-actions-v31'>"
-        "<button type='button' class='manual-room-button-v31'>即时计算</button>"
-        "<span class='manual-room-hint-v31'>点击后会先自动合并误换行，再计算字符数和卖点。网页试算不写回正式总分。</span>"
-        "</div></div>"
+        "<button type='button' class='manual-room-add-v52' "
+        "onclick='return window.S14ManualRoomAdd ? window.S14ManualRoomAdd(this) : false;'>+ 新增房型</button>"
+        "<button type='button' class='manual-room-button-v31' "
+        "onclick='return window.S14ManualRoomCalculate ? window.S14ManualRoomCalculate(this) : false;'>即时计算</button>"
+        "</div>"
+        "<span class='manual-room-hint-v31'>填写完成后点击“即时计算”，系统会统一计算字符数、卖点表达及本项得分。网页试算不写回正式总分。</span>"
+        "</div>"
         "<div class='manual-room-result-v31'><h4>评分明细</h4>"
         "<div class='table-scroll'><table class='manual-room-table-v31'><thead><tr>"
         "<th>房型名称</th><th>字符数</th><th>卖点表达</th><th>判定</th>"
@@ -149,71 +180,130 @@ def _manual_room_card(item: dict[str, Any]) -> str:
 
 def _script() -> str:
     terms_json = json.dumps(list(SELLING_POINT_TERMS), ensure_ascii=False)
-    return f"""
+    script = r"""
 <script>
-(function(){{
-  const terms={terms_json};
-  const strongSplit=/[,，、;；|]+/;
-  const listMarker=/^\s*(?:[-*•·●▪◦]+|\d{{1,3}}\s*[.、)）:：])\s*/;
-  const completeRoom=/(?:房|房间|客房|套房|大床|双床|单人间|双人间|三人间|四人间|五人间|多人间|榻榻米)(?:\s*[（(【\[].*?[）)】\]])?\s*$/;
-  const cleanLine=(raw)=>{{
-    const text=String(raw||'')
-      .replace(/[\u200b\ufeff]/g,'')
-      .replace(listMarker,'')
-      .trim()
-      .replace(/^[\s。.!！?？：:,，、;；|"'“”‘’]+|[\s。.!！?？：:,，、;；|"'“”‘’]+$/g,'');
-    return /[0-9A-Za-z\u3400-\u9fff]/.test(text)?text:'';
-  }};
-  const splitNames=(text)=>{{
-    const collected=[];
-    String(text||'').replace(/\r\n?/g,'\n').split(strongSplit).forEach(segment=>{{
-      let buffer='';
-      segment.split('\n').forEach(raw=>{{
-        const marked=listMarker.test(raw);
-        const line=cleanLine(raw);
-        if(!line) return;
-        if(!buffer){{buffer=line;return;}}
-        if(marked||completeRoom.test(buffer)){{collected.push(buffer);buffer=line;}}
-        else{{buffer+=line;}}
-      }});
-      if(buffer) collected.push(buffer);
-    }});
+(function(){
+  if(window.__s14ManualRoomV52Bound) return;
+  window.__s14ManualRoomV52Bound=true;
+  const terms=__TERMS__;
+  const splitPattern=/[\n\r,，、;；|]+/;
+  const cleanName=(value)=>String(value||'')
+    .replace(/[\u200b\ufeff]/g,'')
+    .trim()
+    .replace(/^[\s。.!！?？：:,，、;；|"'“”‘’]+|[\s。.!！?？：:,，、;；|"'“”‘’]+$/g,'');
+  const escapeHtml=(value)=>String(value||'').replace(/[&<>"']/g,(char)=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[char]));
+  const splitNames=(value)=>{
     const seen=new Set();
-    return collected.map(cleanLine).filter(name=>{{
+    return String(value||'').split(splitPattern).map(cleanName).filter((name)=>{
       if(!name||seen.has(name)) return false;
       seen.add(name);
       return true;
-    }});
-  }};
-  document.querySelectorAll('.manual-room-card-v31').forEach(card=>{{
-    const button=card.querySelector('.manual-room-button-v31');
-    const textarea=card.querySelector('.manual-room-textarea-v31');
+    });
+  };
+  const renumber=(container)=>{
+    Array.from(container.querySelectorAll('.manual-room-field-v52')).forEach((row,index)=>{
+      const label=row.querySelector('label');
+      const input=row.querySelector('.manual-room-name-input-v52');
+      if(label) label.textContent='房型'+(index+1);
+      if(input) input.placeholder='请输入第'+(index+1)+'个房型名称';
+    });
+  };
+  const appendRow=(container,value='')=>{
+    const row=document.createElement('div');
+    row.className='manual-room-field-v52';
+    row.innerHTML='<label></label><input type="text" class="manual-room-name-input-v52" autocomplete="off" spellcheck="false"><button type="button" class="manual-room-remove-v52">删除</button>';
+    const input=row.querySelector('.manual-room-name-input-v52');
+    if(input) input.value=value;
+    container.appendChild(row);
+    renumber(container);
+    if(input) input.focus();
+    return row;
+  };
+  const collectNames=(card)=>{
+    const names=[];
+    const seen=new Set();
+    card.querySelectorAll('.manual-room-name-input-v52').forEach((input)=>{
+      splitNames(input.value).forEach((name)=>{
+        if(!seen.has(name)){seen.add(name);names.push(name);}
+      });
+    });
+    return names;
+  };
+  const rebuildInputs=(card,names)=>{
+    const container=card.querySelector('.manual-room-fields-v52');
+    if(!container) return;
+    container.innerHTML='';
+    const total=Math.max(4,names.length);
+    for(let index=0;index<total;index++) appendRow(container,names[index]||'');
+    const first=container.querySelector('.manual-room-name-input-v52');
+    if(first) first.blur();
+  };
+  const calculate=(button)=>{
+    const card=button.closest('.manual-room-card-v31');
+    if(!card) return false;
     const body=card.querySelector('.manual-room-body-v31');
     const scoreNode=card.querySelector('.manual-room-score-v31');
     const statusNode=card.querySelector('.manual-room-status-v31');
     const noteNode=card.querySelector('.manual-room-score-note-v31');
-    if(!button||!textarea||!body) return;
-    button.addEventListener('click',()=>{{
-      const names=splitNames(textarea.value);
-      textarea.value=names.join('\n');
-      const records=names.map(name=>{{
-        const count=name.replace(/\s+/g,'').length;
-        const sellingPoint=terms.find(term=>name.includes(term))||'';
-        return {{name,count,sellingPoint,passed:count>5&&!!sellingPoint}};
-      }});
-      const passed=records.length>0&&records.every(x=>x.passed);
-      body.innerHTML=records.length?records.map(x=>`<tr><td><span class="room-name">${{x.name.replace(/[&<>"']/g,m=>({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[m]))}}</span></td><td>${{x.count}}</td><td>${{x.sellingPoint||'未命中'}}</td><td><span class="status-badge ${{x.passed?'ok':'disabled'}}">${{x.passed?'通过':'不通过'}}</span></td></tr>`):'<tr><td colspan="4">尚未输入房型名称，本项按0分。</td></tr>';
-      if(scoreNode) scoreNode.textContent=passed?'4分':'0分';
-      if(statusNode){{statusNode.textContent=passed?'已形成结果':'真实为0';statusNode.className='status-badge manual-room-status-v31 '+(passed?'ok':'disabled');}}
-      if(noteNode){{
-        noteNode.classList.toggle('is-zero',!passed);
-        noteNode.textContent=passed?'全部房型名称严格大于5个字且命中卖点表达，网页即时评分为4分。':'存在未通过房型或未输入，网页即时评分为0分。正式总分需重新生成报告。';
-      }}
-    }});
-  }});
-}})();
+    if(!body) return false;
+    const names=collectNames(card);
+    rebuildInputs(card,names);
+    const records=names.map((name)=>{
+      const count=name.replace(/\s+/g,'').length;
+      const sellingPoint=terms.find((term)=>name.includes(term))||'';
+      return {name,count,sellingPoint,passed:count>5&&!!sellingPoint};
+    });
+    const passed=records.length>0&&records.every((record)=>record.passed);
+    body.innerHTML=records.length?records.map((record)=>
+      '<tr><td><span class="room-name">'+escapeHtml(record.name)+'</span></td><td>'+record.count+'</td><td>'+escapeHtml(record.sellingPoint||'未命中')+'</td><td><span class="status-badge '+(record.passed?'ok':'disabled')+'">'+(record.passed?'通过':'不通过')+'</span></td></tr>'
+    ).join(''):'<tr><td colspan="4">尚未输入房型名称，本项按0分。</td></tr>';
+    if(scoreNode) scoreNode.textContent=passed?'4分':'0分';
+    if(statusNode){
+      statusNode.textContent=passed?'已形成结果':'真实为0';
+      statusNode.className='status-badge manual-room-status-v31 '+(passed?'ok':'disabled');
+    }
+    if(noteNode){
+      noteNode.classList.toggle('is-zero',!passed);
+      noteNode.textContent=passed?'全部房型名称严格大于5个字且命中卖点表达，网页即时评分为4分。':'存在未通过房型或未输入，网页即时评分为0分。正式总分需重新生成报告。';
+    }
+    return false;
+  };
+  window.S14ManualRoomCalculate=calculate;
+  window.S14ManualRoomAdd=(button)=>{
+    const card=button.closest('.manual-room-card-v31');
+    const container=card&&card.querySelector('.manual-room-fields-v52');
+    if(container) appendRow(container,'');
+    return false;
+  };
+  window.S14ManualRoomRemove=(button)=>{
+    const card=button.closest('.manual-room-card-v31');
+    const container=card&&card.querySelector('.manual-room-fields-v52');
+    const row=button.closest('.manual-room-field-v52');
+    if(container&&row){
+      const rows=container.querySelectorAll('.manual-room-field-v52');
+      if(rows.length>1) row.remove();
+      else{
+        const input=row.querySelector('.manual-room-name-input-v52');
+        if(input) input.value='';
+      }
+      renumber(container);
+    }
+    return false;
+  };
+  document.addEventListener('click',(event)=>{
+    const calculateButton=event.target.closest('.manual-room-button-v31');
+    if(calculateButton){event.preventDefault();calculate(calculateButton);return;}
+    const addButton=event.target.closest('.manual-room-add-v52');
+    if(addButton){event.preventDefault();window.S14ManualRoomAdd(addButton);return;}
+    const removeButton=event.target.closest('.manual-room-remove-v52');
+    if(removeButton){event.preventDefault();window.S14ManualRoomRemove(removeButton);}
+  });
+})();
 </script>
 """
+    return script.replace("__TERMS__", terms_json)
 
 
 def build_html(result: dict[str, Any]) -> str:
@@ -250,7 +340,9 @@ def write_reports(result: dict[str, Any], output_dir: str | Path) -> dict[str, s
 
 __all__ = [
     "MANUAL_ROOM_STYLE",
+    "_input_rows_html",
     "_manual_room_card",
+    "_script",
     "build_html",
     "build_markdown",
     "write_reports",
