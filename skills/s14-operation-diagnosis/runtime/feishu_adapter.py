@@ -139,8 +139,14 @@ def _status_text(item: dict[str, Any]) -> str:
 
 
 def _overview_lines(result: dict[str, Any]) -> list[str]:
-    visual = _visual(result)
-    normalized = _num(visual.get("normalized_score"))
+    scored_items = [
+        item
+        for item in _items(result)
+        if item.get("participates_in_score") and _num(item.get("item_score")) is not None
+    ]
+    raw_score = sum(_num(item.get("item_score")) or 0 for item in scored_items)
+    connected_base = sum(_num(item.get("base_score")) or 0 for item in scored_items)
+    normalized = raw_score / connected_base * 100 if connected_base else None
     return [f"- 总得分：{'待计算' if normalized is None else f'{normalized:.1f}'}/100"]
 
 
