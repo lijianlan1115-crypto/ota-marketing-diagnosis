@@ -3,7 +3,7 @@
 Primary runtime commands:
 
 ```bash
-python scripts/s14_feishu_entry.py --text 'S14诊断' --format card
+python scripts/s14_feishu_entry.py --text 'S14诊断' --format text
 ```
 
 ```bash

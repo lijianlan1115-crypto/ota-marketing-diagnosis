@@ -104,10 +104,22 @@ skills/s14-operation-diagnosis/openclaw.skill.yaml
 如果先走飞书入口包装脚本，可调用：
 
 ```bash
-python scripts/s14_feishu_entry.py --text 'S14诊断' --format card
+python scripts/s14_feishu_entry.py --text 'S14诊断' --format text
 ```
 
-返回值优先使用 `feishu_card`，失败时 fallback 到 `feishu_message`。
+通过 OpenClaw 的 shell/exec 工具调用时必须使用纯文本输出，避免卡片 JSON
+被通道当作普通聊天内容。只有专用的结构化发送适配器才能使用
+`--format card --raw-card-json`；适配器必须解析 JSON 后调用消息通道，
+不得把 stdout 原样回复给用户。
+
+数据来源按钮依赖飞书应用的卡片回调。回调未配置时保持
+`S14_FEISHU_CARD_CALLBACK_ENABLED=0`，卡片只提示用户直接回复“数据库”或
+“上传Excel”，不会展示无法点击的按钮。只有回调 URL 已配置、服务端能够处理
+`s14_source` 事件后，才可设置：
+
+```bash
+export S14_FEISHU_CARD_CALLBACK_ENABLED=1
+```
 
 ## 生成样例 Excel
 
@@ -233,7 +245,7 @@ python scripts/render_report_html.py \
 
 ```bash
 python -m unittest discover tests
-python scripts/s14_feishu_entry.py --text 'S14诊断' --format card
+python scripts/s14_feishu_entry.py --text 'S14诊断' --format text
 ```
 
 ## 后续计划

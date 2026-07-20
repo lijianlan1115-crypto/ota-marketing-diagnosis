@@ -16,14 +16,14 @@ Rules:
 
 When the user sends `S14诊断`:
 
-1. Prefer the Skill runtime's `source_selection` result. When executing the CLI wrapper, run `scripts/s14_feishu_entry.py` with the message text, current `chat_id`, current sender ID, and `--format card`.
-2. Send only the returned `feishu_card` or, when the channel cannot render a card, the returned `feishu_message`. It asks the user to select `数据库` or `上传Excel`.
+1. Prefer the Skill runtime's `source_selection` result. For an ordinary OpenClaw reply, send only its `feishu_message` field. Never send the complete result object or provider-native `feishu_card` JSON as assistant text.
+2. OpenClaw must render rich UI through its own message/presentation layer. When executing the CLI wrapper through a shell/exec tool, always use `--format text` and send that stdout exactly once. It asks the user to type `数据库` or `上传Excel`.
 3. For a database choice, invoke the Skill with `data_source_mode=database`, `platform=multi`, or call the same script with `--source-choice database`, using the same chat and sender IDs.
 4. For an Excel choice, invoke the Skill with `data_source_mode=excel_pending`, or call the same script with `--source-choice excel`, using the same chat and sender IDs.
-5. After Excel is selected, accept the same user's next `.xlsx` or `.xlsm` attachment in the same group without another @ mention. Download it locally and call the script with `--excel`, the same chat ID, the same sender ID, and `--format card`.
+5. After Excel is selected, accept the same user's next `.xlsx` or `.xlsm` attachment in the same group without another @ mention. Download it locally and call the script with `--excel`, the same chat ID, the same sender ID, and `--format text`.
 6. The pending Excel state expires after 10 minutes. Do not run an attachment diagnosis unless the same chat and sender have selected Excel.
 7. For an interactive-card callback with action `s14_source`, pass its `source` value to `--source-choice`.
-8. After database or Excel diagnosis completes, send the returned `feishu_card` or `feishu_message` exactly once. The result must contain the actual HTML report URL.
+8. After database or Excel diagnosis completes, send `feishu_message` exactly once when using exec/CLI. A dedicated structured adapter may request `--format card --raw-card-json`, parse the JSON, and send it through the channel API; its stdout must never be copied into chat. The result must contain the actual HTML report URL.
 
 Validated command pattern:
 
@@ -33,7 +33,7 @@ source .venv/bin/activate
 set -a
 source /etc/hotel-ota-ai/hotel-ota.env
 set +a
-python scripts/s14_feishu_entry.py --text 'S14诊断' --chat-id CHAT_ID --sender-id SENDER_ID --format card
+python scripts/s14_feishu_entry.py --text 'S14诊断' --chat-id CHAT_ID --sender-id SENDER_ID --format text
 ```
 
 Always send the runtime output exactly once. Do not prepend, summarize, repeat, or replace it with an explanation of code changes.

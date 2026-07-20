@@ -74,6 +74,17 @@ The skill returns:
 - `cap_rules_triggered`
 - `data_time_context`
 
+## OpenClaw delivery contract
+
+- A direct Skill invocation returns a structured result. Send only
+  `feishu_message` as the ordinary assistant reply.
+- Do not copy the full result object or `feishu_card` JSON into chat.
+- When the CLI is executed through shell/exec, use `--format text`.
+- `feishu_card` is retained only for a dedicated structured adapter. Such an
+  adapter must parse the object and submit it through the channel API; it must
+  not forward serialized JSON as message text.
+- Send either the structured card or the text fallback exactly once, never both.
+
 ## Safety boundary
 
 This is a report-only skill.
