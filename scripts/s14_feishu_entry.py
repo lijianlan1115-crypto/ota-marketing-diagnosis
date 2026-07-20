@@ -508,6 +508,27 @@ def _handle_source_choice(
     )
 
 
+def handle_card_source_choice(
+    source: str,
+    *,
+    chat_id: str,
+    sender_id: str,
+) -> dict[str, Any] | str:
+    """Run one trusted card source action and return a structured reply.
+
+    This is the public bridge used by the Feishu callback service. The returned
+    card remains an in-process object and must be sent through Feishu OpenAPI;
+    callers must never print or forward its serialized JSON as assistant text.
+    """
+    return _handle_source_choice(
+        source,
+        chat_id=chat_id,
+        sender_id=sender_id,
+        text="数据库" if source == "database" else "上传Excel",
+        output_format="card",
+    )
+
+
 def _manual_input_ack(names: list[str], state: dict[str, Any]) -> str:
     next_step = {
         "awaiting_source": "请继续选择“数据库”或“上传Excel”。",
