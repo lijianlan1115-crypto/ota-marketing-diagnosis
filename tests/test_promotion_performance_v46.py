@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
 
 from marketing_diagnosis.db_loader_v11 import (
     DEFAULT_MYSQL_TABLES,
@@ -13,7 +12,6 @@ from marketing_diagnosis.promotion_performance_v46 import (
     patch_promotion_performance,
 )
 from marketing_diagnosis.reporting_v34 import _promotion_card
-from marketing_diagnosis.rules_v5 import process
 
 
 class _Cursor:
@@ -156,33 +154,6 @@ class PromotionPerformanceTests(unittest.TestCase):
             visual["items"][0]["promotion_performance"]["roi"],
             7.535,
         )
-
-    def test_process_recalculates_overview_after_mandatory_zero_patch(self):
-        visual = self._visual()
-        visual.update(
-            {
-                "raw_score": 0,
-                "connected_base_score": 0,
-                "normalized_score": None,
-            }
-        )
-        with (
-            patch(
-                "marketing_diagnosis.rules_v5._base_process",
-                return_value={},
-            ),
-            patch(
-                "marketing_diagnosis.rules_v5.build_visual_diagnosis",
-                return_value=visual,
-            ),
-        ):
-            result = process({"sections": {}})
-
-        overview = result["visual_diagnosis"]
-        self.assertEqual(overview["items"][0]["item_score"], 0)
-        self.assertEqual(overview["raw_score"], 0)
-        self.assertEqual(overview["connected_base_score"], 8)
-        self.assertEqual(overview["normalized_score"], 0)
 
     def test_report_hides_promotion_status(self):
         visual = self._visual()

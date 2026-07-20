@@ -127,10 +127,11 @@ class FeishuReportAlignmentTests(unittest.TestCase):
 
     def test_text_reply_uses_same_visual_score_and_fields_as_report(self):
         reply = adapter.build_feishu_reply(self._result())
-        self.assertIn("折算得分：86.4/100", reply)
-        self.assertIn("原始得分：76/100", reply)
-        self.assertIn("已接入基础分：88/100", reply)
-        self.assertIn("未取到数据：1项", reply)
+        self.assertIn("总得分：86.4/100", reply)
+        self.assertNotIn("折算得分", reply)
+        self.assertNotIn("原始得分", reply)
+        self.assertNotIn("已接入基础分", reply)
+        self.assertNotIn("未取到数据", reply)
         self.assertIn("曝光 17,187", reply)
         self.assertIn("支付订单 147", reply)
         self.assertIn("二转 9.08%", reply)
@@ -148,7 +149,7 @@ class FeishuReportAlignmentTests(unittest.TestCase):
             for element in card["card"]["elements"]
             if element.get("tag") == "div"
         )
-        self.assertIn("折算得分：86.4/100", content)
+        self.assertIn("总得分：86.4/100", content)
         self.assertIn("04 流量", content)
         self.assertIn("09 推广", content)
         self.assertIn("13 口碑", content)
