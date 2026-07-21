@@ -9,7 +9,6 @@ from marketing_diagnosis.ctrip_report_v54 import build_html as build_ctrip_page
 
 HEAD_RE = re.compile(r"<head\b[^>]*>(?P<content>.*?)</head>", re.DOTALL | re.IGNORECASE)
 BODY_RE = re.compile(r"<body\b[^>]*>(?P<content>.*?)</body>", re.DOTALL | re.IGNORECASE)
-TITLE_RE = re.compile(r"<title>.*?</title>", re.DOTALL | re.IGNORECASE)
 STYLE_RE = re.compile(r"<style\b[^>]*>.*?</style>", re.DOTALL | re.IGNORECASE)
 SCRIPT_RE = re.compile(r"<script\b[^>]*>.*?</script>", re.DOTALL | re.IGNORECASE)
 PRINT_BUTTON_RE = re.compile(
@@ -24,41 +23,43 @@ RULE_ID_RE = re.compile(r"\bid=(['\"])(?:rule|module)-(?P<no>\d+)\1", re.IGNOREC
 RULE_HREF_RE = re.compile(r"\bhref=(['\"])#(?:rule|module)-(?P<no>\d+)\1", re.IGNORECASE)
 SECTION_ID_RE = re.compile(r"\bid=(['\"])(?P<name>overview|summary)\1", re.IGNORECASE)
 SEARCH_ID_REPLACEMENTS = {
-    "ruleSearch": "{channel}RuleSearch",
-    "statusFilter": "{channel}StatusFilter",
+    "ruleSearch": "ctripRuleSearch",
+    "statusFilter": "ctripStatusFilter",
 }
 
+
 DUAL_STYLE = """
-<style id='DUAL_CHANNEL_REPORT_V57'>
-.channel-view-v57{display:none}
-.channel-view-v57.is-active{display:block}
-.ota-channel-switch-v57{
+<style id='DUAL_CHANNEL_REPORT_V58'>
+.page.channel-view-v58{display:none}
+.page.channel-view-v58.is-active{display:grid}
+.ota-channel-switch-v58{
   display:inline-flex;align-items:center;padding:3px;
   border:1px solid var(--line,#dfe7e4);border-radius:9px;background:#f5f8f7
 }
-.ota-channel-switch-v57 button{
+.ota-channel-switch-v58 button{
   height:30px;display:inline-flex;align-items:center;justify-content:center;
   min-width:58px;padding:0 14px;border:0;border-radius:6px;background:transparent;
   color:var(--muted,#68747f);font:inherit;font-size:13px;font-weight:800;cursor:pointer
 }
-.ota-channel-switch-v57 button:hover{color:var(--green,#16845b)}
-.ota-channel-switch-v57 button.is-active{
+.ota-channel-switch-v58 button:hover{color:var(--green,#16845b)}
+.ota-channel-switch-v58 button.is-active{
   background:#fff;color:var(--green,#16845b);
   box-shadow:0 2px 8px rgba(31,41,51,.12)
 }
 @media print{
-  .channel-view-v57{display:none!important}
-  .channel-view-v57.is-active{display:block!important}
-  .ota-channel-switch-v57{display:none!important}
+  .page.channel-view-v58{display:none!important}
+  .page.channel-view-v58.is-active{display:grid!important}
+  .ota-channel-switch-v58{display:none!important}
 }
 </style>
 """
 
+
 DUAL_SCRIPT = r"""
-<script id='DUAL_CHANNEL_REPORT_SCRIPT_V57'>
+<script id='DUAL_CHANNEL_REPORT_SCRIPT_V58'>
 (function(){
   const valid=new Set(['meituan','ctrip']);
-  const views=Array.from(document.querySelectorAll('[data-channel-view]'));
+  const views=Array.from(document.querySelectorAll('.page[data-channel-view]'));
 
   function selectedChannel(){
     const value=new URLSearchParams(window.location.search).get('channel');
@@ -66,7 +67,7 @@ DUAL_SCRIPT = r"""
   }
 
   function activeView(){
-    return document.querySelector('[data-channel-view].is-active');
+    return document.querySelector('.page[data-channel-view].is-active');
   }
 
   function updateScope(channel){
@@ -77,12 +78,16 @@ DUAL_SCRIPT = r"""
       : '<option>综合诊断</option><option>PMS经营数据</option><option>美团EB数据</option>';
   }
 
+  function findTarget(hash){
+    const view=activeView();
+    if(!view||!hash) return null;
+    return view.querySelector('[data-channel-anchor="'+CSS.escape(hash)+'"]')
+      || view.querySelector('#'+CSS.escape(hash));
+  }
+
   function scrollToHash(){
     const hash=decodeURIComponent((window.location.hash||'').replace(/^#/,''));
-    if(!hash) return;
-    const view=activeView();
-    if(!view) return;
-    const target=view.querySelector('[data-channel-anchor="'+CSS.escape(hash)+'"]');
+    const target=findTarget(hash);
     if(target) requestAnimationFrame(()=>target.scrollIntoView({block:'start'}));
   }
 
@@ -118,13 +123,12 @@ DUAL_SCRIPT = r"""
     }
     const anchor=event.target.closest('a[href^="#"]');
     if(!anchor) return;
-    const value=decodeURIComponent(anchor.getAttribute('href').slice(1));
-    const view=activeView();
-    const target=view&&view.querySelector('[data-channel-anchor="'+CSS.escape(value)+'"]');
+    const hash=decodeURIComponent(anchor.getAttribute('href').slice(1));
+    const target=findTarget(hash);
     if(!target) return;
     event.preventDefault();
     const url=new URL(window.location.href);
-    url.hash=value;
+    url.hash=hash;
     history.pushState({channel:selectedChannel()},'',url);
     target.scrollIntoView({behavior:'smooth',block:'start'});
   });
@@ -137,17 +141,27 @@ DUAL_SCRIPT = r"""
 """
 
 
+def _scope_search_queries(document: str) -> str:
+    # Both channel generators use the same search/filter component. Restrict its
+    # card query to the nearest .page so filtering one channel never hides cards
+    # in the other hidden channel view.
+    document = document.replace(
+        "document.querySelectorAll('.diagnosis-card",
+        "(search.closest('.page')||document).querySelectorAll('.diagnosis-card",
+    )
+    document = document.replace(
+        'document.querySelectorAll(".diagnosis-card',
+        '(search.closest(".page")||document).querySelectorAll(".diagnosis-card',
+    )
+    return document
+
+
 def _document_parts(document: str) -> tuple[str, str]:
     head_match = HEAD_RE.search(document)
     body_match = BODY_RE.search(document)
     if head_match is None or body_match is None:
         raise ValueError("Generated report is missing a complete <head> or <body> element")
     return head_match.group("content"), body_match.group("content")
-
-
-def _extra_styles(base_head: str, other_head: str) -> str:
-    existing = set(STYLE_RE.findall(base_head))
-    return "".join(block for block in STYLE_RE.findall(other_head) if block not in existing)
 
 
 def _balanced_element(document: str, tag: str, class_name: str) -> str:
@@ -171,117 +185,140 @@ def _balanced_element(document: str, tag: str, class_name: str) -> str:
     raise ValueError(f"Generated report has an unclosed <{tag} class='{class_name}'>")
 
 
+def _extra_blocks(pattern: re.Pattern[str], base: str, other: str) -> str:
+    existing = set(pattern.findall(base))
+    return "".join(block for block in pattern.findall(other) if block not in existing)
+
+
 def _switch_html() -> str:
     return (
-        "<div class='ota-channel-switch-v57' aria-label='报告渠道'>"
+        "<div class='ota-channel-switch-v58' aria-label='报告渠道'>"
         "<button type='button' data-channel-target='meituan' aria-pressed='true'>美团</button>"
         "<button type='button' data-channel-target='ctrip' aria-pressed='false'>携程</button>"
         "</div>"
     )
 
 
-def _inject_switch(header: str) -> str:
+def _inject_switch(document: str) -> str:
     switch = _switch_html()
-    header, count = PRINT_BUTTON_RE.subn(
+    document, count = PRINT_BUTTON_RE.subn(
         lambda match: match.group(1) + switch,
-        header,
+        document,
         count=1,
     )
     if count == 0:
-        header, count = TOP_ACTIONS_RE.subn(
+        document, count = TOP_ACTIONS_RE.subn(
             lambda match: match.group(1) + switch,
-            header,
+            document,
             count=1,
         )
-    return switch + header if count == 0 else header
+    if count == 0:
+        raise ValueError("Meituan report is missing the top action area")
+    return document
 
 
-def _scope_content(content: str, channel: str) -> str:
-    for source, replacement in SEARCH_ID_REPLACEMENTS.items():
-        value = replacement.format(channel=channel)
-        content = content.replace(f"id='{source}'", f"id='{value}'")
-        content = content.replace(f'id="{source}"', f'id="{value}"')
-        content = content.replace(f"getElementById('{source}')", f"getElementById('{value}')")
-        content = content.replace(f'getElementById("{source}")', f'getElementById("{value}")')
+def _add_root_attributes(page: str, channel: str, active: bool) -> str:
+    start = re.search(
+        r"<div\b(?P<attrs>[^>]*\bclass=['\"][^'\"]*\bpage\b[^'\"]*['\"][^>]*)>",
+        page,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if start is None:
+        raise ValueError("Generated channel view is missing <div class='page'>")
+    attrs = start.group("attrs")
+    class_match = re.search(r"\bclass=(['\"])(?P<value>.*?)\1", attrs, re.DOTALL | re.IGNORECASE)
+    if class_match is None:
+        raise ValueError("Generated channel page has no class attribute")
+    classes = class_match.group("value").split()
+    if "channel-view-v58" not in classes:
+        classes.append("channel-view-v58")
+    if active and "is-active" not in classes:
+        classes.append("is-active")
+    quote = class_match.group(1)
+    class_attr = f"class={quote}{' '.join(classes)}{quote}"
+    attrs = attrs[: class_match.start()] + class_attr + attrs[class_match.end() :]
+    attrs += (
+        f" data-channel-view='{channel}'"
+        f" aria-hidden='{'false' if active else 'true'}'"
+    )
+    return page[: start.start()] + f"<div{attrs}>" + page[start.end() :]
 
-    content = RULE_ID_RE.sub(
+
+def _annotate_meituan(page: str) -> str:
+    page = RULE_ID_RE.sub(
         lambda match: (
-            f"id={match.group(1)}{channel}-module-{match.group('no')}{match.group(1)} "
+            f"id={match.group(1)}rule-{match.group('no')}{match.group(1)} "
             f"data-channel-anchor={match.group(1)}module-{match.group('no')}{match.group(1)}"
         ),
-        content,
+        page,
     )
-    content = RULE_HREF_RE.sub(
-        lambda match: f"href={match.group(1)}#module-{match.group('no')}{match.group(1)}",
-        content,
-    )
-    content = SECTION_ID_RE.sub(
+    page = SECTION_ID_RE.sub(
         lambda match: (
-            f"id={match.group(1)}{channel}-{match.group('name')}{match.group(1)} "
+            f"id={match.group(1)}{match.group('name')}{match.group(1)} "
             f"data-channel-anchor={match.group(1)}{match.group('name')}{match.group(1)}"
         ),
-        content,
+        page,
     )
-    return content
+    return _add_root_attributes(page, "meituan", True)
 
 
-def _unique_scripts(*bodies: str) -> str:
-    output: list[str] = []
-    seen: set[str] = set()
-    for body in bodies:
-        for block in SCRIPT_RE.findall(body):
-            if block not in seen:
-                seen.add(block)
-                output.append(block)
-    return "".join(output)
+def _scope_ctrip(page: str) -> str:
+    for source, replacement in SEARCH_ID_REPLACEMENTS.items():
+        page = page.replace(f"id='{source}'", f"id='{replacement}'")
+        page = page.replace(f'id="{source}"', f'id="{replacement}"')
+        page = page.replace(f"getElementById('{source}')", f"getElementById('{replacement}')")
+        page = page.replace(f'getElementById("{source}")', f'getElementById("{replacement}")')
+
+    page = RULE_ID_RE.sub(
+        lambda match: (
+            f"id={match.group(1)}ctrip-rule-{match.group('no')}{match.group(1)} "
+            f"data-channel-anchor={match.group(1)}module-{match.group('no')}{match.group(1)}"
+        ),
+        page,
+    )
+    page = RULE_HREF_RE.sub(
+        lambda match: f"href={match.group(1)}#module-{match.group('no')}{match.group(1)}",
+        page,
+    )
+    page = SECTION_ID_RE.sub(
+        lambda match: (
+            f"id={match.group(1)}ctrip-{match.group('name')}{match.group(1)} "
+            f"data-channel-anchor={match.group(1)}{match.group('name')}{match.group(1)}"
+        ),
+        page,
+    )
+    return _add_root_attributes(page, "ctrip", False)
 
 
 def build_html(result: dict[str, Any]) -> str:
-    """Generate the production report.html with two code-generated channel views.
+    """Add a code-generated Ctrip channel to the existing Meituan report.html.
 
-    The file has one shared header and one shared page shell. Meituan and Ctrip
-    each render their own directory, overview, summary and modules. The query
-    string ``?channel=meituan`` or ``?channel=ctrip`` only controls which
-    generated channel view is visible.
+    The complete Meituan document remains the production base. Only a channel
+    switch, Ctrip-specific styles/scripts and one independently generated Ctrip
+    ``.page`` block are injected. This keeps the current Meituan UI and all 23
+    Meituan items intact while adding a complete 22-item Ctrip view selected by
+    ``?channel=ctrip``.
     """
 
-    meituan_html = meituan_report.build_html(result)
-    ctrip_html = build_ctrip_page(result)
+    meituan_html = _scope_search_queries(meituan_report.build_html(result))
+    ctrip_html = _scope_search_queries(build_ctrip_page(result))
     meituan_head, meituan_body = _document_parts(meituan_html)
     ctrip_head, ctrip_body = _document_parts(ctrip_html)
 
-    scoped_meituan_body = _scope_content(meituan_body, "meituan")
-    scoped_ctrip_body = _scope_content(ctrip_body, "ctrip")
+    meituan_page = _balanced_element(meituan_body, "div", "page")
+    ctrip_page = _balanced_element(ctrip_body, "div", "page")
+    rendered_meituan_page = _annotate_meituan(meituan_page)
+    rendered_ctrip_page = _scope_ctrip(ctrip_page)
 
-    header = _inject_switch(_balanced_element(scoped_meituan_body, "header", "topbar"))
-    meituan_page = _balanced_element(scoped_meituan_body, "div", "page")
-    ctrip_page = _balanced_element(scoped_ctrip_body, "div", "page")
+    output = meituan_html.replace(meituan_page, rendered_meituan_page + rendered_ctrip_page, 1)
+    output = _inject_switch(output)
 
-    head = TITLE_RE.sub(
-        "<title>酒店 OTA 全面诊断报告</title>",
-        meituan_head,
-        count=1,
-    )
-    head += _extra_styles(head, ctrip_head)
-    head += DUAL_STYLE
+    extra_styles = _extra_blocks(STYLE_RE, meituan_head, ctrip_head)
+    output = output.replace("</head>", extra_styles + DUAL_STYLE + "</head>", 1)
 
-    scripts = _unique_scripts(scoped_meituan_body, scoped_ctrip_body)
-
-    return (
-        "<!doctype html><html lang='zh-CN'><head>"
-        + head
-        + "</head><body>"
-        + header
-        + "<section class='channel-view-v57 is-active' data-channel-view='meituan' aria-hidden='false'>"
-        + meituan_page
-        + "</section>"
-        + "<section class='channel-view-v57' data-channel-view='ctrip' aria-hidden='true'>"
-        + ctrip_page
-        + "</section>"
-        + scripts
-        + DUAL_SCRIPT
-        + "</body></html>"
-    )
+    extra_scripts = _extra_blocks(SCRIPT_RE, meituan_body, _scope_ctrip(ctrip_body))
+    output = output.replace("</body>", extra_scripts + DUAL_SCRIPT + "</body>", 1)
+    return output
 
 
 __all__ = ["build_html"]
