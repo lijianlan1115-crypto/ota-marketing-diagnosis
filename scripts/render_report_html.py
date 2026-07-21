@@ -4,13 +4,13 @@ import argparse
 import json
 from pathlib import Path
 
-from marketing_diagnosis.reporting_v2 import build_dual_channel_html
+from marketing_diagnosis.reporting_v2 import build_html
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Render an existing report.json into one dual-channel HTML file. "
+            "Render an existing report.json into the production report.html. "
             "Use ?channel=meituan or ?channel=ctrip to switch channels."
         )
     )
@@ -18,7 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         required=True,
-        help="Path to the single dual-channel HTML, for example 双渠道诊断报告预览.html",
+        help="Path to the final report.html",
     )
     return parser
 
@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
 
     result = json.loads(input_path.read_text(encoding="utf-8"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(build_dual_channel_html(result), encoding="utf-8")
+    output_path.write_text(build_html(result), encoding="utf-8")
 
     print(output_path)
     print(f"美团：{output_path.as_uri()}?channel=meituan")
