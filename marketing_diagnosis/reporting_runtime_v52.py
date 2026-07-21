@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from marketing_diagnosis import reporting_runtime_v51 as upstream
-from marketing_diagnosis.ctrip_report_v54 import transform as build_independent_ctrip_page
+from marketing_diagnosis.ctrip_report_v54 import build_html as build_ctrip_page
 
 
 CHANNEL_STYLE = """
@@ -67,17 +67,9 @@ def inject_channel_switch(html_text: str, active: str = "meituan") -> str:
 
 
 def build_ctrip_html(result: dict[str, Any]) -> str:
-    """Build a Ctrip report that is independent from the Meituan page.
+    """Generate the Ctrip report directly from result data."""
 
-    The production Meituan HTML is used only as the current visual/style source.
-    Ctrip receives a separate directory, overview, summary and channel modules.
-    Items 01 and 02 are copied as separate nodes with the same PMS data and
-    layout, while their Ctrip scores can be configured independently.
-    """
-
-    meituan_html = upstream.build_html(result)
-    ctrip_html = build_independent_ctrip_page(meituan_html, result)
-    return inject_channel_switch(ctrip_html, "ctrip")
+    return inject_channel_switch(build_ctrip_page(result), "ctrip")
 
 
 def build_html(result: dict[str, Any]) -> str:
