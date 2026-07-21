@@ -18,19 +18,21 @@ CTRIP_HTML = """<!doctype html><html><head><title>携程</title><style>.ctrip-on
 </body></html>"""
 
 
-def test_one_html_contains_two_code_generated_channels(monkeypatch):
+def test_report_html_has_one_shared_header_and_two_generated_channel_views(monkeypatch):
     monkeypatch.setattr(report.meituan_report, "build_html", lambda result: MEITUAN_HTML)
     monkeypatch.setattr(report, "build_ctrip_page", lambda result: CTRIP_HTML)
 
     output = report.build_html({"hotel_name": "测试酒店"})
 
     assert output.count("<!doctype html>") == 1
-    assert "data-channel-page='meituan'" in output
-    assert "data-channel-page='ctrip'" in output
-    assert "?channel=meituan" in output
-    assert "?channel=ctrip" in output
+    assert output.count("<header class='topbar'>") == 1
+    assert "data-channel-view='meituan'" in output
+    assert "data-channel-view='ctrip'" in output
+    assert "data-channel-target='meituan'" in output
+    assert "data-channel-target='ctrip'" in output
     assert "report.html" not in output
     assert "ctrip_report.html" not in output
+    assert "双渠道诊断报告预览.html" not in output
 
 
 def test_module_hash_and_duplicate_ids_are_scoped(monkeypatch):
