@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from marketing_diagnosis.ctrip_competition import build_competition_item
 from marketing_diagnosis.ctrip_configuration_v63 import build_configuration_items
 from marketing_diagnosis.ctrip_reputation_v64 import build_reputation_item
 from marketing_diagnosis.ctrip_user_profile_v58 import build_user_profile_item
@@ -25,6 +26,11 @@ def process(data: dict[str, Any]) -> dict[str, Any]:
     result["visual_diagnosis"] = visual
 
     ctrip_items = result.setdefault("ctrip_items", {})
+    existing_item_three = ctrip_items.get("3") or ctrip_items.get(3)
+    ctrip_items["3"] = build_competition_item(
+        sections,
+        existing_item_three if isinstance(existing_item_three, dict) else None,
+    )
     ctrip_items["4"] = build_user_profile_item(
         sections.get("ctrip_userprofile_distribution") or []
     )
