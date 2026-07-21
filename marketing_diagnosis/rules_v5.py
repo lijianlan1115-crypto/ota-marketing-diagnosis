@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from marketing_diagnosis.ctrip_user_profile_v58 import build_user_profile_item
 from marketing_diagnosis.promotion_performance_v46 import patch_promotion_performance
 from marketing_diagnosis.review_yesterday_v45 import patch_yesterday_review_count
 from marketing_diagnosis.rules_v4 import process as _base_process
@@ -20,6 +21,11 @@ def process(data: dict[str, Any]) -> dict[str, Any]:
     patch_promotion_performance(visual, sections)
     patch_yesterday_review_count(visual, sections)
     result["visual_diagnosis"] = visual
+
+    ctrip_items = result.setdefault("ctrip_items", {})
+    ctrip_items["4"] = build_user_profile_item(
+        sections.get("ctrip_userprofile_distribution") or []
+    )
     return result
 
 
