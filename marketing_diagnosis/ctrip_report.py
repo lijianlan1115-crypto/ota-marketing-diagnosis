@@ -25,7 +25,7 @@ COMPETITION_STYLE = """
 .ctrip-funnel-block.peer{margin-right:auto;background:linear-gradient(90deg,#b8ead8,#dff5eb);color:#126546}
 .ctrip-funnel-stage{color:#2e3c46;text-align:center;font-size:13px;font-weight:800;overflow-wrap:anywhere}
 .ctrip-funnel-empty-value{color:#81909a;font-size:12px;font-weight:750}
-.ctrip-competition-bottom{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px;margin-top:12px}
+.ctrip-competition-bottom{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px}
 .ctrip-competition-card{min-width:0;padding:14px;border:1px solid #dfe7e4;border-radius:10px;background:#fff}
 .ctrip-competition-card h4{margin:0 0 11px;color:#26343d;font-size:15px}
 .ctrip-competition-table-scroll{max-width:100%;overflow-x:auto}
@@ -209,16 +209,11 @@ def _loss_competitors(payload: dict[str, Any]) -> str:
     )
 
 
-def competition_card(result: dict[str, Any]) -> str:
-    item_spec = upstream.spec(3)
-    no, title, _, period, description, source, _ = item_spec
-    payload = upstream.item_payload(result, item_spec)
+def _card_header(item_spec: tuple[Any, ...], payload: dict[str, Any]) -> tuple[str, str, str, str]:
+    no, title, _, period, description, _, _ = item_spec
     key, text, css = upstream.status(payload)
     score_class = "ok" if upstream.score_value(payload) is not None else "pending"
-    source_path = payload.get("source_path") or "携程 eBooking -> 数据中心 -> 竞争圈动态"
-    source_text = payload.get("source") or "具体数据表与字段映射待确认"
-    return (
-        f"<article class='diagnosis-card' data-status='{upstream.e(key)}' data-title='{upstream.e(title)}' id='rule-{no}'>"
+    html = (
         "<div class='card-top'>"
         f"<div class='rule-no'>{no:02d}</div>"
         f"<div class='card-title'><h3>{upstream.e(title)}</h3><p>{upstream.e(description)}</p></div>"
@@ -228,10 +223,35 @@ def competition_card(result: dict[str, Any]) -> str:
         f"<div class='title-score-value'><strong>{upstream.e(upstream.score_text(item_spec, payload))}</strong>"
         f"<span>满分 {upstream.e(upstream.full_text(item_spec, payload))}</span></div></div>"
         f"<span class='status-badge {css}'>{upstream.e(text)}</span></div></div>"
-        "<div class='result-area'>"
-        f"{_funnel_content(payload)}"
+    )
+    return html, str(no), str(title), str(key)
+
+
+def funnel_card(result: dict[str, Any]) -> str:
+    item_spec = upstream.spec(3)
+    payload = upstream.item_payload(result, item_spec)
+    header, no, title, key = _card_header(item_spec, payload)
+    source_path = payload.get("source_path") or "携程 eBooking -> 数据中心 -> 流量与转化"
+    source_text = payload.get("source") or "待确认"
+    return (
+        f"<article class='diagnosis-card' data-status='{upstream.e(key)}' data-title='{upstream.e(title)}' id='rule-{no}'>"
+        f"{header}<div class='result-area'>{_funnel_content(payload)}"
+        f"<div class='ctrip-competition-source'><b>数据口径：</b>{upstream.e(source_path)}；数据表与字段映射：{upstream.e(source_text)}</div>"
+        "</div></article>"
+    )
+
+
+def competition_analysis_card(result: dict[str, Any]) -> str:
+    item_spec = upstream.spec(5)
+    payload = upstream.item_payload(result, item_spec)
+    header, no, title, key = _card_header(item_spec, payload)
+    source_path = payload.get("source_path") or "携程 eBooking -> 数据中心 -> 竞争圈动态"
+    source_text = payload.get("source") or "待确认"
+    return (
+        f"<article class='diagnosis-card' data-status='{upstream.e(key)}' data-title='{upstream.e(title)}' id='rule-{no}'>"
+        f"{header}<div class='result-area'>"
         f"<div class='ctrip-competition-bottom'>{_competition_rankings(payload)}{_loss_competitors(payload)}</div>"
-        f"<div class='ctrip-competition-source'><b>数据口径：</b>{upstream.e(source_path)}；{upstream.e(source_text)}</div>"
+        f"<div class='ctrip-competition-source'><b>数据口径：</b>{upstream.e(source_path)}；数据表与字段映射：{upstream.e(source_text)}</div>"
         "</div></article>"
     )
 
@@ -246,9 +266,11 @@ def cards_html(result: dict[str, Any]) -> str:
     for item_spec in SPECS[2:]:
         no = item_spec[0]
         if no == 3:
-            cards.append(competition_card(result))
+            cards.append(funnel_card(result))
         elif no == 4:
             cards.append(profile_card(result))
+        elif no == 5:
+            cards.append(competition_analysis_card(result))
         elif no == 6:
             cards.append(upstream.patch_psi_score(psi_card(result, "rule-6"), result))
         else:
@@ -262,7 +284,7 @@ def build_head() -> str:
 
 
 def build_html(result: dict[str, Any]) -> str:
-    """Generate the Ctrip report with stable item-03 and item-04 renderers."""
+    """Generate the Ctrip report with stable item-03, item-04 and item-05 renderers."""
 
     hotel = result.get("hotel_name") or result.get("hotel_id") or "酒店"
     start = result.get("period_start") or "未标注"
@@ -282,4 +304,13 @@ def build_html(result: dict[str, Any]) -> str:
     return build_head() + body
 
 
-__all__ = ["SPECS", "build_html", "cards_html", "competition_card"]
+competition_card = funnel_card
+
+__all__ = [
+    "SPECS",
+    "build_html",
+    "cards_html",
+    "competition_analysis_card",
+    "competition_card",
+    "funnel_card",
+]
