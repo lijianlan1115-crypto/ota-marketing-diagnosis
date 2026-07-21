@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feature/ctrip-page-data-source
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
