@@ -41,8 +41,6 @@ def _scan_order_summary(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
             total += 1
             matched += 1
         else:
-            # A database COUNT loader may return a row with no order id but a
-            # different count-like column. Keep compatibility with common names.
             fallback = next(
                 (
                     _number(row.get(key))
@@ -78,16 +76,22 @@ def _scan_order_summary(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     }
 
 
-def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
-    result = _base_normalize_dataset(raw)
-    raw_scan_rows = [
+def _raw_rows(raw: dict[str, Any], section: str) -> list[dict[str, Any]]:
+    return [
         dict(row)
-        for row in deepcopy(raw or {}).get("scan_orders") or []
+        for row in deepcopy(raw or {}).get(section) or []
         if isinstance(row, dict)
     ]
 
+
+def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    result = _base_normalize_dataset(raw)
+    raw_scan_rows = _raw_rows(raw, "scan_orders")
+    raw_ctrip_profile_rows = _raw_rows(raw, "ctrip_userprofile_distribution")
+
     sections = result.setdefault("sections", {})
     sections["scan_orders"] = raw_scan_rows
+    sections["ctrip_userprofile_distribution"] = raw_ctrip_profile_rows
 
     funnel_rows = list(sections.get("ota_funnel") or [])
     has_summary = any(
@@ -113,6 +117,25 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
             }
         ),
         "status": "ok" if raw_scan_rows or has_summary else "empty",
+    }
+    result.setdefault("diagnostics", {})["ctrip_userprofile_distribution"] = {
+        "section": "ctrip_userprofile_distribution",
+        "row_count": len(raw_ctrip_profile_rows),
+        "source_tables": sorted(
+            {
+                str(row.get("source_table") or row.get("__source_table"))
+                for row in raw_ctrip_profile_rows
+                if row.get("source_table") or row.get("__source_table")
+            }
+        ),
+        "seen_dimension_codes": sorted(
+            {
+                str(row.get("dimension_code"))
+                for row in raw_ctrip_profile_rows
+                if row.get("dimension_code") not in (None, "")
+            }
+        ),
+        "status": "ok" if raw_ctrip_profile_rows else "empty",
     }
     return result
 
