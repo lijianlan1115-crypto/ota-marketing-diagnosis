@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from marketing_diagnosis import reporting_runtime_v51 as upstream
-from marketing_diagnosis.ctrip_report_v54 import build_html as build_ctrip_page
-from marketing_diagnosis.dual_channel_report_v56 import build_html as build_dual_channel_page
+from marketing_diagnosis.ctrip_report import build_html as build_ctrip_page
+from marketing_diagnosis.dual_channel_report import build_html as build_dual_channel_page
 
 
 def build_meituan_html(result: dict[str, Any]) -> str:

@@ -16,15 +16,7 @@ def _number(value: Any) -> float | None:
 
 
 def _scan_order_summary(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Build the item-07 summary from an independent ``scan_orders`` section.
-
-    Some Feishu/Excel loaders provide scan orders as their own section instead of
-    placing the COUNT summary in ``ota_funnel``. Older normalization discarded
-    that section, which made item 07 show "数据未取到" even though source rows had
-    been loaded. Each detail row counts as one order unless an explicit
-    ``scan_order_count`` is present.
-    """
-
+    """Build the item-07 summary from an independent ``scan_orders`` section."""
     if not rows:
         return None
 
@@ -37,7 +29,10 @@ def _scan_order_summary(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         if explicit is not None:
             total += explicit
             matched += 1
-        elif any(row.get(key) not in (None, "") for key in ("order_id", "scan_time", "business_date")):
+        elif any(
+            row.get(key) not in (None, "")
+            for key in ("order_id", "scan_time", "business_date")
+        ):
             total += 1
             matched += 1
         else:
@@ -56,7 +51,9 @@ def _scan_order_summary(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         day = str(row.get("scan_time") or row.get("business_date") or "")[:10]
         if day:
             dates.append(day)
-        source = str(row.get("source_table") or row.get("__source_table") or "").strip()
+        source = str(
+            row.get("source_table") or row.get("__source_table") or ""
+        ).strip()
         if source:
             source_tables.add(source)
 
@@ -68,7 +65,11 @@ def _scan_order_summary(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
         "platform": "meituan",
         "period_type": "scan_order_summary",
         "scan_order_count": value,
-        "scan_order_date_column": "scan_time" if any(row.get("scan_time") not in (None, "") for row in rows) else None,
+        "scan_order_date_column": (
+            "scan_time"
+            if any(row.get("scan_time") not in (None, "") for row in rows)
+            else None
+        ),
         "scan_order_period_start": min(dates) if dates else None,
         "scan_order_period_end": max(dates) if dates else None,
         "source_table": ", ".join(sorted(source_tables)) or "scan_orders",
@@ -84,6 +85,24 @@ def _raw_rows(raw: dict[str, Any], section: str) -> list[dict[str, Any]]:
     ]
 
 
+def _section_diagnostic(
+    section: str,
+    rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "section": section,
+        "row_count": len(rows),
+        "source_tables": sorted(
+            {
+                str(row.get("source_table") or row.get("__source_table"))
+                for row in rows
+                if row.get("source_table") or row.get("__source_table")
+            }
+        ),
+        "status": "ok" if rows else "empty",
+    }
+
+
 def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     result = _base_normalize_dataset(raw)
     raw_scan_rows = _raw_rows(raw, "scan_orders")
@@ -93,6 +112,13 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     raw_ctrip_review_rows = _raw_rows(raw, "ctrip_review_overview")
     raw_ctrip_yesterday_rows = _raw_rows(raw, "ctrip_review_yesterday")
     raw_ctrip_hourly_order_rows = _raw_rows(raw, "ctrip_hourly_orders")
+    raw_ctrip_competition_rows = _raw_rows(raw, "ctrip_competition_metrics_30d")
+    raw_ctrip_funnel_metric_rows = _raw_rows(
+        raw,
+        "ctrip_business_metrics_funnel",
+    )
+    raw_ctrip_loss_metric_rows = _raw_rows(raw, "ctrip_business_metrics_loss")
+    raw_ctrip_loss_competitor_rows = _raw_rows(raw, "ctrip_order_loss_monthly")
 
     sections = result.setdefault("sections", {})
     sections["scan_orders"] = raw_scan_rows
@@ -102,6 +128,10 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     sections["ctrip_review_overview"] = raw_ctrip_review_rows
     sections["ctrip_review_yesterday"] = raw_ctrip_yesterday_rows
     sections["ctrip_hourly_orders"] = raw_ctrip_hourly_order_rows
+    sections["ctrip_competition_metrics_30d"] = raw_ctrip_competition_rows
+    sections["ctrip_business_metrics_funnel"] = raw_ctrip_funnel_metric_rows
+    sections["ctrip_business_metrics_loss"] = raw_ctrip_loss_metric_rows
+    sections["ctrip_order_loss_monthly"] = raw_ctrip_loss_competitor_rows
 
     funnel_rows = list(sections.get("ota_funnel") or [])
     has_summary = any(
@@ -114,29 +144,16 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         funnel_rows.append(summary)
         sections["ota_funnel"] = funnel_rows
 
-    result.setdefault("diagnostics", {})["scan_orders"] = {
-        "section": "scan_orders",
-        "row_count": len(raw_scan_rows),
+    diagnostics = result.setdefault("diagnostics", {})
+    diagnostics["scan_orders"] = {
+        **_section_diagnostic("scan_orders", raw_scan_rows),
         "summary_created": summary is not None,
         "summary_preserved": has_summary,
-        "source_tables": sorted(
-            {
-                str(row.get("source_table") or row.get("__source_table"))
-                for row in raw_scan_rows
-                if row.get("source_table") or row.get("__source_table")
-            }
-        ),
-        "status": "ok" if raw_scan_rows or has_summary else "empty",
     }
-    result.setdefault("diagnostics", {})["ctrip_userprofile_distribution"] = {
-        "section": "ctrip_userprofile_distribution",
-        "row_count": len(raw_ctrip_profile_rows),
-        "source_tables": sorted(
-            {
-                str(row.get("source_table") or row.get("__source_table"))
-                for row in raw_ctrip_profile_rows
-                if row.get("source_table") or row.get("__source_table")
-            }
+    diagnostics["ctrip_userprofile_distribution"] = {
+        **_section_diagnostic(
+            "ctrip_userprofile_distribution",
+            raw_ctrip_profile_rows,
         ),
         "seen_dimension_codes": sorted(
             {
@@ -145,7 +162,6 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
                 if row.get("dimension_code") not in (None, "")
             }
         ),
-        "status": "ok" if raw_ctrip_profile_rows else "empty",
     }
     for section, rows in (
         ("ctrip_joined_rights", raw_ctrip_rights_rows),
@@ -153,19 +169,12 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         ("ctrip_review_overview", raw_ctrip_review_rows),
         ("ctrip_review_yesterday", raw_ctrip_yesterday_rows),
         ("ctrip_hourly_orders", raw_ctrip_hourly_order_rows),
+        ("ctrip_competition_metrics_30d", raw_ctrip_competition_rows),
+        ("ctrip_business_metrics_funnel", raw_ctrip_funnel_metric_rows),
+        ("ctrip_business_metrics_loss", raw_ctrip_loss_metric_rows),
+        ("ctrip_order_loss_monthly", raw_ctrip_loss_competitor_rows),
     ):
-        result["diagnostics"][section] = {
-            "section": section,
-            "row_count": len(rows),
-            "source_tables": sorted(
-                {
-                    str(row.get("source_table") or row.get("__source_table"))
-                    for row in rows
-                    if row.get("source_table") or row.get("__source_table")
-                }
-            ),
-            "status": "ok" if rows else "empty",
-        }
+        diagnostics[section] = _section_diagnostic(section, rows)
     return result
 
 

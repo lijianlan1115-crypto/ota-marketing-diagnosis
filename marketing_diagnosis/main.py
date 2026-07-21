@@ -10,7 +10,7 @@ from typing import Any
 
 from marketing_diagnosis.data_v4 import normalize_dataset
 from marketing_diagnosis.excel_loader_v2 import load_excel_package
-from marketing_diagnosis.db_loader_v16 import load_database_dataset, load_mysql_dsn_dataset
+from marketing_diagnosis.ctrip_competition import load_database_dataset, load_mysql_dsn_dataset
 from marketing_diagnosis.reporting_v2 import write_reports
 from marketing_diagnosis.runtime_env import load_local_s14_env
 from marketing_diagnosis.rules_v5 import process
