@@ -33,8 +33,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+          python -m pip install pytest
 
       - name: Consolidate numbered modules
         run: python scripts/consolidate_versioned_modules.py --apply
@@ -49,7 +50,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          pytest -q 2>&1 | tee consolidation-test-output.txt
+          python -m pytest -q 2>&1 | tee consolidation-test-output.txt
 
       - name: Upload test diagnostics
         if: always()
