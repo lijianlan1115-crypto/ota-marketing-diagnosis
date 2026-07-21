@@ -83,6 +83,18 @@ def test_unjoined_business_price_hides_extra_fields_and_zeroes_rooms():
     assert items["19"]["fields"][-1]["value"] == 0
 
 
+def test_hourly_orders_use_detail_count_when_available():
+    items = build_configuration_items(
+        {
+            "ctrip_promotion_status": [_row("hourly_room", orders_30d=9, room_type_count=2)],
+            "ctrip_hourly_orders": [{"orders_30d": 0}],
+        }
+    )
+
+    assert items["18"]["item_score"] == 1
+    assert items["18"]["fields"][-1]["value"] == 0
+
+
 def test_rules_attach_ctrip_configuration_items_to_report_result():
     result = process(
         {

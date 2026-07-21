@@ -92,6 +92,7 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     raw_ctrip_profile_rows = _raw_rows(raw, "ctrip_userprofile_distribution")
     raw_ctrip_review_rows = _raw_rows(raw, "ctrip_review_overview")
     raw_ctrip_yesterday_rows = _raw_rows(raw, "ctrip_review_yesterday")
+    raw_ctrip_hourly_order_rows = _raw_rows(raw, "ctrip_hourly_orders")
 
     sections = result.setdefault("sections", {})
     sections["scan_orders"] = raw_scan_rows
@@ -100,6 +101,7 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     sections["ctrip_userprofile_distribution"] = raw_ctrip_profile_rows
     sections["ctrip_review_overview"] = raw_ctrip_review_rows
     sections["ctrip_review_yesterday"] = raw_ctrip_yesterday_rows
+    sections["ctrip_hourly_orders"] = raw_ctrip_hourly_order_rows
 
     funnel_rows = list(sections.get("ota_funnel") or [])
     has_summary = any(
@@ -150,6 +152,7 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         ("ctrip_promotion_status", raw_ctrip_status_rows),
         ("ctrip_review_overview", raw_ctrip_review_rows),
         ("ctrip_review_yesterday", raw_ctrip_yesterday_rows),
+        ("ctrip_hourly_orders", raw_ctrip_hourly_order_rows),
     ):
         result["diagnostics"][section] = {
             "section": section,

@@ -192,13 +192,13 @@ def _business_item(row: dict[str, Any] | None) -> dict[str, Any]:
     return _item(16, score, "success", source, fields, "已开通且有参与房型得2分；已开通但无有效房型得1分。")
 
 
-def _hourly_item(row: dict[str, Any] | None) -> dict[str, Any]:
-    source = "携程 eBooking / 促销推广 / 钟点房促销"
+def _hourly_item(row: dict[str, Any] | None, order_count: Any = None) -> dict[str, Any]:
+    source = "携程 eBooking / 促销推广 / 钟点房促销 + 订单明细"
     if not row:
         return _item(18, None, "missing", source, [], "等待钟点房状态快照。")
     active = _state(row)
     configured = active and "enabled" in _words(row)
-    orders = _number(row.get("orders_30d")) or 0
+    orders = _number(order_count)
     fields = [
         _decision("钟点房配置", configured, positive="已配置", negative="未配置"),
         _field("核心房型", row.get("room_type_count")),
@@ -207,8 +207,10 @@ def _hourly_item(row: dict[str, Any] | None) -> dict[str, Any]:
     ]
     if active is None:
         return _item(18, None, "pending_rule", source, fields, "钟点房配置状态无法由现有字段确认。")
+    if orders is None:
+        return _item(18, None, "pending_rule", source, fields, "近30天钟点房订单明细暂未取得。")
     score = (1.0 if configured else 0.0) + (1.0 if orders > 0 else 0.0)
-    return _item(18, score, "success", source, fields, "核心房型已配置钟点房得1分，近30天有钟点房订单再得1分。")
+    return _item(18, score, "success", source, fields, "核心房型已配置钟点房得1分；订单明细中近30天有有效钟点房订单再得1分。")
 
 
 def _travel_photo_item(row: dict[str, Any] | None) -> dict[str, Any]:
@@ -275,13 +277,22 @@ def _listing_item(row: dict[str, Any] | None) -> dict[str, Any]:
 def build_configuration_items(sections: dict[str, Any]) -> dict[str, dict[str, Any]]:
     rights = [dict(row) for row in sections.get("ctrip_joined_rights") or [] if isinstance(row, dict)]
     statuses = [dict(row) for row in sections.get("ctrip_promotion_status") or [] if isinstance(row, dict)]
+    hourly_rows = [dict(row) for row in sections.get("ctrip_hourly_orders") or [] if isinstance(row, dict)]
+    hourly_status = _activity(statuses, 18)
+    hourly_order_count = (
+        hourly_rows[0].get("orders_30d")
+        if hourly_rows
+        else hourly_status.get("orders_30d")
+        if hourly_status is not None and "ctrip_hourly_orders" not in sections
+        else None
+    )
     items = {
         "13": _rights_item(rights),
         "14": _points_item(_activity(statuses, 14)),
         "15": _preferred_item(_activity(statuses, 15)),
         "16": _business_item(_activity(statuses, 16)),
         "17": _item(17, None, "pending_rule", "携程 eBooking / 闪住服务入口", [_field("入口状态", None)], "暂无数据库表；待按实际后台菜单补充入口字段后计分。"),
-        "18": _hourly_item(_activity(statuses, 18)),
+        "18": _hourly_item(hourly_status, hourly_order_count),
         "19": _travel_photo_item(_activity(statuses, 19)),
         "20": _video_item(_activity(statuses, 20)),
         "21": _listing_item(_activity(statuses, 21)),

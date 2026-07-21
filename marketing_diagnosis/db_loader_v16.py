@@ -9,6 +9,7 @@ from marketing_diagnosis import db_loader_v15 as previous
 
 DEFAULT_MYSQL_TABLES = {
     **previous.DEFAULT_MYSQL_TABLES,
+    "ctrip_order_detail": "ctrip_ota_order_detail",
     "ctrip_joined_rights": "ctrip_ota_joined_rights",
     "ctrip_promotion_status": "ctrip_ota_promotion_status",
     "ctrip_userprofile_distribution": "ctrip_ota_userprofile_distribution",
@@ -277,6 +278,55 @@ def _load_ctrip_yesterday_counts(
         }
 
 
+def _load_ctrip_hourly_order_count(
+    cursor,
+    table: str,
+    hotel_id: str | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    columns, schema_error = base._table_columns(cursor, table)
+    required = {"order_status_type", "is_hour_room"}
+    if schema_error:
+        return [], {"table": table, "rows": 0, "status": "error", "error": schema_error}
+    if not required.issubset(columns):
+        return [], {
+            "table": table,
+            "rows": 0,
+            "status": "error",
+            "error": "required columns missing: order_status_type, is_hour_room",
+            "table_columns": sorted(columns),
+        }
+
+    params: list[Any] = ["CheckIn", 1]
+    filters = ["`order_status_type` = %s", "`is_hour_room` = %s"]
+    if hotel_id and "hotel_id" in columns:
+        filters.insert(0, "`hotel_id` = %s")
+        params.insert(0, hotel_id)
+    sql = (
+        "SELECT COUNT(*) AS orders_30d "
+        f"FROM {base._safe_identifier(table)} WHERE {base._where(filters)}"
+    )
+    try:
+        cursor.execute(sql, params)
+        row = dict(cursor.fetchone() or {})
+        count = int(row.get("orders_30d") or 0)
+        return [{"orders_30d": count, "__source_table": table}], {
+            "table": table,
+            "rows": 1,
+            "status": "ok",
+            "where": "order_status_type=CheckIn AND is_hour_room=1",
+            "hotel_id": hotel_id,
+            "source_rule": "表内已是最近30天订单；统计有效钟点房入住订单明细条数",
+        }
+    except Exception as exc:
+        return [], {
+            "table": table,
+            "rows": 0,
+            "status": "error",
+            "error": str(exc),
+            "where": "order_status_type=CheckIn AND is_hour_room=1",
+        }
+
+
 def load_mysql_dsn_dataset(
     dsn: str,
     limit: int = 5000,
@@ -302,6 +352,7 @@ def load_mysql_dsn_dataset(
         dataset.setdefault("ctrip_joined_rights", [])
         dataset.setdefault("ctrip_promotion_status", [])
         dataset.setdefault("ctrip_userprofile_distribution", [])
+        dataset.setdefault("ctrip_hourly_orders", [])
         return dataset
 
     ctrip_id = ctrip_hotel_id or hotel_id
@@ -322,12 +373,16 @@ def load_mysql_dsn_dataset(
             review_yesterday, review_yesterday_diag = _load_ctrip_yesterday_counts(
                 cursor, table_map["ctrip_reviews"], ctrip_id
             )
+            hourly_orders, hourly_orders_diag = _load_ctrip_hourly_order_count(
+                cursor, table_map["ctrip_order_detail"], ctrip_id
+            )
 
     dataset["ctrip_joined_rights"] = base._tag_rows(rights, table_map["ctrip_joined_rights"])
     dataset["ctrip_promotion_status"] = base._tag_rows(statuses, table_map["ctrip_promotion_status"])
     dataset["ctrip_userprofile_distribution"] = base._tag_rows(profiles, table_map["ctrip_userprofile_distribution"])
     dataset["ctrip_review_overview"] = base._tag_rows(review_overview, table_map["ctrip_review_overview"])
     dataset["ctrip_review_yesterday"] = review_yesterday
+    dataset["ctrip_hourly_orders"] = hourly_orders
     diagnostics = _diagnostics(dataset)
     if diagnostics is not None:
         tables_diag = diagnostics.setdefault("tables", {})
@@ -336,6 +391,7 @@ def load_mysql_dsn_dataset(
         tables_diag["ctrip_userprofile_distribution"] = profiles_diag
         tables_diag["ctrip_review_overview"] = review_overview_diag
         tables_diag["ctrip_review_yesterday"] = review_yesterday_diag
+        tables_diag["ctrip_hourly_orders"] = hourly_orders_diag
         diagnostics.setdefault("transformations", []).append(
             {
                 "section": "ctrip_userprofile_distribution",
@@ -367,6 +423,14 @@ def load_mysql_dsn_dataset(
                     "section": "ctrip_review_yesterday",
                     "rows": len(review_yesterday),
                     "rule": f"hotel_id={ctrip_id}; COUNT(*) where DATE(review_time)=database yesterday",
+                },
+                {
+                    "section": "ctrip_hourly_orders",
+                    "rows": len(hourly_orders),
+                    "rule": (
+                        f"hotel_id={ctrip_id}; COUNT(*) where order_status_type=CheckIn, "
+                        "is_hour_room=1; source table already contains the recent 30 days"
+                    ),
                 },
             ]
         )
