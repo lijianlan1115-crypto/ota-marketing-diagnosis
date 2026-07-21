@@ -12,6 +12,7 @@ DEFAULT_MYSQL_TABLES = {
     **upstream.DEFAULT_MYSQL_TABLES,
     "ctrip_competition_metrics_30d": "ctrip_ota_competition_metrics_30d",
     "ctrip_order_loss_monthly": "ctrip_ota_order_loss_monthly",
+    "ctrip_promotion_performance_30d": "ctrip_ota_promotion_performance_30d",
 }
 
 _ORDER_COLUMNS = (
@@ -427,6 +428,39 @@ def _load_order_loss(
     }
 
 
+def _load_page_entry(
+    cursor,
+    table: str,
+    limit: int,
+    hotel_id: str | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    columns, schema_error = base._table_columns(cursor, table)
+    if schema_error:
+        return [], {"table": table, "rows": 0, "status": "error", "error": schema_error}
+    if "hotel_name" not in columns:
+        return [], {
+            "table": table,
+            "rows": 0,
+            "status": "error",
+            "error": "required column missing: hotel_name",
+            "table_columns": sorted(columns),
+        }
+    rows, diag = base._profiled_fetch(
+        cursor,
+        table,
+        limit,
+        hotel_id=hotel_id,
+        order_candidates=("snapshot_time DESC", "period_end_date DESC"),
+    )
+    latest = base._latest_snapshot(rows)
+    return latest, {
+        **diag,
+        "rows_read": len(rows),
+        "rows_used": len(latest),
+        "selection_rule": "latest snapshot; only hotel_name is currently used by item 10",
+    }
+
+
 def load_mysql_dsn_dataset(
     dsn: str,
     limit: int = 5000,
@@ -454,6 +488,7 @@ def load_mysql_dsn_dataset(
         dataset.setdefault("ctrip_business_metrics_funnel", [])
         dataset.setdefault("ctrip_business_metrics_loss", [])
         dataset.setdefault("ctrip_order_loss_monthly", [])
+        dataset.setdefault("ctrip_promotion_performance_30d", [])
         return dataset
 
     ctrip_id = ctrip_hotel_id or hotel_id
@@ -482,6 +517,12 @@ def load_mysql_dsn_dataset(
                 limit,
                 ctrip_id,
             )
+            page_entry, page_entry_diag = _load_page_entry(
+                cursor,
+                table_map["ctrip_promotion_performance_30d"],
+                limit,
+                ctrip_id,
+            )
 
     dataset["ctrip_competition_metrics_30d"] = base._tag_rows(
         competition,
@@ -499,6 +540,10 @@ def load_mysql_dsn_dataset(
         loss_competitors,
         table_map["ctrip_order_loss_monthly"],
     )
+    dataset["ctrip_promotion_performance_30d"] = base._tag_rows(
+        page_entry,
+        table_map["ctrip_promotion_performance_30d"],
+    )
 
     diagnostics = _diagnostics(dataset)
     if diagnostics is not None:
@@ -508,6 +553,7 @@ def load_mysql_dsn_dataset(
                 "ctrip_business_metrics_funnel": funnel_metrics_diag,
                 "ctrip_business_metrics_loss": loss_metrics_diag,
                 "ctrip_order_loss_monthly": loss_competitors_diag,
+                "ctrip_promotion_performance_30d": page_entry_diag,
             }
         )
         diagnostics.setdefault("transformations", []).extend(
@@ -531,6 +577,11 @@ def load_mysql_dsn_dataset(
                     "section": "ctrip_order_loss_monthly",
                     "rows": len(loss_competitors),
                     "rule": "ctrip/qunar rows retained; renderer selects latest Top5",
+                },
+                {
+                    "section": "ctrip_promotion_performance_30d",
+                    "rows": len(page_entry),
+                    "rule": "latest snapshot; item 10 currently uses hotel_name only",
                 },
             ]
         )
