@@ -1,21 +1,72 @@
-from marketing_diagnosis.ctrip_report_v54 import transform
+from marketing_diagnosis.ctrip_report_v54 import build_html
 
 
-BASE_HTML = """<!doctype html><html><head><title>美团报告</title></head><body>
-<header class='topbar'><div class='topbar-inner'><div class='brand'><h1>酒店 OTA 全面诊断报告</h1><p>测试酒店</p></div><div class='top-actions'><button onclick='window.print()'>导出报告</button></div></div></header>
-<div class='page'><nav class='side'><div class='side-title'>美团目录</div><a href='#rule-1'><span>01</span>月度经营趋势 YOY</a><a href='#rule-3'><span>03</span>美团曝光</a></nav>
-<main><section id='overview'>美团总分</section>
-<article class='diagnosis-card' data-status='success' data-title='月度经营趋势 YOY' id='rule-1'><div class='card-top'><div class='rule-no'>01</div><div class='card-title'><h3>月度经营趋势 YOY</h3></div><div class='card-tags'><div class='title-meta-item title-score ok'><small>当前得分</small><div class='title-score-value'><strong>9分</strong><span>满分 10分</span></div></div></div></div><div class='result-area'><div id='shared-one-data'>月度经营真实数据</div></div></article>
-<article class='diagnosis-card' data-status='success' data-title='房型 RevPAR 与低效房型' id='rule-2'><div class='card-top'><div class='rule-no'>02</div><div class='card-title'><h3>房型 RevPAR 与低效房型</h3></div><div class='card-tags'><div class='title-meta-item title-score ok'><small>当前得分</small><div class='title-score-value'><strong>6分</strong><span>满分 8分</span></div></div></div></div><div class='result-area'><div id='shared-two-data'>房型经营真实数据</div></div></article>
-<article class='diagnosis-card' id='rule-3'>美团曝光内容</article></main></div></body></html>"""
-
-
-def test_ctrip_page_is_independent_and_keeps_shared_pms_cards():
-    result = {
+def result_fixture():
+    return {
         "hotel_name": "测试酒店",
         "period_start": "2026-07-01",
         "period_end": "2026-07-30",
-        "ctrip_summary": {"total_score": 72.5, "connected_items": 3},
+        "visual_diagnosis": {
+            "items": [
+                {
+                    "standard_item_id": 1,
+                    "item_name": "月度经营趋势 YOY",
+                    "participates_in_score": True,
+                    "base_score": 10,
+                    "item_score": 9,
+                    "data_status": "success",
+                    "trend_periods": [
+                        {
+                            "current_range": "2026-07-01—2026-07-30",
+                            "previous_range": "2025-07-01—2025-07-30",
+                            "metrics": [
+                                {"key": "revenue", "current": 123456, "previous": 100000, "yoy": 0.23456},
+                                {"key": "adr", "current": 288, "previous": 260, "yoy": 0.10769},
+                                {"key": "occupancy", "current": 0.72, "previous": 0.68, "yoy": 0.05882},
+                                {"key": "revpar", "current": 207.36, "previous": 176.8, "yoy": 0.17285},
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "standard_item_id": 2,
+                    "item_name": "房型 RevPAR 与低效房型",
+                    "participates_in_score": True,
+                    "base_score": 8,
+                    "item_score": 6,
+                    "data_status": "success",
+                    "fields": [
+                        {"label": "房型数", "value": 2},
+                        {"label": "房间总数", "value": 20},
+                        {"label": "低效房型数", "value": 1},
+                        {"label": "低效房型占比", "value": 0.5},
+                    ],
+                    "records": [
+                        {
+                            "room_type_name": "测试大床房",
+                            "room_count": 10,
+                            "room_nights": 120,
+                            "occupancy_points": 75,
+                            "room_revenue": 30000,
+                            "average_room_price": 250,
+                            "revpar": 187.5,
+                            "is_low": False,
+                        },
+                        {
+                            "room_type_name": "测试双床房",
+                            "room_count": 10,
+                            "room_nights": 60,
+                            "occupancy_points": 45,
+                            "room_revenue": 12000,
+                            "average_room_price": 200,
+                            "revpar": 90,
+                            "is_low": True,
+                        },
+                    ],
+                },
+            ]
+        },
+        "ctrip_summary": {"total_score": 72.5, "connected_items": 4},
         "ctrip_items": {
             "1": {"item_score": 7, "full_score": 12},
             "2": {"item_score": 5, "full_score": 9},
@@ -30,30 +81,43 @@ def test_ctrip_page_is_independent_and_keeps_shared_pms_cards():
         },
     }
 
-    output = transform(BASE_HTML, result)
 
+def test_ctrip_page_is_directly_generated_and_independent():
+    output = build_html(result_fixture())
+
+    assert "CTRIP_CODE_GENERATED_V55" in output
     assert "携程诊断目录" in output
     assert "平台流量漏斗分析" in output
     assert "YOYO 卡 / 扫码住" in output
-    assert "美团曝光内容" not in output
-    assert "美团曝光</a>" not in output
+    assert "携程渠道经营与服务质量诊断" in output
+    assert "不会从美团成品HTML复制目录或诊断卡片" in output
 
-    assert "月度经营真实数据" in output
-    assert "房型经营真实数据" in output
+    # 01/02 are newly rendered from the same PMS result, not copied from a Meituan page.
+    assert "123,456.00" in output
+    assert "测试大床房" in output
+    assert "测试双床房" in output
     assert "7分</strong><span>满分 12分" in output
     assert "5分</strong><span>满分 9分" in output
 
+    # Ctrip summary and PSI scores remain independent.
     assert "携程综合得分" in output
-    assert "72.5分" in output
+    assert "72.5" in output
     assert "PSI 服务质量分" in output
     assert "我的基础分" in output
     assert "6.5分</strong><span>满分 8分" in output
 
+    # Header/layout uses the same production class system as Meituan.
+    assert "<header class='topbar'>" in output
+    assert "<div class='page'>" in output
+    assert "class='diagnosis-card performance-card-v54'" in output
+    assert "class='diagnosis-card room-type-card-v30'" in output
 
-def test_missing_ctrip_data_never_reuses_meituan_demo_values():
-    output = transform(BASE_HTML, {"hotel_name": "测试酒店"})
+
+def test_missing_ctrip_data_never_invents_or_reuses_meituan_values():
+    output = build_html({"hotel_name": "测试酒店"})
 
     assert "待接入" in output
     assert "¥328,650" not in output
     assert "73.9" not in output
-    assert "<section id='overview'>美团总分</section>" not in output
+    assert "美团曝光内容" not in output
+    assert "美团总分" not in output
