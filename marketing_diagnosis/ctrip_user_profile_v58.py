@@ -71,24 +71,10 @@ _SKIP_FALLBACK_KEYS = {
     "updated_at",
     "business_date",
     "data_date",
-    "period_start_date",
-    "period_end_date",
     "sort_order",
     "rank",
     "source_table",
     "__source_table",
-}
-
-# Technical collection timestamps are used by the database loader to choose the
-# newest row, but they are not part of the user-profile business display.
-_HIDDEN_RECORD_KEYS = {
-    "snapshot_time",
-    "created_at",
-    "updated_at",
-    "business_date",
-    "data_date",
-    "period_start_date",
-    "period_end_date",
 }
 
 
@@ -193,10 +179,6 @@ def _dimension_rows(rows: list[dict[str, Any]], code: str, aliases: tuple[str, .
     return [row for _, row in sorted(enumerate(selected), key=lambda pair: _row_order(pair[1], pair[0]))]
 
 
-def _public_record(row: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in row.items() if key not in _HIDDEN_RECORD_KEYS}
-
-
 def build_user_profile_item(rows: list[dict[str, Any]] | None) -> dict[str, Any]:
     clean_rows = [dict(row) for row in rows or [] if isinstance(row, dict)]
     fields: list[dict[str, Any]] = []
@@ -228,7 +210,7 @@ def build_user_profile_item(rows: list[dict[str, Any]] | None) -> dict[str, Any]
         "data_status": "success" if connected else "missing",
         "source": "ctrip_ota_userprofile_distribution",
         "fields": fields,
-        "records": [_public_record(row) for row in clean_rows],
+        "records": clean_rows,
         "connected_dimensions": connected,
         "expected_dimensions": len(DIMENSIONS),
     }
