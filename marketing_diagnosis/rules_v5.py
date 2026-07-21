@@ -4,6 +4,7 @@ from typing import Any
 
 from marketing_diagnosis.ctrip_competition import build_competition_item
 from marketing_diagnosis.ctrip_configuration_v63 import build_configuration_items
+from marketing_diagnosis.ctrip_psi import build_psi_item
 from marketing_diagnosis.ctrip_reputation_v64 import build_reputation_item
 from marketing_diagnosis.ctrip_room_name_v65 import build_room_name_item
 from marketing_diagnosis.ctrip_user_profile_v58 import build_user_profile_item
@@ -136,6 +137,9 @@ def process(data: dict[str, Any]) -> dict[str, Any]:
     ctrip_items["4"] = build_user_profile_item(
         sections.get("ctrip_userprofile_distribution") or []
     )
+    psi_item = build_psi_item(sections)
+    ctrip_items["6"] = psi_item
+    result["ctrip_psi"] = psi_item
     ctrip_items["12"] = build_reputation_item(sections)
     ctrip_items["11"] = build_room_name_item(sections)
     ctrip_items.update(build_configuration_items(sections))
