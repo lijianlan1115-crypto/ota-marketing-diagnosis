@@ -37,6 +37,16 @@ jobs:
           python -m pip install -e .
           python -m pip install pytest
 
+      - name: Capture baseline test results
+        shell: bash
+        run: |
+          set +e
+          python -m pytest -q --tb=no > baseline-test-output.txt 2>&1
+          echo $? > baseline-test-exit.txt
+          set -e
+          grep -E '^(FAILED|ERROR) ' baseline-test-output.txt | sed 's/ - .*//' | sort -u > baseline-test-issues.txt || true
+          cat baseline-test-output.txt
+
       - name: Consolidate numbered modules
         run: python scripts/consolidate_versioned_modules.py --apply
 
@@ -46,18 +56,40 @@ jobs:
       - name: Compile package
         run: python -m compileall -q marketing_diagnosis scripts
 
-      - name: Run regression tests
+      - name: Run consolidated regression tests
         shell: bash
         run: |
-          set -o pipefail
-          python -m pytest -q 2>&1 | tee consolidation-test-output.txt
+          set +e
+          python -m pytest -q --tb=no > consolidation-test-output.txt 2>&1
+          echo $? > consolidation-test-exit.txt
+          set -e
+          grep -E '^(FAILED|ERROR) ' consolidation-test-output.txt | sed 's/ - .*//' | sort -u > consolidation-test-issues.txt || true
+          cat consolidation-test-output.txt
+
+      - name: Reject new test failures
+        shell: bash
+        run: |
+          comm -13 baseline-test-issues.txt consolidation-test-issues.txt > new-consolidation-issues.txt
+          if [ -s new-consolidation-issues.txt ]; then
+            echo "Consolidation introduced new failures:"
+            cat new-consolidation-issues.txt
+            exit 1
+          fi
+          echo "No new failures were introduced by consolidation"
+          echo "Baseline issues: $(wc -l < baseline-test-issues.txt)"
+          echo "Consolidated issues: $(wc -l < consolidation-test-issues.txt)"
 
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: consolidation-test-output
-          path: consolidation-test-output.txt
+          path: |
+            baseline-test-output.txt
+            baseline-test-issues.txt
+            consolidation-test-output.txt
+            consolidation-test-issues.txt
+            new-consolidation-issues.txt
           if-no-files-found: ignore
 
       - name: Commit generated consolidation
