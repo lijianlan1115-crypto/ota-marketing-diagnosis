@@ -27,7 +27,7 @@ def _diagnostics(dataset: dict[str, Any]) -> dict[str, Any] | None:
     return records[0] if records and isinstance(records[0], dict) else None
 
 
-def _row_key(row: dict[str, Any], index: int) -> tuple[str, str, str, int]:
+def _row_key(row: dict[str, Any]) -> tuple[str, str, str]:
     dimension = str(row.get("dimension_code") or "").strip()
     bucket = str(
         row.get("bucket_code")
@@ -37,7 +37,7 @@ def _row_key(row: dict[str, Any], index: int) -> tuple[str, str, str, int]:
         or ""
     ).strip()
     hotel = str(row.get("hotel_id") or "").strip()
-    return hotel, dimension, bucket, index
+    return hotel, dimension, bucket
 
 
 def _order_key(row: dict[str, Any], index: int) -> tuple[str, str, str, str, str, int, int]:
@@ -56,6 +56,15 @@ def _order_key(row: dict[str, Any], index: int) -> tuple[str, str, str, str, str
     )
 
 
+def _sort_number(value: Any) -> float:
+    if value in (None, ""):
+        return 999999.0
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return 999999.0
+
+
 def latest_distribution_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keep the newest row for every dimension/bucket pair.
 
@@ -66,8 +75,7 @@ def latest_distribution_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
 
     selected: dict[tuple[str, str, str], tuple[tuple[Any, ...], dict[str, Any]]] = {}
     for index, row in enumerate(rows):
-        hotel, dimension, bucket, _ = _row_key(row, index)
-        key = (hotel, dimension, bucket)
+        key = _row_key(row)
         order = _order_key(row, index)
         current = selected.get(key)
         if current is None or order >= current[0]:
@@ -77,8 +85,8 @@ def latest_distribution_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
     output.sort(
         key=lambda row: (
             str(row.get("dimension_code") or ""),
-            float(row.get("sort_order") or 999999),
-            float(row.get("rank") or row.get("ranking_position") or 999999),
+            _sort_number(row.get("sort_order")),
+            _sort_number(row.get("rank") or row.get("ranking_position")),
             str(row.get("bucket_label") or row.get("bucket_name") or ""),
         )
     )
