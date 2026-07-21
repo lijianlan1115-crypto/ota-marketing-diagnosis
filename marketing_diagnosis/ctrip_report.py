@@ -24,7 +24,7 @@ COMPETITION_STYLE = """
 .ctrip-funnel-block.hotel{margin-left:auto;background:linear-gradient(90deg,#dfeaff,#83aef5);color:#173b7a}
 .ctrip-funnel-block.peer{margin-right:auto;background:linear-gradient(90deg,#b8ead8,#dff5eb);color:#126546}
 .ctrip-funnel-stage{color:#2e3c46;text-align:center;font-size:13px;font-weight:800;overflow-wrap:anywhere}
-.ctrip-funnel-empty{padding:28px;text-align:center;color:#89959e}
+.ctrip-funnel-empty-value{color:#81909a;font-size:12px;font-weight:750}
 .ctrip-competition-bottom{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px;margin-top:12px}
 .ctrip-competition-card{min-width:0;padding:14px;border:1px solid #dfe7e4;border-radius:10px;background:#fff}
 .ctrip-competition-card h4{margin:0 0 11px;color:#26343d;font-size:15px}
@@ -39,19 +39,43 @@ COMPETITION_STYLE = """
 .ctrip-loss-stat{padding:11px 12px;border:1px solid #e1e9e6;border-radius:8px;background:#f8fbfa}
 .ctrip-loss-stat small{display:block;color:#7a8790;font-size:11px;font-weight:700}
 .ctrip-loss-stat strong{display:block;margin-top:6px;color:#27343d;font-size:20px}
-.ctrip-loss-platforms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ctrip-loss-tabs{display:flex;gap:8px;margin-bottom:9px;padding:4px;border-radius:8px;background:#f3f7f5}
+.ctrip-loss-tab{flex:1;padding:8px 12px;border:1px solid transparent;border-radius:6px;background:transparent;color:#68767f;font-size:12px;font-weight:800;cursor:pointer}
+.ctrip-loss-tab.active{border-color:#94cdb5;background:#fff;color:#16845b;box-shadow:0 1px 4px rgba(27,91,67,.08)}
 .ctrip-loss-platform{overflow:hidden;border:1px solid #e1e9e6;border-radius:8px;background:#fff}
+.ctrip-loss-platform[hidden]{display:none}
 .ctrip-loss-platform h5{margin:0;padding:9px 11px;border-bottom:1px solid #e8eeeb;background:#f6faf8;color:#31584b;font-size:12px}
 .ctrip-loss-list{margin:0;padding:0;list-style:none}
 .ctrip-loss-list li{display:grid;grid-template-columns:25px minmax(0,1fr);gap:7px;align-items:start;padding:8px 10px;border-bottom:1px solid #eef2f1;font-size:11px}
 .ctrip-loss-list li:last-child{border-bottom:0}
 .ctrip-loss-rank{width:20px;height:20px;display:grid;place-items:center;border-radius:50%;background:#e8f5ef;color:#16845b;font-size:10px;font-weight:900}
 .ctrip-loss-name{color:#3c4953;line-height:1.4;overflow-wrap:anywhere}
-.ctrip-competition-source{margin-top:12px;padding:10px 12px;border:1px solid #d9e6e1;border-radius:9px;background:#f4faf7;color:#315b4c;font-size:12px;overflow-wrap:anywhere}
+.ctrip-competition-source{margin-top:12px;padding:10px 12px;border:1px solid #eadfc9;border-radius:9px;background:#fff9ef;color:#876429;font-size:12px;overflow-wrap:anywhere}
 .ctrip-competition-empty{padding:18px;color:#89959e;text-align:center}
 @media(max-width:980px){.ctrip-competition-bottom{grid-template-columns:1fr}}
-@media(max-width:760px){.ctrip-funnel-panel{overflow-x:auto}.ctrip-funnel-head,.ctrip-funnel-row{min-width:650px}.ctrip-loss-platforms{grid-template-columns:1fr}}
+@media(max-width:760px){.ctrip-funnel-panel{overflow-x:auto}.ctrip-funnel-head,.ctrip-funnel-row{min-width:650px}.ctrip-loss-summary{grid-template-columns:1fr}}
 </style>
+"""
+
+LOSS_TAB_SCRIPT = """
+<script id='CTRIP_LOSS_TAB_SCRIPT'>
+(function(){
+  document.querySelectorAll('[data-ctrip-loss-card]').forEach(function(card){
+    card.querySelectorAll('[data-loss-tab]').forEach(function(button){
+      button.addEventListener('click', function(){
+        var platform = button.getAttribute('data-loss-tab');
+        card.querySelectorAll('[data-loss-tab]').forEach(function(item){
+          item.classList.toggle('active', item === button);
+          item.setAttribute('aria-selected', item === button ? 'true' : 'false');
+        });
+        card.querySelectorAll('[data-loss-panel]').forEach(function(panel){
+          panel.hidden = panel.getAttribute('data-loss-panel') !== platform;
+        });
+      });
+    });
+  });
+})();
+</script>
 """
 
 
@@ -59,36 +83,51 @@ def _number(value: Any) -> float | None:
     return upstream.number(value)
 
 
-def _display(value: Any, unit: str = "") -> str:
+def _plain_number(value: Any, *, decimals: int | None = None) -> str:
+    number = _number(value)
+    if number is None:
+        return "待接入"
+    if decimals is not None:
+        return f"{number:,.{decimals}f}"
+    return f"{number:,.0f}" if number.is_integer() else f"{number:,.2f}"
+
+
+def _metric_value(value: Any, unit: str = "") -> str:
     number = _number(value)
     if number is None:
         return "待接入"
     if unit == "%":
         percent = number * 100 if abs(number) <= 1 else number
-        return f"{percent:.2f}%"
+        return f"{percent:.2f}"
     if unit == "元":
-        return f"¥{number:,.2f}"
-    if unit == "单":
-        return f"{number:,.0f}单"
-    return f"{number:,.0f}" if number.is_integer() else f"{number:,.2f}{unit}"
+        return f"{number:,.2f}"
+    return f"{number:,.0f}" if number.is_integer() else f"{number:,.2f}"
 
 
 def _funnel_content(payload: dict[str, Any]) -> str:
     stages = [stage for stage in payload.get("funnel_stages") or [] if isinstance(stage, dict)]
     if not stages:
-        return "<div class='ctrip-funnel-panel'><div class='ctrip-funnel-empty'>流量漏斗数据待接入</div></div>"
+        stages = [
+            {"label": "列表页曝光量", "hotel_value": None, "competitor_avg": None},
+            {"label": "详情页访客量", "hotel_value": None, "competitor_avg": None},
+            {"label": "订单页访客量", "hotel_value": None, "competitor_avg": None},
+            {"label": "订单提交人数", "hotel_value": None, "competitor_avg": None},
+            {"label": "成交订单数", "hotel_value": None, "competitor_avg": None},
+        ]
 
     rows: list[str] = []
     total = max(len(stages), 1)
     for index, stage in enumerate(stages):
         width = max(52, 100 - index * (42 / total))
-        hotel_value = _display(stage.get("hotel_value"))
-        competitor_value = _display(stage.get("competitor_avg"))
+        hotel_value = _plain_number(stage.get("hotel_value"))
+        competitor_value = _plain_number(stage.get("competitor_avg"))
+        hotel_class = " ctrip-funnel-empty-value" if hotel_value == "待接入" else ""
+        peer_class = " ctrip-funnel-empty-value" if competitor_value == "待接入" else ""
         rows.append(
             "<div class='ctrip-funnel-row'>"
-            f"<div class='ctrip-funnel-side'><div class='ctrip-funnel-block hotel' style='width:{width:.1f}%'>{upstream.e(hotel_value)}</div></div>"
+            f"<div class='ctrip-funnel-side'><div class='ctrip-funnel-block hotel{hotel_class}' style='width:{width:.1f}%'>{upstream.e(hotel_value)}</div></div>"
             f"<div class='ctrip-funnel-stage'>{upstream.e(stage.get('label') or '漏斗阶段')}</div>"
-            f"<div class='ctrip-funnel-side'><div class='ctrip-funnel-block peer' style='width:{width:.1f}%'>{upstream.e(competitor_value)}</div></div>"
+            f"<div class='ctrip-funnel-side'><div class='ctrip-funnel-block peer{peer_class}' style='width:{width:.1f}%'>{upstream.e(competitor_value)}</div></div>"
             "</div>"
         )
     return (
@@ -107,26 +146,28 @@ def _competition_rankings(payload: dict[str, Any]) -> str:
         rows = []
         for entry in entries:
             unit = str(entry.get("unit") or "")
+            label = str(entry.get("label") or entry.get("metric_code") or "指标")
+            label_with_unit = f"{label}（{unit}）" if unit else label
             rank = _number(entry.get("competitor_rank"))
             count = _number(entry.get("competitor_count"))
             rank_text = "待接入" if rank is None else f"第 {rank:g} 名" + (f" / {count:g}家" if count is not None else "")
             rows.append(
                 "<tr>"
-                f"<td>{upstream.e(entry.get('label') or entry.get('metric_code') or '指标')}</td>"
-                f"<td class='num'>{upstream.e(_display(entry.get('hotel_value'), unit))}</td>"
-                f"<td class='num'>{upstream.e(_display(entry.get('competitor_avg'), unit))}</td>"
+                f"<td>{upstream.e(label_with_unit)}</td>"
+                f"<td class='num'>{upstream.e(_metric_value(entry.get('hotel_value'), unit))}</td>"
+                f"<td class='num'>{upstream.e(_metric_value(entry.get('competitor_avg'), unit))}</td>"
                 f"<td class='num'><span class='ctrip-rank-pill'>{upstream.e(rank_text)}</span></td>"
                 "</tr>"
             )
         body = (
             "<div class='ctrip-competition-table-scroll'><table class='ctrip-competition-table'>"
-            "<thead><tr><th>竞争圈指标</th><th>我的数据</th><th>竞争圈平均</th><th>竞争圈排名</th></tr></thead>"
+            "<thead><tr><th>竞争圈指标（单位见指标名）</th><th>我的数据</th><th>竞争圈平均</th><th>竞争圈排名</th></tr></thead>"
             f"<tbody>{''.join(rows)}</tbody></table></div>"
         )
-    return f"<section class='ctrip-competition-card'><h4>竞争圈全部指标与排名</h4>{body}</section>"
+    return f"<section class='ctrip-competition-card'><h4>竞争圈核心指标与排名</h4>{body}</section>"
 
 
-def _competitor_list(entries: list[dict[str, Any]], title: str) -> str:
+def _competitor_list(entries: list[dict[str, Any]], title: str, platform: str, *, hidden: bool) -> str:
     if not entries:
         rows = "<li><span class='ctrip-loss-rank'>—</span><span class='ctrip-loss-name'>待接入</span></li>"
     else:
@@ -141,7 +182,11 @@ def _competitor_list(entries: list[dict[str, Any]], title: str) -> str:
                 "</li>"
             )
         rows = "".join(rendered)
-    return f"<div class='ctrip-loss-platform'><h5>{upstream.e(title)} Top5</h5><ol class='ctrip-loss-list'>{rows}</ol></div>"
+    hidden_attr = " hidden" if hidden else ""
+    return (
+        f"<div class='ctrip-loss-platform' data-loss-panel='{upstream.e(platform)}'{hidden_attr}>"
+        f"<h5>{upstream.e(title)} Top5</h5><ol class='ctrip-loss-list'>{rows}</ol></div>"
+    )
 
 
 def _loss_competitors(payload: dict[str, Any]) -> str:
@@ -149,14 +194,18 @@ def _loss_competitors(payload: dict[str, Any]) -> str:
     competitors = payload.get("loss_competitors") if isinstance(payload.get("loss_competitors"), dict) else {}
     date_text = str(summary.get("business_date") or "数据库昨日")
     return (
-        "<section class='ctrip-competition-card'><h4>昨日流失与主要流失竞对</h4>"
+        "<section class='ctrip-competition-card' data-ctrip-loss-card><h4>昨日流失与主要流失竞对</h4>"
         "<div class='ctrip-loss-summary'>"
-        f"<div class='ctrip-loss-stat'><small>流失订单量｜{upstream.e(date_text)}</small><strong>{upstream.e(_display(summary.get('order_count'), '单'))}</strong></div>"
-        f"<div class='ctrip-loss-stat'><small>流失订单金额｜{upstream.e(date_text)}</small><strong>{upstream.e(_display(summary.get('order_amount'), '元'))}</strong></div>"
-        "</div><div class='ctrip-loss-platforms'>"
-        f"{_competitor_list(list(competitors.get('ctrip') or []), '携程')}"
-        f"{_competitor_list(list(competitors.get('qunar') or []), '去哪儿')}"
-        "</div></section>"
+        f"<div class='ctrip-loss-stat'><small>流失订单量（单）｜{upstream.e(date_text)}</small><strong>{upstream.e(_plain_number(summary.get('order_count')))}</strong></div>"
+        f"<div class='ctrip-loss-stat'><small>流失订单金额（元）｜{upstream.e(date_text)}</small><strong>{upstream.e(_plain_number(summary.get('order_amount'), decimals=2))}</strong></div>"
+        "</div>"
+        "<div class='ctrip-loss-tabs' role='tablist'>"
+        "<button class='ctrip-loss-tab active' type='button' role='tab' aria-selected='true' data-loss-tab='ctrip'>携程 Top5</button>"
+        "<button class='ctrip-loss-tab' type='button' role='tab' aria-selected='false' data-loss-tab='qunar'>去哪儿 Top5</button>"
+        "</div>"
+        f"{_competitor_list(list(competitors.get('ctrip') or []), '携程', 'ctrip', hidden=False)}"
+        f"{_competitor_list(list(competitors.get('qunar') or []), '去哪儿', 'qunar', hidden=True)}"
+        "</section>"
     )
 
 
@@ -167,7 +216,7 @@ def competition_card(result: dict[str, Any]) -> str:
     key, text, css = upstream.status(payload)
     score_class = "ok" if upstream.score_value(payload) is not None else "pending"
     source_path = payload.get("source_path") or "携程 eBooking -> 数据中心 -> 竞争圈动态"
-    source_text = payload.get("source") or source
+    source_text = payload.get("source") or "具体数据表与字段映射待确认"
     return (
         f"<article class='diagnosis-card' data-status='{upstream.e(key)}' data-title='{upstream.e(title)}' id='rule-{no}'>"
         "<div class='card-top'>"
@@ -182,7 +231,7 @@ def competition_card(result: dict[str, Any]) -> str:
         "<div class='result-area'>"
         f"{_funnel_content(payload)}"
         f"<div class='ctrip-competition-bottom'>{_competition_rankings(payload)}{_loss_competitors(payload)}</div>"
-        f"<div class='ctrip-competition-source'><b>携程数据来源：</b>{upstream.e(source_path)}（{upstream.e(source_text)}）</div>"
+        f"<div class='ctrip-competition-source'><b>数据口径：</b>{upstream.e(source_path)}；{upstream.e(source_text)}</div>"
         "</div></article>"
     )
 
@@ -228,7 +277,7 @@ def build_html(result: dict[str, Any]) -> str:
         "<button class='btn primary' onclick='window.print()'>导出报告</button>"
         "</div></div></header>"
         f"<div class='page'>{upstream.nav_html()}<main>{upstream.overview_html(result)}{upstream.summary_html(result)}"
-        f"{cards_html(result)}</main></div>{upstream.search_script()}{reporting_v37._script()}</body></html>"
+        f"{cards_html(result)}</main></div>{upstream.search_script()}{reporting_v37._script()}{LOSS_TAB_SCRIPT}</body></html>"
     )
     return build_head() + body
 
