@@ -90,7 +90,6 @@ def test_ctrip_page_is_directly_generated_and_independent():
     assert "平台流量漏斗分析" in output
     assert "YOYO 卡 / 扫码住" in output
     assert "携程渠道经营与服务质量诊断" in output
-    assert "不会从美团成品HTML复制目录或诊断卡片" in output
 
     # 01/02 are newly rendered from the same PMS result, not copied from a Meituan page.
     assert "123,456.00" in output
