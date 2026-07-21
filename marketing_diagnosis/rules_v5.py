@@ -5,6 +5,7 @@ from typing import Any
 from marketing_diagnosis.ctrip_competition import build_competition_item
 from marketing_diagnosis.ctrip_configuration_v63 import build_configuration_items
 from marketing_diagnosis.ctrip_page_entry_v66 import build_page_entry_item
+from marketing_diagnosis.ctrip_psi import build_psi_item
 from marketing_diagnosis.ctrip_reputation_v64 import build_reputation_item
 from marketing_diagnosis.ctrip_room_name_v65 import build_room_name_item
 from marketing_diagnosis.ctrip_user_profile_v58 import build_user_profile_item
@@ -12,6 +13,16 @@ from marketing_diagnosis.promotion_performance_v46 import patch_promotion_perfor
 from marketing_diagnosis.review_yesterday_v45 import patch_yesterday_review_count
 from marketing_diagnosis.rules_v4 import process as _base_process
 from marketing_diagnosis.visual_diagnosis_v20 import build_visual_diagnosis
+
+
+def _number(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        number = float(str(value).replace(",", "").rstrip("%"))
+    except (TypeError, ValueError):
+        return None
+    return None if number != number else number
 
 
 def _has_funnel_data(stages: list[dict[str, Any]]) -> bool:
@@ -109,6 +120,46 @@ def _split_competition_payload(
     return item_three, item_five
 
 
+def _refresh_ctrip_summary(result: dict[str, Any]) -> None:
+    items = result.get("ctrip_items")
+    if not isinstance(items, dict):
+        return
+    total_score = 0.0
+    full_score = 0.0
+    scored_items = 0
+    connected_items = 0
+    for item in items.values():
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("data_status") or "") == "success":
+            connected_items += 1
+        if item.get("participates_in_score") is False:
+            continue
+        maximum = _number(item.get("full_score") or item.get("item_full_score") or item.get("weight"))
+        score = None
+        for key in ("item_score", "diagnosis_score", "score", "current_score"):
+            score = _number(item.get(key))
+            if score is not None:
+                break
+        if maximum is not None:
+            full_score += maximum
+        if score is not None:
+            total_score += score
+            scored_items += 1
+    summary = {
+        "total_score": total_score,
+        "full_score": full_score,
+        "scored_items": scored_items,
+        "connected_items": connected_items,
+        "calculation_rule": "sum each scoring item's item_score once; PSI submetrics are diagnostic only",
+    }
+    result["ctrip_summary"] = summary
+    channel_scores = result.setdefault("channel_scores", {})
+    if isinstance(channel_scores, dict):
+        current = channel_scores.get("ctrip")
+        channel_scores["ctrip"] = {**(current if isinstance(current, dict) else {}), **summary, "items": items}
+
+
 def process(data: dict[str, Any]) -> dict[str, Any]:
     """Preserve established rules and replace only the visual diagnosis layer."""
 
@@ -138,9 +189,13 @@ def process(data: dict[str, Any]) -> dict[str, Any]:
         sections.get("ctrip_userprofile_distribution") or []
     )
     ctrip_items["10"] = build_page_entry_item(sections)
+    psi_item = build_psi_item(sections)
+    ctrip_items["6"] = psi_item
+    result["ctrip_psi"] = psi_item
     ctrip_items["12"] = build_reputation_item(sections)
     ctrip_items["11"] = build_room_name_item(sections)
     ctrip_items.update(build_configuration_items(sections))
+    _refresh_ctrip_summary(result)
     return result
 
 

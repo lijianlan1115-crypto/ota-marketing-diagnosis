@@ -121,6 +121,8 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     raw_ctrip_loss_competitor_rows = _raw_rows(raw, "ctrip_order_loss_monthly")
     raw_ctrip_goods_rows = _raw_rows(raw, "ctrip_goods_price_mapping")
     raw_ctrip_page_entry_rows = _raw_rows(raw, "ctrip_promotion_performance_30d")
+    raw_ctrip_psi_score_rows = _raw_rows(raw, "ctrip_psi_score")
+    raw_ctrip_psi_metric_rows = _raw_rows(raw, "ctrip_psi_metric")
 
     sections = result.setdefault("sections", {})
     sections["scan_orders"] = raw_scan_rows
@@ -136,6 +138,8 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     sections["ctrip_order_loss_monthly"] = raw_ctrip_loss_competitor_rows
     sections["ctrip_goods_price_mapping"] = raw_ctrip_goods_rows
     sections["ctrip_promotion_performance_30d"] = raw_ctrip_page_entry_rows
+    sections["ctrip_psi_score"] = raw_ctrip_psi_score_rows
+    sections["ctrip_psi_metric"] = raw_ctrip_psi_metric_rows
 
     funnel_rows = list(sections.get("ota_funnel") or [])
     has_summary = any(
@@ -179,6 +183,8 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         ("ctrip_order_loss_monthly", raw_ctrip_loss_competitor_rows),
         ("ctrip_goods_price_mapping", raw_ctrip_goods_rows),
         ("ctrip_promotion_performance_30d", raw_ctrip_page_entry_rows),
+        ("ctrip_psi_score", raw_ctrip_psi_score_rows),
+        ("ctrip_psi_metric", raw_ctrip_psi_metric_rows),
     ):
         diagnostics[section] = _section_diagnostic(section, rows)
     return result
