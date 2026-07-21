@@ -1,0 +1,68 @@
+name: Test Ctrip PSI page
+
+on:
+  push:
+    branches:
+      - feature/ctrip-page-data-source
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e . pytest
+      - name: Compile
+        run: python -m compileall -q marketing_diagnosis scripts
+      - name: Test
+        continue-on-error: true
+        run: python -m pytest -q | tee pytest-output.txt
+      - name: Build Ctrip preview
+        run: |
+          mkdir -p preview
+          python - <<'PY'
+          from pathlib import Path
+          from marketing_diagnosis.reporting_v2 import build_ctrip_html
+
+          metrics = {
+              "A": {"score": 3.28, "yesterday_change": -0.15},
+              "B": {"score": 3.28, "yesterday_change": -0.10},
+              "C": {"score": 5.00},
+              "D": {"score": 5.00},
+              "E": {"score": 5.00},
+              "F": {"score": 4.40, "yesterday_change": 0.58},
+              "G": {"score": 3.96},
+              "H": {"score": 5.00},
+              "I": {"score": 5.00},
+          }
+          result = {
+              "hotel_name": "携程页面结构预览",
+              "period_start": "2026-06-21",
+              "period_end": "2026-07-20",
+              "ctrip_psi": {
+                  "base_score": 4.15,
+                  "yesterday_change": 0.01,
+                  "weak_item_count": 0,
+                  "metrics": metrics,
+              },
+          }
+          Path("preview/ctrip_report.html").write_text(build_ctrip_html(result), encoding="utf-8")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ctrip-psi-preview
+          path: |
+            preview/ctrip_report.html
+            pytest-output.txt
