@@ -12,7 +12,10 @@ from marketing_diagnosis.data_v4 import normalize_dataset
 from marketing_diagnosis.excel_loader_v2 import load_excel_package
 from marketing_diagnosis.db_loader_v16 import load_database_dataset, load_mysql_dsn_dataset
 from marketing_diagnosis.reporting_v2 import write_reports
+from marketing_diagnosis.runtime_env import load_local_s14_env
 from marketing_diagnosis.rules_v5 import process
+
+load_local_s14_env()
 
 DEFAULT_REPORT_ROOT = Path("/var/lib/ota-marketing-diagnosis/reports")
 
@@ -90,6 +93,7 @@ def command_db(args):
         source,
         limit=args.limit,
         hotel_id=args.hotel_id,
+        ctrip_hotel_id=args.ctrip_hotel_id,
         platform=args.platform,
         period_start=period_start,
         period_end=period_end,
@@ -100,6 +104,7 @@ def command_db(args):
 def _add_common_args(parser):
     parser.add_argument("--output", default=os.environ.get("S14_REPORT_OUTPUT_DIR") or str(DEFAULT_REPORT_ROOT), help="Report root directory. Each run writes to hotel/platform/period/run_id under this root.")
     parser.add_argument("--hotel-id", default="puyue")
+    parser.add_argument("--ctrip-hotel-id", default=os.environ.get("S14_CTRIP_HOTEL_ID") or None)
     parser.add_argument("--hotel-name", default="璞悦")
     parser.add_argument("--platform", default="multi")
     parser.add_argument("--period-start", default="")

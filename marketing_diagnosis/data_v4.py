@@ -87,11 +87,19 @@ def _raw_rows(raw: dict[str, Any], section: str) -> list[dict[str, Any]]:
 def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     result = _base_normalize_dataset(raw)
     raw_scan_rows = _raw_rows(raw, "scan_orders")
+    raw_ctrip_rights_rows = _raw_rows(raw, "ctrip_joined_rights")
+    raw_ctrip_status_rows = _raw_rows(raw, "ctrip_promotion_status")
     raw_ctrip_profile_rows = _raw_rows(raw, "ctrip_userprofile_distribution")
+    raw_ctrip_review_rows = _raw_rows(raw, "ctrip_review_overview")
+    raw_ctrip_yesterday_rows = _raw_rows(raw, "ctrip_review_yesterday")
 
     sections = result.setdefault("sections", {})
     sections["scan_orders"] = raw_scan_rows
+    sections["ctrip_joined_rights"] = raw_ctrip_rights_rows
+    sections["ctrip_promotion_status"] = raw_ctrip_status_rows
     sections["ctrip_userprofile_distribution"] = raw_ctrip_profile_rows
+    sections["ctrip_review_overview"] = raw_ctrip_review_rows
+    sections["ctrip_review_yesterday"] = raw_ctrip_yesterday_rows
 
     funnel_rows = list(sections.get("ota_funnel") or [])
     has_summary = any(
@@ -137,6 +145,24 @@ def normalize_dataset(raw: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         ),
         "status": "ok" if raw_ctrip_profile_rows else "empty",
     }
+    for section, rows in (
+        ("ctrip_joined_rights", raw_ctrip_rights_rows),
+        ("ctrip_promotion_status", raw_ctrip_status_rows),
+        ("ctrip_review_overview", raw_ctrip_review_rows),
+        ("ctrip_review_yesterday", raw_ctrip_yesterday_rows),
+    ):
+        result["diagnostics"][section] = {
+            "section": section,
+            "row_count": len(rows),
+            "source_tables": sorted(
+                {
+                    str(row.get("source_table") or row.get("__source_table"))
+                    for row in rows
+                    if row.get("source_table") or row.get("__source_table")
+                }
+            ),
+            "status": "ok" if rows else "empty",
+        }
     return result
 
 

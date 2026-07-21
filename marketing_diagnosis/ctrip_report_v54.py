@@ -26,11 +26,11 @@ SPECS = (
     (9, "推广数据：金字塔", 8, "近30天", "展示投入、曝光、点击、订单、成交金额和ROI。", "携程 eBooking / 金字塔推广", ("推广产品", "投入金额", "曝光量", "推广订单", "ROI")),
     (10, "页面展示和入口基础", 3, "最新快照", "检查门店后缀、地标商圈词、推荐词、标签和卖点。", "携程酒店详情页 / eBooking信息维护", ("门店后缀", "地标 / 商圈词", "推荐词 / 标签")),
     (11, "房型名称与售卖房型", 4, "最新快照", "展示房型名称长度、卖点命中、合格占比和售卖渠道。", "携程 eBooking / 房型与售卖", ("房型总数", "合格房型", "合格占比", "售卖渠道")),
-    (12, "口碑分析", 10, "当前值", "分别展示携程、去哪儿、同程旅行和智行评分。", "携程系平台点评数据", ("携程", "去哪儿", "同程旅行", "智行")),
-    (13, "权益中心", 4, "当前值", "展示免费取消、提前入住、延迟退房和早餐等权益。", "携程 eBooking / 权益中心", ("已报名权益", "免费取消", "延迟退房", "早餐")),
+    (12, "口碑分析", 10, "当前值", "按携程、去哪儿、同程旅行和智行分别展示点评质量与回复情况。", "携程 eBooking / 点评问答 / 订单点评", ("携程", "去哪儿", "同程旅行", "智行")),
+    (13, "权益中心", 4, "当前值", "展示已报名权益数量和权益清单。", "携程 eBooking / 权益中心", ("已报名权益", "权益清单")),
     (14, "积分联盟", 3, "近30天", "展示报名状态、近30天订单、成交金额和平台覆盖。", "携程 eBooking / 积分联盟", ("报名状态", "近30天订单", "成交金额", "覆盖平台")),
-    (15, "优享会", 3, "当前值", "展示参加状态、标签状态、参与房型和订单。", "携程 eBooking / 优享会", ("参加状态", "标签状态", "参与房型", "近30天订单")),
-    (16, "商旅专享价", 2, "当前值", "展示开通状态、参与房型数和近30天订单。", "携程 eBooking / 商旅专享价", ("开通状态", "参与房型", "近30天订单", "成交金额")),
+    (15, "优享会", 3, "当前值", "展示参加状态和标签状态。", "携程 eBooking / 优享会", ("参加状态", "标签状态")),
+    (16, "商旅专享价", 2, "当前值", "展示开通状态和参与房型数。", "携程 eBooking / 商旅专享价", ("开通状态", "参与房型")),
     (17, "闪住", 2, "当前值", "展示闪住开通状态和参与房型数。", "携程 eBooking / 闪住", ("开通状态", "参与房型", "后台入口")),
     (18, "钟点房", 2, "近30天", "展示核心房型配置、促销状态和钟点房订单。", "携程 eBooking / 钟点房", ("钟点房配置", "核心房型", "促销状态", "近30天订单")),
     (19, "旅拍", 2, "当前值", "展示旅拍上传、认领状态和数量。", "携程 eBooking / 旅拍", ("旅拍上传", "认领状态", "旅拍数量")),
@@ -57,8 +57,41 @@ CTRIP_STYLE = """
 .ctrip-metric-v55 strong{display:block;margin-top:9px;color:#26343d;font-size:20px;line-height:1.25;overflow-wrap:anywhere}
 .ctrip-metric-v55 span{display:block;margin-top:6px;color:#84909a;font-size:11px}
 .ctrip-source-v55{margin-top:12px;padding:11px 13px;border:1px solid #d9e6e1;border-radius:9px;background:#f4faf7;color:#315b4c;font-size:12px}
+.ctrip-rights-table-v63{width:100%;border-collapse:collapse;border:1px solid #dfe7e4;border-radius:9px;overflow:hidden;background:#fff}
+.ctrip-rights-table-v63 th,.ctrip-rights-table-v63 td{padding:11px 13px;border-bottom:1px solid #eaf0ed;text-align:left}
+.ctrip-rights-table-v63 th{background:#f5faf7;color:#53616b;font-size:12px;font-weight:700}
+.ctrip-rights-table-v63 td{color:#26343d;font-size:14px;font-weight:700}
+.ctrip-rights-table-v63 tr:last-child td{border-bottom:0}
+.ctrip-reputation-summary-v64{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.ctrip-reputation-summary-card-v64{padding:14px;border:1px solid #dfe7e4;border-radius:9px;background:#f7fbf9}
+.ctrip-reputation-summary-card-v64 small{display:block;color:#68747f;font-size:12px;font-weight:700}
+.ctrip-reputation-summary-card-v64 strong{display:block;margin-top:7px;color:#26343d;font-size:22px;line-height:1.2}
+.ctrip-reputation-summary-card-v64 span{display:block;margin-top:5px;color:#84909a;font-size:11px}
+.ctrip-reputation-grid-v64{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ctrip-reputation-card-v64{overflow:hidden;border:1px solid #dfe7e4;border-radius:9px;background:#fff}
+.ctrip-reputation-head-v64{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 15px;border-bottom:1px solid #eaf0ed;background:#f7faf9}
+.ctrip-reputation-name-v64{display:flex;align-items:center;gap:9px;color:#26343d;font-size:16px;font-weight:900}
+.ctrip-reputation-dot-v64{width:8px;height:8px;border-radius:50%;background:#2f9d72}
+.ctrip-reputation-weight-v64{display:block;margin-top:4px;color:#84909a;font-size:11px;font-weight:500}
+.ctrip-reputation-score-v64{text-align:right;color:#16845b;font-weight:900}
+.ctrip-reputation-score-v64 strong{display:block;font-size:18px;line-height:1.1}
+.ctrip-reputation-score-v64 span{display:block;margin-top:4px;color:#84909a;font-size:11px;font-weight:600}
+.ctrip-reputation-rating-v64{display:flex;align-items:end;justify-content:space-between;gap:14px;padding:14px 15px 10px}
+.ctrip-reputation-rating-v64 small{display:block;color:#68747f;font-size:12px;font-weight:700}
+.ctrip-reputation-rating-v64 strong{display:block;margin-top:5px;color:#26343d;font-size:28px;line-height:1}
+.ctrip-reputation-rating-v64 em{font-style:normal;font-size:12px;font-weight:800}
+.ctrip-reputation-rating-v64.good em{color:#16845b}.ctrip-reputation-rating-v64.fair em{color:#b6791f}.ctrip-reputation-rating-v64.low em{color:#c44c43}.ctrip-reputation-rating-v64.pending em{color:#84909a}
+.ctrip-reputation-metrics-v64{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:0 15px 13px}
+.ctrip-reputation-metric-v64{padding:9px 10px;border:1px solid #edf1ef;border-radius:7px;background:#fbfcfc}
+.ctrip-reputation-metric-v64 small{display:block;color:#84909a;font-size:11px;font-weight:600}
+.ctrip-reputation-metric-v64 strong{display:block;margin-top:5px;color:#34424b;font-size:14px;line-height:1.2;overflow-wrap:anywhere}
+.ctrip-reputation-dimensions-v64{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 15px 15px;padding-top:12px;border-top:1px solid #edf1ef}
+.ctrip-reputation-dimension-v64 small{display:block;color:#84909a;font-size:11px}.ctrip-reputation-dimension-v64 strong{display:block;margin-top:4px;color:#53616b;font-size:13px}
+.ctrip-reputation-muted-v64{color:#9aa5ad!important;font-weight:600!important}
 .ctrip-pending-v55{color:#788497!important}
 @media(max-width:980px){.ctrip-grid-v55{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:980px){.ctrip-reputation-grid-v64{grid-template-columns:1fr}}
+@media(max-width:680px){.ctrip-reputation-summary-v64{grid-template-columns:1fr}.ctrip-reputation-metrics-v64{grid-template-columns:repeat(2,minmax(0,1fr))}.ctrip-reputation-dimensions-v64{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.ctrip-grid-v55{grid-template-columns:1fr}}
 </style>
 """
@@ -208,6 +241,8 @@ def fields(item_spec: tuple[Any, ...], payload: dict[str, Any]) -> list[dict[str
                 rows.append({"label": value[0], "value": value[1]})
 
     known = {str(row.get("label") or "") for row in rows}
+    if payload.get("fields_complete"):
+        return rows
     for label in item_spec[6]:
         if label not in known:
             rows.append({"label": label, "value": payload.get(label)})
@@ -247,6 +282,101 @@ def pms_item(result: dict[str, Any], no: int) -> dict[str, Any]:
     return item
 
 
+def _reputation_value(entry: dict[str, Any], key: str, *, suffix: str = "") -> str:
+    value = entry.get(key)
+    if entry.get("data_status") == "missing":
+        return "待接入"
+    if value in (None, ""):
+        return "暂无数据"
+    parsed = number(value)
+    if parsed is not None and parsed.is_integer():
+        return f"{int(parsed)}{suffix}"
+    return f"{parsed:.2f}{suffix}" if parsed is not None else f"{value}{suffix}"
+
+
+def _reputation_percent(entry: dict[str, Any]) -> str:
+    value = entry.get("reply_rate")
+    if entry.get("data_status") == "missing":
+        return "待接入"
+    if value in (None, ""):
+        return "暂无数据"
+    parsed = number(value)
+    return "暂无数据" if parsed is None else f"{parsed * 100:.1f}%"
+
+
+def _reputation_card_content(payload: dict[str, Any]) -> str:
+    platforms = payload.get("platforms")
+    if not isinstance(platforms, list):
+        platforms = []
+    score = score_value(payload)
+    available = sum(
+        1
+        for entry in platforms
+        if isinstance(entry, dict) and entry.get("data_status") != "missing"
+    )
+    summary = (
+        "<div class='ctrip-reputation-summary-v64'>"
+        f"<div class='ctrip-reputation-summary-card-v64'><small>平台评分合计</small><strong>{e('待计算' if score is None else f'{score:g}分')}</strong><span>满分 10 分</span></div>"
+        f"<div class='ctrip-reputation-summary-card-v64'><small>已接入平台</small><strong>{available}/4</strong><span>携程、去哪儿、同程旅行、智行</span></div>"
+        "<div class='ctrip-reputation-summary-card-v64'><small>评分规则</small><strong>4.7分</strong><span>达标平台按对应权重计满分</span></div>"
+        "</div>"
+    )
+    cards: list[str] = []
+    for entry in platforms:
+        if not isinstance(entry, dict):
+            continue
+        rating = number(entry.get("rating"))
+        rating_class = (
+            "pending"
+            if rating is None
+            else "good"
+            if rating >= 4.7
+            else "fair"
+            if rating >= 4.5
+            else "low"
+        )
+        rating_note = (
+            "待接入"
+            if rating is None
+            else "达标"
+            if rating >= 4.7
+            else "80%计分"
+            if rating >= 4.5
+            else "未达标"
+        )
+        dimensions: list[str] = []
+        for label, key in (
+            ("环境", "environment_score"),
+            ("设施", "facility_score"),
+            ("服务", "service_score"),
+            ("卫生", "hygiene_score"),
+        ):
+            muted = "ctrip-reputation-muted-v64" if entry.get(key) in (None, "") else ""
+            dimensions.append(
+                f"<div class='ctrip-reputation-dimension-v64'><small>{e(label)}</small>"
+                f"<strong class='{muted}'>{e(_reputation_value(entry, key))}</strong></div>"
+            )
+        cards.append(
+            "<section class='ctrip-reputation-card-v64'>"
+            "<div class='ctrip-reputation-head-v64'><div>"
+            f"<div class='ctrip-reputation-name-v64'><i class='ctrip-reputation-dot-v64'></i>{e(entry.get('platform_name') or '平台')}</div>"
+            f"<span class='ctrip-reputation-weight-v64'>平台权重 {_reputation_value(entry, 'full_score', suffix='分')}</span>"
+            "</div><div class='ctrip-reputation-score-v64'>"
+            f"<strong>{e(_reputation_value(entry, 'score', suffix='分'))}</strong><span>本平台得分</span></div></div>"
+            f"<div class='ctrip-reputation-rating-v64 {rating_class}'><div><small>点评分</small><strong>{e(_reputation_value(entry, 'rating'))}</strong></div><em>{e(rating_note)}</em></div>"
+            "<div class='ctrip-reputation-metrics-v64'>"
+            f"<div class='ctrip-reputation-metric-v64'><small>点评条数</small><strong>{e(_reputation_value(entry, 'review_count', suffix='条'))}</strong></div>"
+            f"<div class='ctrip-reputation-metric-v64'><small>昨日新增点评数</small><strong>{e(_reputation_value(entry, 'yesterday_new_review_count', suffix='条'))}</strong></div>"
+            f"<div class='ctrip-reputation-metric-v64'><small>未回复点评</small><strong>{e(_reputation_value(entry, 'unreplied_review_count', suffix='条'))}</strong></div>"
+            f"<div class='ctrip-reputation-metric-v64'><small>点评回复率</small><strong>{e(_reputation_percent(entry))}</strong></div>"
+            f"<div class='ctrip-reputation-metric-v64'><small>差评数</small><strong>{e(_reputation_value(entry, 'negative_review_count', suffix='条'))}</strong></div>"
+            "</div>"
+            f"<div class='ctrip-reputation-dimensions-v64'>{''.join(dimensions)}</div>"
+            "</section>"
+        )
+    return summary + "<div class='ctrip-reputation-grid-v64'>" + "".join(cards) + "</div>"
+
+
 def generic_card(result: dict[str, Any], item_spec: tuple[Any, ...]) -> str:
     no, title, _, period, description, source, _ = item_spec
     payload = item_payload(result, item_spec)
@@ -262,6 +392,31 @@ def generic_card(result: dict[str, Any], item_spec: tuple[Any, ...]) -> str:
         f"<span>{e(row.get('note') or '')}</span></div>"
         for row in rows
     )
+    if no == 12:
+        result_content = _reputation_card_content(payload)
+    elif no == 13:
+        rights = payload.get("rights_list")
+        if not isinstance(rights, list):
+            rights = [
+                value.strip()
+                for value in str(next((row.get("value") for row in rows if row.get("label") == "权益清单"), "") or "").split("、")
+                if value.strip()
+            ]
+        count = next((row.get("value") for row in rows if row.get("label") == "已报名权益"), None)
+        table_rows = "".join(f"<tr><td>{e(value)}</td></tr>" for value in rights)
+        if not table_rows:
+            empty_text = "待接入" if key == "missing" else "暂无已报名权益"
+            table_rows = f"<tr><td class='ctrip-pending-v55'>{e(empty_text)}</td></tr>"
+        result_content = (
+            "<div class='ctrip-grid-v55'>"
+            f"<div class='ctrip-metric-v55'><small>已报名权益</small><strong>{e(count if count not in (None, '') else '待接入')}</strong></div>"
+            "</div>"
+            "<div class='table-scroll'><table class='ctrip-rights-table-v63'>"
+            "<thead><tr><th>权益清单</th></tr></thead>"
+            f"<tbody>{table_rows}</tbody></table></div>"
+        )
+    else:
+        result_content = f"<div class='ctrip-grid-v55'>{metrics}</div>"
     score_class = "display-only" if item_spec[2] is None else "ok" if score_value(payload) is not None else "pending"
     return (
         f"<article class='diagnosis-card' data-status='{e(key)}' data-title='{e(title)}' id='rule-{no}'>"
@@ -275,7 +430,7 @@ def generic_card(result: dict[str, Any], item_spec: tuple[Any, ...]) -> str:
         f"<span>满分 {e(full_text(item_spec, payload))}</span></div></div>"
         f"<span class='status-badge {css}'>{e(text)}</span></div></div>"
         "<div class='result-area'>"
-        f"<div class='ctrip-grid-v55'>{metrics}</div>"
+        f"{result_content}"
         f"<div class='ctrip-source-v55'><b>携程数据来源：</b>{e(payload.get('source') or source)}</div>"
         "<div class='notice'>未接入字段统一显示“待接入”，不会使用美团数据或示例值替代。</div>"
         "</div></article>"

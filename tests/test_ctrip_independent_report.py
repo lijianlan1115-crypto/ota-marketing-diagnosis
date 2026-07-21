@@ -120,3 +120,65 @@ def test_missing_ctrip_data_never_invents_or_reuses_meituan_values():
     assert "73.9" not in output
     assert "美团曝光内容" not in output
     assert "美团总分" not in output
+
+
+def test_configuration_cards_only_render_business_facing_fields():
+    output = build_html(
+        {
+            "hotel_name": "测试酒店",
+            "ctrip_items": {
+                "13": {
+                    "item_score": 4,
+                    "data_status": "success",
+                    "fields_complete": True,
+                    "fields": [
+                        {"label": "已报名权益", "value": "5项"},
+                        {"label": "权益清单", "value": "免费取消、早餐"},
+                    ],
+                    "rights_list": ["免费取消", "早餐"],
+                },
+                "15": {
+                    "item_score": 3,
+                    "data_status": "success",
+                    "fields_complete": True,
+                    "fields": [
+                        {"label": "参加状态", "value": "已参加"},
+                        {"label": "标签状态", "value": "正常展示"},
+                    ],
+                },
+                "16": {
+                    "item_score": 0,
+                    "data_status": "success",
+                    "fields_complete": True,
+                    "fields": [
+                        {"label": "开通状态", "value": "未开通"},
+                        {"label": "参与房型", "value": 0},
+                    ],
+                },
+                "19": {
+                    "item_score": 0,
+                    "data_status": "success",
+                    "fields_complete": True,
+                    "fields": [
+                        {"label": "旅拍上传", "value": "未上传"},
+                        {"label": "认领状态", "value": "未上传"},
+                        {"label": "旅拍数量", "value": 0},
+                    ],
+                },
+            },
+        }
+    )
+
+    rights_card = output.split("id='rule-13'", 1)[1].split("id='rule-14'", 1)[0]
+    preferred_card = output.split("id='rule-15'", 1)[1].split("id='rule-16'", 1)[0]
+    business_card = output.split("id='rule-16'", 1)[1].split("id='rule-17'", 1)[0]
+    photo_card = output.split("id='rule-19'", 1)[1].split("id='rule-20'", 1)[0]
+
+    assert "ctrip-rights-table-v63" in rights_card
+    assert rights_card.count("class='ctrip-metric-v55'") == 1
+    assert "免费取消" in rights_card and "早餐" in rights_card
+    assert "参与房型" not in preferred_card and "近30天订单" not in preferred_card
+    assert "参与房型" in business_card and ">0</strong>" in business_card
+    assert "近30天订单" not in business_card and "成交金额" not in business_card
+    assert "旅拍数量" in photo_card and ">0</strong>" in photo_card
+    assert "ENABLED" not in output and "NOT_JOINED" not in output and "NOT_UPLOADED" not in output

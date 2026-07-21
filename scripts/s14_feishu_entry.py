@@ -22,9 +22,12 @@ STATE_DIR.mkdir(parents=True, exist_ok=True)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from marketing_diagnosis.runtime_env import load_local_s14_env
 from marketing_diagnosis.room_name_manual_v43 import (
     parse_room_type_names_from_text,
 )
+
+load_local_s14_env()
 
 TRIGGERS = (
     "S14诊断",
@@ -168,6 +171,8 @@ def _config() -> dict[str, Any]:
         cfg["public_base_url"] = os.environ["S14_PUBLIC_BASE_URL"]
     if os.environ.get("S14_DB_DSN"):
         cfg["db_dsn"] = os.environ["S14_DB_DSN"]
+    if os.environ.get("S14_CTRIP_HOTEL_ID"):
+        cfg["ctrip_hotel_id"] = os.environ["S14_CTRIP_HOTEL_ID"]
     return cfg
 
 
