@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from marketing_diagnosis import reporting_runtime_v51 as upstream
-from marketing_diagnosis.ctrip_psi_v53 import transform as transform_ctrip_page
+from marketing_diagnosis.ctrip_report_v54 import transform as build_independent_ctrip_page
 
 
 CHANNEL_STYLE = """
@@ -42,27 +42,47 @@ def _switch_html(active: str) -> str:
 
 
 def inject_channel_switch(html_text: str, active: str = "meituan") -> str:
+    """Add links between the two independently generated report pages."""
+
     if "OTA_CHANNEL_SWITCH_V52" not in html_text:
         html_text = html_text.replace("</head>", CHANNEL_STYLE + "</head>", 1)
     if "ota-channel-switch-v52" in html_text.split("</head>", 1)[-1]:
         return _SWITCH_RE.sub(_switch_html(active), html_text, count=1)
 
     switch = _switch_html(active)
-    html_text, count = _PRINT_BUTTON_RE.subn(lambda match: match.group(1) + switch, html_text, count=1)
+    html_text, count = _PRINT_BUTTON_RE.subn(
+        lambda match: match.group(1) + switch,
+        html_text,
+        count=1,
+    )
     if count == 0:
-        html_text, count = _TOP_ACTIONS_RE.subn(lambda match: match.group(1) + switch, html_text, count=1)
+        html_text, count = _TOP_ACTIONS_RE.subn(
+            lambda match: match.group(1) + switch,
+            html_text,
+            count=1,
+        )
     if count == 0:
         html_text = html_text.replace("<body>", "<body>" + switch, 1)
     return html_text
 
 
 def build_ctrip_html(result: dict[str, Any]) -> str:
-    """Use the current production Meituan layout as the Ctrip page shell."""
-    return inject_channel_switch(transform_ctrip_page(upstream.build_html(result), result), "ctrip")
+    """Build a Ctrip report that is independent from the Meituan page.
+
+    The production Meituan HTML is used only as the current visual/style source.
+    Ctrip receives a separate directory, overview, summary and channel modules.
+    Items 01 and 02 are copied as separate nodes with the same PMS data and
+    layout, while their Ctrip scores can be configured independently.
+    """
+
+    meituan_html = upstream.build_html(result)
+    ctrip_html = build_independent_ctrip_page(meituan_html, result)
+    return inject_channel_switch(ctrip_html, "ctrip")
 
 
 def build_html(result: dict[str, Any]) -> str:
-    """Keep the current Meituan page body unchanged."""
+    """Keep the existing Meituan report body and scoring logic unchanged."""
+
     return inject_channel_switch(upstream.build_html(result), "meituan")
 
 
