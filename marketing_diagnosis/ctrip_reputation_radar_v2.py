@@ -41,6 +41,24 @@ def _display(value: float | None) -> str:
     return "—" if value is None else f"{value:g}"
 
 
+def _dimensions(entry: dict[str, Any]) -> tuple[tuple[str, str, int], ...]:
+    platform_key = str(entry.get("platform_key") or "").lower()
+    platform_name = str(entry.get("platform_name") or "")
+    if platform_key == "qunar" or platform_name == "去哪儿":
+        return (
+            ("风格", "style_score", -90),
+            ("服务", "service_score", 0),
+            ("卫生", "hygiene_score", 90),
+            ("安全", "safety_score", 180),
+        )
+    return (
+        ("环境", "environment_score", -90),
+        ("服务", "service_score", 0),
+        ("卫生", "hygiene_score", 90),
+        ("设施", "facility_score", 180),
+    )
+
+
 def _point(cx: float, cy: float, radius: float, angle: float, score: float) -> tuple[float, float]:
     radian = math.radians(angle)
     distance = radius * min(5.0, max(0.0, score)) / 5.0
@@ -76,27 +94,23 @@ def _smooth_path(points: list[tuple[float, float]]) -> str:
 
 
 def radar_chart(entry: dict[str, Any]) -> str:
-    dimensions = (
-        ("环境", "environment_score", -90),
-        ("服务", "service_score", 0),
-        ("卫生", "hygiene_score", 90),
-        ("设施", "facility_score", 180),
-    )
+    dimensions = _dimensions(entry)
     values = {key: _number(entry.get(key)) for _, key, _ in dimensions}
     valid = [value for value in values.values() if value is not None]
     name = str(entry.get("platform_name") or "平台")
     stroke, fill = PALETTE.get(name, ("#2fa66a", "rgba(47,166,106,.16)"))
 
     cx, cy, radius = 130.0, 82.0, 48.0
-    labels = (
-        f"<text x='130' y='13' text-anchor='middle' class='radar-label'>环境 "
-        f"<tspan class='radar-value' fill='{stroke}'>{upstream.e(_display(values['environment_score']))}</tspan></text>"
-        f"<text x='252' y='86' text-anchor='end' class='radar-label'>服务 "
-        f"<tspan class='radar-value' fill='{stroke}'>{upstream.e(_display(values['service_score']))}</tspan></text>"
-        f"<text x='130' y='166' text-anchor='middle' class='radar-label'>卫生 "
-        f"<tspan class='radar-value' fill='{stroke}'>{upstream.e(_display(values['hygiene_score']))}</tspan></text>"
-        f"<text x='8' y='86' text-anchor='start' class='radar-label'>设施 "
-        f"<tspan class='radar-value' fill='{stroke}'>{upstream.e(_display(values['facility_score']))}</tspan></text>"
+    label_positions = (
+        (130, 13, "middle"),
+        (252, 86, "end"),
+        (130, 166, "middle"),
+        (8, 86, "start"),
+    )
+    labels = "".join(
+        f"<text x='{x}' y='{y}' text-anchor='{anchor}' class='radar-label'>{upstream.e(label)} "
+        f"<tspan class='radar-value' fill='{stroke}'>{upstream.e(_display(values[key]))}</tspan></text>"
+        for (label, key, _), (x, y, anchor) in zip(dimensions, label_positions)
     )
 
     grid = (
@@ -137,9 +151,10 @@ def radar_chart(entry: dict[str, Any]) -> str:
             + f"<text x='{cx}' y='{cy+11}' text-anchor='middle' class='radar-average-label'>维度均分</text>"
         )
 
+    aria_dimensions = "、".join(label for label, _, _ in dimensions)
     return (
         "<div class='rep-radar'>"
-        "<svg viewBox='0 0 260 174' role='img' aria-label='环境、设施、服务、卫生雷达图'>"
+        f"<svg viewBox='0 0 260 174' role='img' aria-label='{upstream.e(aria_dimensions)}雷达图'>"
         + content
         + "</svg></div>"
     )
