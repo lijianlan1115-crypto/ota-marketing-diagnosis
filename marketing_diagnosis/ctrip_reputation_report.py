@@ -116,7 +116,7 @@ def build_content(payload: dict[str, Any]) -> str:
         f"<div class='rep-kpi'><small>模块得分</small><strong>{upstream.e('待计算' if score is None else f'{score:g}/10')}</strong><span>平台权重合计</span></div>"
         f"<div class='rep-kpi'><small>平台平均分</small><strong>{upstream.e('—' if average is None else f'{average:.2f}')}</strong><span>四个平台横向对比</span></div>"
         f"<div class='rep-kpi'><small>已接入平台</small><strong>{available}/4</strong><span>真实渠道数据</span></div>"
-        f"<div class='rep-kpi'><small>达标平台</small><strong>{reached}/{len(valid_ratings) or 4}</strong><span>达标线 {TARGET:g}</span></div>"
+        f"<div class='rep-kpi'><small>达标平台</small><strong>{reached}/{len(valid_ratings) or 4}</strong><span>满分线 {TARGET:g}</span></div>"
         "</div>"
     )
 
@@ -139,7 +139,7 @@ def build_content(payload: dict[str, Any]) -> str:
         )
     comparison = (
         "<div class='rep-compare'><div class='rep-compare-head'>"
-        f"<b>平台评分对比</b><span>竖线为达标线 {TARGET:g}</span></div>"
+        f"<b>平台评分对比</b><span>竖线为满分线 {TARGET:g}</span></div>"
         + "".join(compare_rows)
         + "</div>"
     )
@@ -148,7 +148,7 @@ def build_content(payload: dict[str, Any]) -> str:
         _, gap, risk = max(risk_entries, key=lambda item: (item[0], item[1]))
         insight = (
             f"<b>重点结论：</b>{upstream.e(risk.get('platform_name') or '重点平台')}"
-            f"当前低于达标线 {gap:.2f} 分，且权重较高，建议优先处理差评并改善最低分维度。"
+            f"当前低于满分线 {gap:.2f} 分，且权重较高，建议优先处理差评并改善最低分维度。"
         )
     else:
         insight = "<b>重点结论：</b>当前已接入平台均达到目标线，继续关注新增差评和回复时效。"
