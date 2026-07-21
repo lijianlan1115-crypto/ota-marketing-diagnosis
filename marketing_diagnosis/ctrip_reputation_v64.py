@@ -125,6 +125,8 @@ def build_reputation_item(sections: dict[str, Any]) -> dict[str, Any]:
                 "facility_score": _number(row.get("facility_score")),
                 "service_score": _number(row.get("service_score")),
                 "hygiene_score": _number(row.get("hygiene_score")),
+                "style_score": _number(row.get("style_score")),
+                "safety_score": _number(row.get("safety_score")),
             }
         )
 
