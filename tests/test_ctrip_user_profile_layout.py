@@ -1,5 +1,5 @@
 from marketing_diagnosis.ctrip_report import build_html
-from marketing_diagnosis.ctrip_user_profile_report import donut_svg
+from marketing_diagnosis.ctrip_user_profile_report import profile_table
 from marketing_diagnosis.ctrip_user_profile_v58 import build_user_profile_item
 
 
@@ -47,25 +47,30 @@ def test_zero_percent_is_omitted_and_tiny_values_are_preserved():
     assert len(item["hourly_distribution"]) == 3
 
 
-def test_donut_uses_external_leader_only_for_small_positive_values():
-    svg = donut_svg(
-        [
-            {"label": "主项", "rate_pct": 76.96},
-            {"label": "次项", "rate_pct": 20.53},
-            {"label": "小项", "rate_pct": 2.51},
-            {"label": "零值", "rate_pct": 0},
-        ],
-        "消费价格带",
+def test_profile_table_uses_multiple_rows_for_each_dimension():
+    item = build_user_profile_item(profile_rows())
+    output = profile_table(
+        item["charts"],
+        item["average_advance_days"],
+        item["average_stay_nights"],
     )
 
-    assert "76.96%" in svg
-    assert "20.53%" in svg
-    assert "2.51%" in svg
-    assert "<polyline" in svg
-    assert "0.00%" not in svg
+    assert "ctrip-profile-table" in output
+    assert "画像维度" in output
+    assert "细分项" in output
+    assert "占比展示" in output
+    assert "rowspan='2'" in output
+    assert "rowspan='3'" in output
+    assert "男" in output and "女" in output
+    assert "501–1000元" in output
+    assert "1001–2000元" not in output
+    assert "0.14%" in output
+    assert "平均提前 1.6 天" in output
+    assert "平均入住 1.2 晚" in output
+    assert "ctrip-profile-bar-fill" in output
 
 
-def test_report_uses_responsive_profile_layout_without_zero_bucket():
+def test_report_uses_table_and_keeps_city_and_peak_modules():
     item = build_user_profile_item(profile_rows())
     output = build_html(
         {
@@ -77,15 +82,10 @@ def test_report_uses_responsive_profile_layout_without_zero_bucket():
     )
 
     assert "CTRIP_USER_PROFILE_STABLE" in output
-    assert "ctrip-profile-grid" in output
-    assert "auto-fit" in output
+    assert "ctrip-profile-table-scroll" in output
     assert "overflow-x:auto" in output
-    assert "消费价格带" in output
     assert "501–1000元" in output
     assert "1001–2000元" not in output
-    assert "0.14%" in output
-    assert "平均提前 1.6 天" in output
-    assert "平均入住 1.2 晚" in output
     assert "主要客源城市（Top5）" in output
     assert "主要预订时段" in output
     assert "17:00" in output
