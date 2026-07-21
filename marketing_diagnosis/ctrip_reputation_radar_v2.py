@@ -26,10 +26,10 @@ RADAR_STYLE = """
 """
 
 PALETTE = {
-    "携程": ("#4f91d8", "rgba(79,145,216,.16)"),
-    "去哪儿": ("#42a985", "rgba(66,169,133,.16)"),
-    "同程旅行": ("#e0a44f", "rgba(224,164,79,.17)"),
-    "智行": ("#8c77c8", "rgba(140,119,200,.15)"),
+    "携程": ("#2fa66a", "rgba(47,166,106,.16)"),
+    "去哪儿": ("#3f8fe8", "rgba(63,143,232,.16)"),
+    "同程旅行": ("#f2a521", "rgba(242,165,33,.16)"),
+    "智行": ("#9368d8", "rgba(147,104,216,.16)"),
 }
 
 
@@ -85,7 +85,7 @@ def radar_chart(entry: dict[str, Any]) -> str:
     values = {key: _number(entry.get(key)) for _, key, _ in dimensions}
     valid = [value for value in values.values() if value is not None]
     name = str(entry.get("platform_name") or "平台")
-    stroke, fill = PALETTE.get(name, ("#63aa91", "rgba(99,170,145,.16)"))
+    stroke, fill = PALETTE.get(name, ("#2fa66a", "rgba(47,166,106,.16)"))
 
     cx, cy, radius = 130.0, 82.0, 48.0
     labels = (
