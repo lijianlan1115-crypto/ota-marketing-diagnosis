@@ -25,7 +25,7 @@ SPECS = (
     (8, "信息完整度", 4, "当前值", "展示携程信息首页完整度及缺失项。", "携程 eBooking / 信息维护", ("信息完整度", "基础信息缺失", "政策缺失", "设施缺失")),
     (9, "推广数据：金字塔", 8, "近30天", "展示投入、曝光、点击、订单、成交金额和ROI。", "携程 eBooking / 金字塔推广", ("推广产品", "投入金额", "曝光量", "推广订单", "ROI")),
     (10, "页面展示和入口基础", 3, "最新快照", "检查门店后缀、地标商圈词、推荐词、标签和卖点。", "携程酒店详情页 / eBooking信息维护", ("门店后缀", "地标 / 商圈词", "推荐词 / 标签")),
-    (11, "房型名称与售卖房型", 4, "最新快照", "展示房型名称长度、卖点命中、合格占比和售卖渠道。", "携程 eBooking / 房型与售卖", ("房型总数", "合格房型", "合格占比", "售卖渠道")),
+    (11, "房型名称与售卖房型", 4, "最新快照", "展示售卖商品、房型名称合格数和合格占比。", "ctrip_ota_goods_price_mapping", ("售卖商品数", "售卖房型数", "合格房型", "合格房型占比")),
     (12, "口碑分析", 10, "当前值", "按携程、去哪儿、同程旅行和智行分别展示点评质量与回复情况。", "携程 eBooking / 点评问答 / 订单点评", ("携程", "去哪儿", "同程旅行", "智行")),
     (13, "权益中心", 4, "当前值", "展示已报名权益数量和权益清单。", "携程 eBooking / 权益中心", ("已报名权益", "权益清单")),
     (14, "积分联盟", 3, "近30天", "展示报名状态、近30天订单、成交金额和平台覆盖。", "携程 eBooking / 积分联盟", ("报名状态", "近30天订单", "成交金额", "覆盖平台")),
@@ -88,10 +88,19 @@ CTRIP_STYLE = """
 .ctrip-reputation-dimensions-v64{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 15px 15px;padding-top:12px;border-top:1px solid #edf1ef}
 .ctrip-reputation-dimension-v64 small{display:block;color:#84909a;font-size:11px}.ctrip-reputation-dimension-v64 strong{display:block;margin-top:4px;color:#53616b;font-size:13px}
 .ctrip-reputation-muted-v64{color:#9aa5ad!important;font-weight:600!important}
+.ctrip-room-name-summary-v65{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.ctrip-room-name-table-v65{width:100%;border-collapse:collapse;border:1px solid #dfe7e4;background:#fff}
+.ctrip-room-name-table-v65 th,.ctrip-room-name-table-v65 td{padding:11px 12px;border-bottom:1px solid #eaf0ed;text-align:left}
+.ctrip-room-name-table-v65 th{background:#f5faf7;color:#53616b;font-size:12px;font-weight:700}
+.ctrip-room-name-table-v65 td{color:#34424b;font-size:13px}
+.ctrip-room-name-table-v65 tr:last-child td{border-bottom:0}
+.ctrip-room-name-table-v65 .qualified{color:#16845b;font-weight:800}
+.ctrip-room-name-table-v65 .unqualified{color:#b65c35;font-weight:800}
 .ctrip-pending-v55{color:#788497!important}
 @media(max-width:980px){.ctrip-grid-v55{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:980px){.ctrip-reputation-grid-v64{grid-template-columns:1fr}}
 @media(max-width:680px){.ctrip-reputation-summary-v64{grid-template-columns:1fr}.ctrip-reputation-metrics-v64{grid-template-columns:repeat(2,minmax(0,1fr))}.ctrip-reputation-dimensions-v64{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){.ctrip-room-name-summary-v65{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.ctrip-grid-v55{grid-template-columns:1fr}}
 </style>
 """
@@ -377,6 +386,50 @@ def _reputation_card_content(payload: dict[str, Any]) -> str:
     return summary + "<div class='ctrip-reputation-grid-v64'>" + "".join(cards) + "</div>"
 
 
+def _room_name_card_content(payload: dict[str, Any]) -> str:
+    fields_by_label = {
+        str(row.get("label") or ""): row.get("value")
+        for row in payload.get("fields") or []
+        if isinstance(row, dict)
+    }
+    summary = "".join(
+        "<div class='ctrip-metric-v55'>"
+        f"<small>{e(label)}</small>"
+        f"<strong>{e(value if value not in (None, '') else '待接入')}</strong>"
+        "</div>"
+        for label, value in fields_by_label.items()
+    )
+    records = payload.get("records")
+    records = records if isinstance(records, list) else []
+    table_rows: list[str] = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        qualified = bool(record.get("qualified"))
+        result_class = "qualified" if qualified else "unqualified"
+        result_text = "合格" if qualified else "待优化"
+        table_rows.append(
+            "<tr>"
+            f"<td>{e(record.get('name') or '未命名售卖房型')}</td>"
+            f"<td>{e(record.get('length'))}</td>"
+            f"<td>{e(record.get('reason') or '待核验')}</td>"
+            f"<td class='{result_class}'>{result_text}</td>"
+            "</tr>"
+        )
+    if not table_rows:
+        table_rows.append(
+            "<tr><td colspan='4' class='ctrip-pending-v55'>"
+            "待接入携程售卖房型快照</td></tr>"
+        )
+    return (
+        f"<div class='ctrip-room-name-summary-v65'>{summary}</div>"
+        "<div class='table-scroll'><table class='ctrip-room-name-table-v65'>"
+        "<thead><tr><th>售卖房型名称</th><th>名称字数</th>"
+        "<th>识别信息</th><th>判定</th></tr></thead>"
+        f"<tbody>{''.join(table_rows)}</tbody></table></div>"
+    )
+
+
 def generic_card(result: dict[str, Any], item_spec: tuple[Any, ...]) -> str:
     no, title, _, period, description, source, _ = item_spec
     payload = item_payload(result, item_spec)
@@ -392,7 +445,9 @@ def generic_card(result: dict[str, Any], item_spec: tuple[Any, ...]) -> str:
         f"<span>{e(row.get('note') or '')}</span></div>"
         for row in rows
     )
-    if no == 12:
+    if no == 11:
+        result_content = _room_name_card_content(payload)
+    elif no == 12:
         result_content = _reputation_card_content(payload)
     elif no == 13:
         rights = payload.get("rights_list")

@@ -5,6 +5,7 @@ from typing import Any
 from marketing_diagnosis.ctrip_competition import build_competition_item
 from marketing_diagnosis.ctrip_configuration_v63 import build_configuration_items
 from marketing_diagnosis.ctrip_reputation_v64 import build_reputation_item
+from marketing_diagnosis.ctrip_room_name_v65 import build_room_name_item
 from marketing_diagnosis.ctrip_user_profile_v58 import build_user_profile_item
 from marketing_diagnosis.promotion_performance_v46 import patch_promotion_performance
 from marketing_diagnosis.review_yesterday_v45 import patch_yesterday_review_count
@@ -136,6 +137,7 @@ def process(data: dict[str, Any]) -> dict[str, Any]:
         sections.get("ctrip_userprofile_distribution") or []
     )
     ctrip_items["12"] = build_reputation_item(sections)
+    ctrip_items["11"] = build_room_name_item(sections)
     ctrip_items.update(build_configuration_items(sections))
     return result
 

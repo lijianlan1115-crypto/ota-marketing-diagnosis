@@ -10,6 +10,7 @@ from marketing_diagnosis import db_loader_v15 as previous
 DEFAULT_MYSQL_TABLES = {
     **previous.DEFAULT_MYSQL_TABLES,
     "ctrip_order_detail": "ctrip_ota_order_detail",
+    "ctrip_products": "ctrip_ota_goods_price_mapping",
     "ctrip_joined_rights": "ctrip_ota_joined_rights",
     "ctrip_promotion_status": "ctrip_ota_promotion_status",
     "ctrip_userprofile_distribution": "ctrip_ota_userprofile_distribution",
@@ -327,6 +328,39 @@ def _load_ctrip_hourly_order_count(
         }
 
 
+def _load_ctrip_goods_mapping(
+    cursor,
+    table: str,
+    limit: int,
+    hotel_id: str | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    columns, schema_error = base._table_columns(cursor, table)
+    if schema_error:
+        return [], {"table": table, "rows": 0, "status": "error", "error": schema_error}
+    if "ota_product_name" not in columns:
+        return [], {
+            "table": table,
+            "rows": 0,
+            "status": "error",
+            "error": "required column missing: ota_product_name",
+            "table_columns": sorted(columns),
+        }
+    rows, diag = base._profiled_fetch(
+        cursor,
+        table,
+        limit,
+        hotel_id=hotel_id,
+        order_candidates=("snapshot_time DESC", "ota_product_id ASC"),
+    )
+    latest = base._latest_snapshot(rows)
+    return latest, {
+        **diag,
+        "rows_read": len(rows),
+        "rows_used": len(latest),
+        "selection_rule": "latest snapshot from ctrip_ota_goods_price_mapping",
+    }
+
+
 def load_mysql_dsn_dataset(
     dsn: str,
     limit: int = 5000,
@@ -353,6 +387,7 @@ def load_mysql_dsn_dataset(
         dataset.setdefault("ctrip_promotion_status", [])
         dataset.setdefault("ctrip_userprofile_distribution", [])
         dataset.setdefault("ctrip_hourly_orders", [])
+        dataset.setdefault("ctrip_goods_price_mapping", [])
         return dataset
 
     ctrip_id = ctrip_hotel_id or hotel_id
@@ -376,6 +411,9 @@ def load_mysql_dsn_dataset(
             hourly_orders, hourly_orders_diag = _load_ctrip_hourly_order_count(
                 cursor, table_map["ctrip_order_detail"], ctrip_id
             )
+            goods_rows, goods_diag = _load_ctrip_goods_mapping(
+                cursor, table_map["ctrip_products"], limit, ctrip_id
+            )
 
     dataset["ctrip_joined_rights"] = base._tag_rows(rights, table_map["ctrip_joined_rights"])
     dataset["ctrip_promotion_status"] = base._tag_rows(statuses, table_map["ctrip_promotion_status"])
@@ -383,6 +421,7 @@ def load_mysql_dsn_dataset(
     dataset["ctrip_review_overview"] = base._tag_rows(review_overview, table_map["ctrip_review_overview"])
     dataset["ctrip_review_yesterday"] = review_yesterday
     dataset["ctrip_hourly_orders"] = hourly_orders
+    dataset["ctrip_goods_price_mapping"] = base._tag_rows(goods_rows, table_map["ctrip_products"])
     diagnostics = _diagnostics(dataset)
     if diagnostics is not None:
         tables_diag = diagnostics.setdefault("tables", {})
@@ -392,6 +431,7 @@ def load_mysql_dsn_dataset(
         tables_diag["ctrip_review_overview"] = review_overview_diag
         tables_diag["ctrip_review_yesterday"] = review_yesterday_diag
         tables_diag["ctrip_hourly_orders"] = hourly_orders_diag
+        tables_diag["ctrip_goods_price_mapping"] = goods_diag
         diagnostics.setdefault("transformations", []).append(
             {
                 "section": "ctrip_userprofile_distribution",
@@ -431,6 +471,11 @@ def load_mysql_dsn_dataset(
                         f"hotel_id={ctrip_id}; COUNT(*) where order_status_type=CheckIn, "
                         "is_hour_room=1; source table already contains the recent 30 days"
                     ),
+                },
+                {
+                    "section": "ctrip_goods_price_mapping",
+                    "rows": len(goods_rows),
+                    "rule": f"hotel_id={ctrip_id}; latest snapshot from ctrip_ota_goods_price_mapping",
                 },
             ]
         )
