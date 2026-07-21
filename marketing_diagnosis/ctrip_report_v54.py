@@ -1,17 +1,22 @@
 from __future__ import annotations
 
+import copy
 import html
 import math
 import re
+from datetime import datetime
 from typing import Any
 
+from marketing_diagnosis import reporting_v8, reporting_v30, reporting_v35, reporting_v37
 from marketing_diagnosis.ctrip_psi_v53 import STYLE as PSI_STYLE
 from marketing_diagnosis.ctrip_psi_v53 import card as psi_card
+from marketing_diagnosis.visual_diagnosis import build_visual_diagnosis
+
 
 # no, title, full score (None = display only), period, description, source, field labels
 SPECS = (
-    (1, "月度经营趋势 YOY", 10, "本日 / 本月 / 本年", "展示房费、ADR、出租率、RevPAR及去年同期同比。", "PMS经营数据（当前与美团页面取数口径一致）", ()),
-    (2, "房型 RevPAR 与低效房型", 8, "本日 / 本月", "按房型展示出租率、RevPAR及低效房型判定。", "PMS房型经营数据（当前与美团页面取数口径一致）", ()),
+    (1, "月度经营趋势 YOY", 10, "近三个月", "展示房费、ADR、出租率、RevPAR及去年同期同比。", "PMS经营数据（与美团页面当前取数口径一致）", ()),
+    (2, "房型 RevPAR 与低效房型", 8, "近30天", "按房型展示出租率、RevPAR及低效房型判定。", "PMS房型经营数据（与美团页面当前取数口径一致）", ()),
     (3, "平台流量漏斗分析", 15, "近30天", "展示曝光、访客、订单页和成交漏斗。", "携程 eBooking / 流量与转化", ("列表曝光", "APP访客", "订单页访客", "成交订单", "竞争圈排名")),
     (4, "用户来源画像", None, "近30天", "展示性别、年龄、本地异地、出行目的和预订习惯。", "携程 eBooking / 用户画像", ("性别", "年龄段", "本地 / 异地", "主要客源城市")),
     (5, "竞争圈分析", None, "近30天", "展示竞争圈排名、均值、流失订单和主要流失竞对。", "携程 eBooking / 竞争圈分析", ("竞争圈排名", "平均订单量", "流失订单量", "流失订单金额")),
@@ -35,150 +40,429 @@ SPECS = (
 )
 
 STATUS = {
-    "success": ("已形成结果", "ok"), "zero": ("真实为0", "disabled"),
-    "missing": ("数据待接入", "pending"), "error": ("查询失败", "pending"),
-    "pending_rule": ("规则待确认", "pending"), "manual_pending": ("待人工录入", "manual"),
+    "success": ("已形成结果", "ok"),
+    "zero": ("真实为0", "disabled"),
+    "missing": ("数据待接入", "pending"),
+    "error": ("查询失败", "pending"),
+    "pending_rule": ("规则待确认", "pending"),
+    "manual_pending": ("待人工录入", "manual"),
 }
-NAV_RE = re.compile(r"<nav\b[^>]*class=['\"][^'\"]*\bside\b[^'\"]*['\"][^>]*>.*?</nav>", re.S | re.I)
-MAIN_RE = re.compile(r"<main\b[^>]*>.*?</main>", re.S | re.I)
-TITLE_RE = re.compile(r"<title>.*?</title>", re.S | re.I)
-CARD_RE = {n: re.compile(rf"<article\b(?=[^>]*\bid=['\"](?:rule|module)-{n}['\"])[^>]*>.*?</article>", re.S | re.I) for n in (1, 2)}
-SCORE_RE = re.compile(r"(<div\b[^>]*class=['\"][^'\"]*\btitle-score-value\b[^'\"]*['\"][^>]*>\s*<strong>).*?(</strong>\s*<span>\s*满分\s*).*?(</span>)", re.S | re.I)
-SCORE_CLASS_RE = re.compile(r"class=(['\"])(?P<c>[^'\"]*\btitle-meta-item\b[^'\"]*\btitle-score\b[^'\"]*)\1", re.I)
 
-STYLE = """
-<style id='CTRIP_INDEPENDENT_V54'>
-.ctrip-note-v54{margin-top:14px;padding:11px 13px;border:1px solid rgba(255,255,255,.18);border-radius:9px;background:rgba(255,255,255,.09);color:rgba(255,255,255,.84);font-size:12px}
-.ctrip-grid-v54{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.ctrip-metric-v54{min-height:92px;padding:13px;border:1px solid #dfe7e4;border-radius:9px;background:#fff}.ctrip-metric-v54 small{display:block;color:#68747f;font-size:12px;font-weight:700}.ctrip-metric-v54 strong{display:block;margin-top:9px;color:#26343d;font-size:20px;line-height:1.25;overflow-wrap:anywhere}.ctrip-metric-v54 span{display:block;margin-top:6px;color:#84909a;font-size:11px}.ctrip-source-v54{margin-top:12px;padding:11px 13px;border:1px solid #d9e6e1;border-radius:9px;background:#f4faf7;color:#315b4c;font-size:12px}.ctrip-pending-v54{color:#788497!important}@media(max-width:980px){.ctrip-grid-v54{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){.ctrip-grid-v54{grid-template-columns:1fr}}
+CTRIP_STYLE = """
+<style id='CTRIP_CODE_GENERATED_V55'>
+.ctrip-note-v55{margin-top:14px;padding:11px 13px;border:1px solid rgba(255,255,255,.18);border-radius:9px;background:rgba(255,255,255,.09);color:rgba(255,255,255,.84);font-size:12px}
+.ctrip-grid-v55{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.ctrip-metric-v55{min-height:92px;padding:13px;border:1px solid #dfe7e4;border-radius:9px;background:#fff}
+.ctrip-metric-v55 small{display:block;color:#68747f;font-size:12px;font-weight:700}
+.ctrip-metric-v55 strong{display:block;margin-top:9px;color:#26343d;font-size:20px;line-height:1.25;overflow-wrap:anywhere}
+.ctrip-metric-v55 span{display:block;margin-top:6px;color:#84909a;font-size:11px}
+.ctrip-source-v55{margin-top:12px;padding:11px 13px;border:1px solid #d9e6e1;border-radius:9px;background:#f4faf7;color:#315b4c;font-size:12px}
+.ctrip-pending-v55{color:#788497!important}
+@media(max-width:980px){.ctrip-grid-v55{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.ctrip-grid-v55{grid-template-columns:1fr}}
 </style>
 """
 
 
-def e(v: Any) -> str: return html.escape("" if v is None else str(v), quote=True)
-def number(v: Any) -> float | None:
+def e(value: Any) -> str:
+    return html.escape("" if value is None else str(value), quote=True)
+
+
+def number(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
     try:
-        x = float(v); return None if math.isnan(x) or math.isinf(x) else x
-    except (TypeError, ValueError): return None
+        parsed = float(str(value).replace(",", "").rstrip("%"))
+    except (TypeError, ValueError):
+        return None
+    return None if math.isnan(parsed) or math.isinf(parsed) else parsed
+
 
 def sections(result: dict[str, Any]) -> dict[str, Any]:
-    return result.get("sections") if isinstance(result.get("sections"), dict) else {}
+    value = result.get("sections")
+    return value if isinstance(value, dict) else {}
 
-def spec(no: int) -> tuple[Any, ...]: return next(x for x in SPECS if x[0] == no)
+
+def spec(no: int) -> tuple[Any, ...]:
+    return next(item for item in SPECS if item[0] == no)
+
 
 def item_source(result: dict[str, Any]) -> Any:
-    s = sections(result)
-    return result.get("ctrip_items") or result.get("ctrip_diagnosis_items") or s.get("ctrip_items") or s.get("ctrip_diagnosis_items") or {}
+    nested = sections(result)
+    return (
+        result.get("ctrip_items")
+        or result.get("ctrip_diagnosis_items")
+        or nested.get("ctrip_items")
+        or nested.get("ctrip_diagnosis_items")
+        or {}
+    )
 
-def item_payload(result: dict[str, Any], sp: tuple[Any, ...]) -> dict[str, Any]:
-    no, title = sp[0], sp[1]; source = item_source(result); found: dict[str, Any] = {}
+
+def item_payload(result: dict[str, Any], item_spec: tuple[Any, ...]) -> dict[str, Any]:
+    no, title = item_spec[0], item_spec[1]
+    source = item_source(result)
+    found: dict[str, Any] = {}
+
     if isinstance(source, dict):
         value = source.get(no) or source.get(str(no)) or source.get(title)
-        if isinstance(value, dict): found = dict(value)
+        if isinstance(value, dict):
+            found = dict(value)
     elif isinstance(source, list):
         for value in source:
-            if isinstance(value, dict) and (str(value.get("no") or value.get("standard_item_id") or value.get("item_no") or "") == str(no) or str(value.get("title") or value.get("item_name") or "") == title):
-                found = dict(value); break
+            if not isinstance(value, dict):
+                continue
+            value_no = value.get("no") or value.get("standard_item_id") or value.get("item_no")
+            value_title = value.get("title") or value.get("item_name")
+            if str(value_no or "") == str(no) or str(value_title or "") == title:
+                found = dict(value)
+                break
+
     channel = result.get("channel_scores")
     if isinstance(channel, dict) and isinstance(channel.get("ctrip"), dict):
         values = channel["ctrip"].get("items") or channel["ctrip"].get("item_scores")
         if isinstance(values, dict):
             value = values.get(no) or values.get(str(no)) or values.get(title)
-            if isinstance(value, dict): found = {**value, **found}
-            elif value not in (None, "") and "item_score" not in found: found["item_score"] = value
+            if isinstance(value, dict):
+                found = {**value, **found}
+            elif value not in (None, "") and "item_score" not in found:
+                found["item_score"] = value
+
     if no == 6:
-        s = sections(result); psi = result.get("ctrip_psi") or result.get("psi_service_quality") or s.get("ctrip_psi") or s.get("psi_service_quality")
-        if isinstance(psi, dict): found = {**psi, **found}
+        nested = sections(result)
+        psi = (
+            result.get("ctrip_psi")
+            or result.get("psi_service_quality")
+            or nested.get("ctrip_psi")
+            or nested.get("psi_service_quality")
+        )
+        if isinstance(psi, dict):
+            found = {**psi, **found}
     return found
 
-def summary_payload(result: dict[str, Any]) -> dict[str, Any]:
-    s = sections(result)
-    for value in (result.get("ctrip_summary"), result.get("ctrip_score_summary"), s.get("ctrip_summary"), s.get("ctrip_score_summary")):
-        if isinstance(value, dict): return dict(value)
-    channel = result.get("channel_scores")
-    return dict(channel["ctrip"]) if isinstance(channel, dict) and isinstance(channel.get("ctrip"), dict) else {}
 
-def score_value(p: dict[str, Any]) -> float | None:
+def summary_payload(result: dict[str, Any]) -> dict[str, Any]:
+    nested = sections(result)
+    for value in (
+        result.get("ctrip_summary"),
+        result.get("ctrip_score_summary"),
+        nested.get("ctrip_summary"),
+        nested.get("ctrip_score_summary"),
+    ):
+        if isinstance(value, dict):
+            return dict(value)
+    channel = result.get("channel_scores")
+    if isinstance(channel, dict) and isinstance(channel.get("ctrip"), dict):
+        return dict(channel["ctrip"])
+    return {}
+
+
+def score_value(payload: dict[str, Any]) -> float | None:
     for key in ("item_score", "diagnosis_score", "score", "current_score"):
-        value = number(p.get(key))
-        if value is not None: return value
+        value = number(payload.get(key))
+        if value is not None:
+            return value
     return None
 
-def full_text(sp: tuple[Any, ...], p: dict[str, Any]) -> str:
-    if sp[2] is None: return "仅展示"
+
+def configured_full_score(item_spec: tuple[Any, ...], payload: dict[str, Any]) -> float | None:
+    if item_spec[2] is None:
+        return None
     for key in ("full_score", "item_full_score", "weight"):
-        value = number(p.get(key))
-        if value is not None: return f"{value:g}分"
-    return f"{sp[2]:g}分"
+        value = number(payload.get(key))
+        if value is not None:
+            return value
+    return float(item_spec[2])
 
-def score_text(sp: tuple[Any, ...], p: dict[str, Any]) -> str:
-    if sp[2] is None: return "仅展示"
-    value = score_value(p); return "待计算" if value is None else f"{value:g}分"
 
-def status(p: dict[str, Any]) -> tuple[str, str, str]:
-    key = str(p.get("data_status") or p.get("status_key") or "")
-    if not key: key = "success" if p.get("fields") or p.get("records") or score_value(p) is not None else "missing"
-    text, css = STATUS.get(key, (str(p.get("status") or key), "neutral")); return key, text, css
+def full_text(item_spec: tuple[Any, ...], payload: dict[str, Any]) -> str:
+    value = configured_full_score(item_spec, payload)
+    return "仅展示" if value is None else f"{value:g}分"
 
-def fields(sp: tuple[Any, ...], p: dict[str, Any]) -> list[dict[str, Any]]:
-    raw = p.get("fields"); rows: list[dict[str, Any]] = []
+
+def score_text(item_spec: tuple[Any, ...], payload: dict[str, Any]) -> str:
+    if item_spec[2] is None:
+        return "仅展示"
+    value = score_value(payload)
+    return "待计算" if value is None else f"{value:g}分"
+
+
+def status(payload: dict[str, Any]) -> tuple[str, str, str]:
+    key = str(payload.get("data_status") or payload.get("status_key") or "")
+    if not key:
+        key = "success" if payload.get("fields") or payload.get("records") or score_value(payload) is not None else "missing"
+    text, css = STATUS.get(key, (str(payload.get("status") or key), "neutral"))
+    return key, text, css
+
+
+def fields(item_spec: tuple[Any, ...], payload: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = payload.get("fields")
+    rows: list[dict[str, Any]] = []
     if isinstance(raw, dict):
-        for label, value in raw.items(): rows.append({"label": label, **value} if isinstance(value, dict) else {"label": label, "value": value})
+        for label, value in raw.items():
+            rows.append({"label": label, **value} if isinstance(value, dict) else {"label": label, "value": value})
     elif isinstance(raw, list):
         for value in raw:
-            if isinstance(value, dict): rows.append(dict(value))
-            elif isinstance(value, (list, tuple)) and len(value) > 1: rows.append({"label": value[0], "value": value[1]})
-    known = {str(x.get("label") or "") for x in rows}
-    for label in sp[6]:
-        if label not in known: rows.append({"label": label, "value": p.get(label)})
+            if isinstance(value, dict):
+                rows.append(dict(value))
+            elif isinstance(value, (list, tuple)) and len(value) > 1:
+                rows.append({"label": value[0], "value": value[1]})
+
+    known = {str(row.get("label") or "") for row in rows}
+    for label in item_spec[6]:
+        if label not in known:
+            rows.append({"label": label, "value": payload.get(label)})
     return rows
 
-def patch_score(card: str, result: dict[str, Any], sp: tuple[Any, ...]) -> str:
-    p = item_payload(result, sp)
-    card = SCORE_RE.sub(lambda m: m.group(1) + e(score_text(sp, p)) + m.group(2) + e(full_text(sp, p)) + m.group(3), card, count=1)
-    cls = "display-only" if sp[2] is None else "ok" if score_value(p) is not None else "pending"
-    def repl(m: re.Match[str]) -> str:
-        values = [x for x in m.group("c").split() if x not in {"ok", "zero", "pending", "display-only"}] + [cls]
-        return f"class={m.group(1)}{' '.join(values)}{m.group(1)}"
-    return SCORE_CLASS_RE.sub(repl, card, count=1)
 
-def generic_card(result: dict[str, Any], sp: tuple[Any, ...]) -> str:
-    no, title, _, period, desc, source, _ = sp; p = item_payload(result, sp); key, text, css = status(p); rows = fields(sp, p) or [{"label": "数据状态", "value": None, "note": "等待携程数据接入"}]
-    metrics = "".join(f"<div class='ctrip-metric-v54'><small>{e(x.get('label') or '指标')}</small><strong class='{'ctrip-pending-v54' if x.get('value') in (None, '') else ''}'>{e('待接入' if x.get('value') in (None, '') else x.get('value'))}</strong><span>{e(x.get('note') or '')}</span></div>" for x in rows)
-    score_cls = "display-only" if sp[2] is None else "ok" if score_value(p) is not None else "pending"
-    return f"<article class='diagnosis-card' data-status='{e(key)}' data-title='{e(title)}' id='rule-{no}'><div class='card-top'><div class='rule-no'>{no:02d}</div><div class='card-title'><h3>{e(title)}</h3><p>{e(desc)}</p></div><div class='card-tags'><div class='title-meta-item title-period'><small>统计周期</small><strong>{e(period)}</strong></div><div class='title-meta-item title-score {score_cls}'><small>当前得分</small><div class='title-score-value'><strong>{e(score_text(sp,p))}</strong><span>满分 {e(full_text(sp,p))}</span></div></div><span class='status-badge {css}'>{e(text)}</span></div></div><div class='result-area'><div class='ctrip-grid-v54'>{metrics}</div><div class='ctrip-source-v54'><b>携程数据来源：</b>{e(p.get('source') or source)}</div><div class='notice'>未接入字段统一显示“待接入”，不会使用美团数据或示例值替代。</div></div></article>"
+def visual_items(result: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    visual = result.get("visual_diagnosis")
+    if not isinstance(visual, dict):
+        visual = build_visual_diagnosis({}, str(result.get("hotel_name") or ""))
+    return {
+        int(item.get("standard_item_id") or 0): item
+        for item in (visual.get("items") or [])
+        if isinstance(item, dict)
+    }
 
-def shared_card(meituan_html: str, result: dict[str, Any], no: int) -> str:
-    match = CARD_RE[no].search(meituan_html); return patch_score(match.group(0), result, spec(no)) if match else generic_card(result, spec(no))
+
+def pms_item(result: dict[str, Any], no: int) -> dict[str, Any]:
+    """Create a Ctrip-owned 01/02 item from the shared PMS diagnosis result.
+
+    The records/fields/trend data come from the same PMS result used by Meituan.
+    Only the Ctrip score configuration is overlaid, so the two HTML nodes remain
+    independent while their current data and visual renderer stay identical.
+    """
+
+    item_spec = spec(no)
+    base = copy.deepcopy(visual_items(result).get(no) or {})
+    payload = item_payload(result, item_spec)
+    item = base
+    item["standard_item_id"] = no
+    item["item_name"] = item_spec[1]
+    item["participates_in_score"] = item_spec[2] is not None
+    item["base_score"] = configured_full_score(item_spec, payload) or 0
+    item["item_score"] = score_value(payload)
+    if not item.get("data_status"):
+        item["data_status"] = "success" if item.get("fields") or item.get("records") or item.get("trend_periods") else "missing"
+    return item
+
+
+def generic_card(result: dict[str, Any], item_spec: tuple[Any, ...]) -> str:
+    no, title, _, period, description, source, _ = item_spec
+    payload = item_payload(result, item_spec)
+    key, text, css = status(payload)
+    rows = fields(item_spec, payload) or [
+        {"label": "数据状态", "value": None, "note": "等待携程数据接入"}
+    ]
+    metrics = "".join(
+        "<div class='ctrip-metric-v55'>"
+        f"<small>{e(row.get('label') or '指标')}</small>"
+        f"<strong class='{'ctrip-pending-v55' if row.get('value') in (None, '') else ''}'>"
+        f"{e('待接入' if row.get('value') in (None, '') else row.get('value'))}</strong>"
+        f"<span>{e(row.get('note') or '')}</span></div>"
+        for row in rows
+    )
+    score_class = "display-only" if item_spec[2] is None else "ok" if score_value(payload) is not None else "pending"
+    return (
+        f"<article class='diagnosis-card' data-status='{e(key)}' data-title='{e(title)}' id='rule-{no}'>"
+        "<div class='card-top'>"
+        f"<div class='rule-no'>{no:02d}</div>"
+        f"<div class='card-title'><h3>{e(title)}</h3><p>{e(description)}</p></div>"
+        "<div class='card-tags'>"
+        f"<div class='title-meta-item title-period'><small>统计周期</small><strong>{e(period)}</strong></div>"
+        f"<div class='title-meta-item title-score {score_class}'><small>当前得分</small>"
+        f"<div class='title-score-value'><strong>{e(score_text(item_spec, payload))}</strong>"
+        f"<span>满分 {e(full_text(item_spec, payload))}</span></div></div>"
+        f"<span class='status-badge {css}'>{e(text)}</span></div></div>"
+        "<div class='result-area'>"
+        f"<div class='ctrip-grid-v55'>{metrics}</div>"
+        f"<div class='ctrip-source-v55'><b>携程数据来源：</b>{e(payload.get('source') or source)}</div>"
+        "<div class='notice'>未接入字段统一显示“待接入”，不会使用美团数据或示例值替代。</div>"
+        "</div></article>"
+    )
+
+
+def patch_psi_score(card_html: str, result: dict[str, Any]) -> str:
+    item_spec = spec(6)
+    payload = item_payload(result, item_spec)
+    current = score_text(item_spec, payload)
+    full = full_text(item_spec, payload)
+    marker = "<div class='title-score-value'><strong>待计算</strong><span>满分 8分</span></div>"
+    replacement = (
+        "<div class='title-score-value'>"
+        f"<strong>{e(current)}</strong><span>满分 {e(full)}</span></div>"
+    )
+    output = card_html.replace(marker, replacement, 1)
+    if score_value(payload) is not None:
+        output = output.replace("title-meta-item title-score pending", "title-meta-item title-score ok", 1)
+    return output
+
 
 def nav_html() -> str:
-    return "<nav class='side'><div class='side-title'>携程诊断目录</div><a href='#overview'><span>00</span>诊断概览</a><a href='#summary'><span>表</span>诊断结果总览</a>" + "".join(f"<a href='#rule-{x[0]}'><span>{x[0]:02d}</span>{e(x[1])}</a>" for x in SPECS) + "</nav>"
+    links = "".join(
+        f"<a href='#rule-{item[0]}'><span>{item[0]:02d}</span>{e(item[1])}</a>"
+        for item in SPECS
+    )
+    return (
+        "<nav class='side'><div class='side-title'>携程诊断目录</div>"
+        "<a href='#overview'><span>00</span>诊断概览</a>"
+        "<a href='#summary'><span>表</span>诊断结果总览</a>"
+        f"{links}</nav>"
+    )
+
 
 def overview_html(result: dict[str, Any]) -> str:
-    p = summary_payload(result); total = number(p.get("total_score") or p.get("score")); total_text = "待计算" if total is None else f"{total:g}分"; scoring = sum(1 for x in SPECS if x[2] is not None); connected = p.get("connected_items"); connected_text = "待接入" if connected in (None, "") else f"{connected}项"
-    return f"<section id='overview'><div class='hero'><div class='hero-grid'><div><h2>{e(result.get('hotel_name') or result.get('hotel_id') or '酒店')}｜携程渠道诊断</h2><p>诊断周期：{e(result.get('period_start') or '未标注')} 至 {e(result.get('period_end') or '未标注')}</p><div class='source-standard'><div><small>页面关系</small><b>携程页面独立生成</b></div><div><small>01、02数据</small><b>PMS独立输出，当前与美团一致</b></div><div><small>03以后数据</small><b>仅使用携程渠道数据</b></div></div><div class='ctrip-note-v54'>美团与携程是两个独立HTML页面；顶部按钮只负责页面切换。两个页面中的01、02分别存在，当前样式和PMS数据一致，但得分可独立配置。</div></div><div class='hero-stats'><div class='hero-stat'><small>携程综合得分</small><strong>{e(total_text)}</strong><em>不沿用美团得分</em></div><div class='hero-stat'><small>计分模块</small><strong>{scoring}项</strong><em>携程规则独立计算</em></div><div class='hero-stat'><small>展示模块</small><strong>{len(SPECS)-scoring}项</strong><em>不参与总分</em></div><div class='hero-stat'><small>已接入模块</small><strong>{e(connected_text)}</strong><em>未接入保持待计算</em></div></div></div></div></section>"
+    payload = summary_payload(result)
+    total = number(payload.get("total_score") or payload.get("score"))
+    total_text = "待计算" if total is None else f"{total:g}"
+    scoring = sum(1 for item in SPECS if item[2] is not None)
+    connected = payload.get("connected_items")
+    connected_text = "待接入" if connected in (None, "") else f"{connected}项"
+    start = result.get("period_start") or "未标注"
+    end = result.get("period_end") or "未标注"
+    return (
+        "<section id='overview'><div class='hero'><div class='hero-grid'><div>"
+        "<h2>携程渠道经营与服务质量诊断</h2>"
+        "<p>携程页面由Python直接生成；目录、得分和渠道模块均独立于美团页面。</p>"
+        "<div class='source-standard'>"
+        f"<div><small>诊断周期</small><b>{e(start)} 至 {e(end)}</b></div>"
+        "<div><small>01、02数据</small><b>PMS独立输出，当前与美团一致</b></div>"
+        "<div><small>03以后数据</small><b>仅使用携程渠道数据</b></div>"
+        "</div>"
+        "<div class='ctrip-note-v55'>两个页面中的01、02分别由代码生成，读取同一份PMS结果；页面节点、满分和得分互不影响。</div>"
+        "</div><div class='hero-stats'>"
+        f"<div class='hero-stat'><small>携程综合得分</small><strong>{e(total_text)}</strong><em>不沿用美团得分</em></div>"
+        f"<div class='hero-stat'><small>计分模块</small><strong>{scoring}项</strong><em>携程规则独立计算</em></div>"
+        f"<div class='hero-stat'><small>展示模块</small><strong>{len(SPECS)-scoring}项</strong><em>不参与总分</em></div>"
+        f"<div class='hero-stat'><small>已接入模块</small><strong>{e(connected_text)}</strong><em>未接入保持待计算</em></div>"
+        "</div></div></div>"
+        "<div class='section-body'><div class='notice'>携程页面不会从美团成品HTML复制目录或诊断卡片。</div></div>"
+        "</section>"
+    )
+
+
+def summary_row(result: dict[str, Any], item_spec: tuple[Any, ...]) -> str:
+    no = item_spec[0]
+    if no in (1, 2):
+        item = pms_item(result, no)
+        key = str(item.get("data_status") or "missing")
+        text, css = STATUS.get(key, (key, "neutral"))
+        payload = item_payload(result, item_spec)
+    else:
+        payload = item_payload(result, item_spec)
+        key, text, css = status(payload)
+    return (
+        f"<tr data-status='{e(key)}' data-title='{e(item_spec[1])}'>"
+        f"<td>{no:02d}</td><td><a href='#rule-{no}'>{e(item_spec[1])}</a></td>"
+        f"<td>{e(full_text(item_spec, payload))}</td><td>{e(score_text(item_spec, payload))}</td>"
+        f"<td><span class='status-badge {css}'>{e(text)}</span></td>"
+        f"<td>{e(payload.get('source') or item_spec[5])}<br>{e(item_spec[4])}</td></tr>"
+    )
+
 
 def summary_html(result: dict[str, Any]) -> str:
-    rows = []
-    for sp in SPECS:
-        p = item_payload(result, sp); key, text, css = status(p)
-        if sp[0] in (1,2): key, (text, css) = "success", STATUS["success"]
-        rows.append(f"<tr data-status='{e(key)}' data-title='{e(sp[1])}'><td>{sp[0]:02d}</td><td><a href='#rule-{sp[0]}'>{e(sp[1])}</a></td><td>{e(full_text(sp,p))}</td><td>{e(score_text(sp,p))}</td><td><span class='status-badge {css}'>{e(text)}</span></td><td>{e(p.get('source') or sp[5])}<br>{e(sp[4])}</td></tr>")
-    return "<section id='summary'><div class='section-head'><div><h2>携程诊断结果总览</h2><p>携程目录、满分、得分和数据状态独立于美团页面。</p></div></div><div class='section-body'><div class='table-scroll'><table class='summary-table'><thead><tr><th>编号</th><th>携程诊断项目</th><th>满分</th><th>当前得分</th><th>当前状态</th><th>数据来源/诊断内容</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table></div></div></section>"
+    rows = "".join(summary_row(result, item_spec) for item_spec in SPECS)
+    return (
+        "<section id='summary'><div class='section-head'><div>"
+        "<h2>携程诊断结果总览</h2>"
+        "<p>携程目录、满分、得分和数据状态独立于美团页面。</p></div>"
+        "<div class='toolbar'><input class='search' id='ruleSearch' placeholder='搜索诊断项'/>"
+        "<select class='filter' id='statusFilter'><option value='all'>全部状态</option>"
+        "<option value='success'>已形成结果</option><option value='missing'>数据待接入</option>"
+        "<option value='pending_rule'>规则待确认</option></select></div></div>"
+        "<div class='section-body'><div class='table-scroll'><table class='summary-table'>"
+        "<thead><tr><th>编号</th><th>携程诊断项目</th><th>满分</th><th>当前得分</th>"
+        "<th>当前状态</th><th>数据来源/诊断内容</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table></div></div></section>"
+    )
 
-def main_html(meituan_html: str, result: dict[str, Any]) -> str:
-    cards = []
-    for sp in SPECS:
-        no = sp[0]
-        if no in (1,2): cards.append(shared_card(meituan_html, result, no))
-        elif no == 6: cards.append(patch_score(psi_card(result, "rule-6"), result, sp))
-        else: cards.append(generic_card(result, sp))
-    return "<main>" + overview_html(result) + summary_html(result) + "".join(cards) + "</main>"
 
-def transform(meituan_html: str, result: dict[str, Any]) -> str:
-    """Generate a separate Ctrip page while reusing only the current visual CSS and the 01/02 PMS output."""
-    output = TITLE_RE.sub("<title>携程｜酒店 OTA 全面诊断报告</title>", meituan_html, count=1)
-    if "CTRIP_INDEPENDENT_V54" not in output: output = output.replace("</head>", STYLE + PSI_STYLE + "</head>", 1)
-    output = NAV_RE.sub(nav_html(), output, count=1)
-    return MAIN_RE.sub(lambda _: main_html(meituan_html, result), output, count=1)
+def cards_html(result: dict[str, Any]) -> str:
+    item_one = pms_item(result, 1)
+    item_two = pms_item(result, 2)
+    cards = [
+        reporting_v37._performance_card(item_one),
+        reporting_v35._clean_customer_html(reporting_v30._room_type_card(item_two)),
+    ]
+    for item_spec in SPECS[2:]:
+        no = item_spec[0]
+        if no == 6:
+            cards.append(patch_psi_score(psi_card(result, "rule-6"), result))
+        else:
+            cards.append(generic_card(result, item_spec))
+    return "".join(cards)
 
-__all__ = ["SPECS", "transform"]
+
+def search_script() -> str:
+    return """
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const search=document.getElementById('ruleSearch');
+  const filter=document.getElementById('statusFilter');
+  if(!search||!filter) return;
+  function apply(){
+    const q=(search.value||'').trim().toLowerCase();
+    const state=filter.value;
+    document.querySelectorAll('.diagnosis-card').forEach(function(card){
+      const matchText=!q||(card.dataset.title||'').toLowerCase().includes(q);
+      const matchState=state==='all'||card.dataset.status===state;
+      card.classList.toggle('hidden-card',!(matchText&&matchState));
+    });
+  }
+  search.addEventListener('input',apply);
+  filter.addEventListener('change',apply);
+});
+</script>
+"""
+
+
+def build_head() -> str:
+    """Use the same base report template and direct-render styles as Meituan."""
+
+    template = reporting_v8.TEMPLATE_PATH.read_text(encoding="utf-8")
+    base = template.split("</head>", 1)[0]
+    base = re.sub(
+        r"<title>.*?</title>",
+        "<title>携程｜酒店 OTA 全面诊断报告</title>",
+        base,
+        count=1,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    return (
+        base
+        + reporting_v8.EXTRA_STYLE
+        + reporting_v30.ROOM_TYPE_STYLE
+        + reporting_v37.PERFORMANCE_TREND_STYLE
+        + PSI_STYLE
+        + CTRIP_STYLE
+        + "</head>"
+    )
+
+
+def build_html(result: dict[str, Any]) -> str:
+    """Generate the complete Ctrip report directly from result data.
+
+    No Meituan HTML is passed in, searched, copied or replaced. The two reports
+    share the same base style system and PMS data model for items 01 and 02, but
+    each page receives its own independently generated DOM and score settings.
+    """
+
+    hotel = result.get("hotel_name") or result.get("hotel_id") or "酒店"
+    start = result.get("period_start") or "未标注"
+    end = result.get("period_end") or "未标注"
+    body = (
+        "<body><header class='topbar'><div class='topbar-inner'>"
+        "<div class='brand'><h1>酒店 OTA 全面诊断报告</h1>"
+        f"<p>{e(hotel)}｜诊断周期：{e(start)} 至 {e(end)}｜生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>"
+        "</div><div class='top-actions'>"
+        "<select class='scope-select'><option>携程综合诊断</option><option>PMS经营数据</option>"
+        "<option>携程 eBooking 数据</option></select>"
+        "<button class='btn primary' onclick='window.print()'>导出报告</button>"
+        "</div></div></header>"
+        f"<div class='page'>{nav_html()}<main>{overview_html(result)}{summary_html(result)}"
+        f"{cards_html(result)}</main></div>{search_script()}{reporting_v37._script()}</body></html>"
+    )
+    return build_head() + body
+
+
+__all__ = ["SPECS", "build_html", "pms_item"]
