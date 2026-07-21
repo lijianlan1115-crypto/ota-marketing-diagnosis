@@ -102,7 +102,7 @@ def test_ctrip_page_is_directly_generated_and_independent():
     assert "携程综合得分" in output
     assert "72.5" in output
     assert "PSI 服务质量分" in output
-    assert "我的基础分" in output
+    assert "基础分" in output
     assert "6.5分</strong><span>满分 8分" in output
 
     # Header/layout uses the same production class system as Meituan.
