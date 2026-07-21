@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 from marketing_diagnosis import db_loader as base
@@ -24,6 +25,145 @@ _ORDER_COLUMNS = (
     "id",
 )
 
+_CORE_METRICS = ("订单量", "销售额", "出租率", "转化率")
+
+_FUNNEL_DEFINITIONS = (
+    {
+        "key": "list_exposure",
+        "label": "列表页曝光量",
+        "hotel_keys": (
+            "exposure",
+            "exposure_uv",
+            "list_exposure",
+            "list_exposure_uv",
+            "list_page_exposure",
+            "list_page_exposure_uv",
+        ),
+        "peer_keys": (
+            "peer_exposure",
+            "competitor_exposure",
+            "competitor_avg_exposure",
+            "peer_list_exposure",
+        ),
+        "aliases": (
+            "列表页曝光",
+            "列表曝光",
+            "list_page_exposure",
+            "list_exposure",
+            "exposure_uv",
+            "曝光人数",
+            "曝光量",
+        ),
+    },
+    {
+        "key": "detail_visitors",
+        "label": "详情页访客量",
+        "hotel_keys": (
+            "views",
+            "view_uv",
+            "browse_uv",
+            "detail_visitors",
+            "detail_visitor_uv",
+            "detail_page_visitors",
+            "detail_page_visitor_uv",
+            "app_visitors",
+            "app_visitor_uv",
+        ),
+        "peer_keys": (
+            "peer_views",
+            "competitor_views",
+            "peer_detail_visitors",
+            "competitor_detail_visitors",
+            "competitor_avg_visitors",
+        ),
+        "aliases": (
+            "详情页访客",
+            "详情访客",
+            "detail_page_visitor",
+            "detail_visitor",
+            "app访客",
+            "app_visitor",
+            "浏览人数",
+            "browse_uv",
+            "访客量",
+            "访客",
+        ),
+    },
+    {
+        "key": "order_page_visitors",
+        "label": "订单页访客量",
+        "hotel_keys": (
+            "order_page_visitors",
+            "order_page_visitor_uv",
+            "order_visitors",
+            "order_visitor_uv",
+        ),
+        "peer_keys": (
+            "peer_order_page_visitors",
+            "competitor_order_page_visitors",
+            "competitor_avg_order_page_visitors",
+        ),
+        "aliases": (
+            "订单页访客",
+            "订单页浏览",
+            "order_page_visitor",
+            "order_page_uv",
+            "order_visitor",
+        ),
+    },
+    {
+        "key": "submitted_orders",
+        "label": "订单提交人数",
+        "hotel_keys": (
+            "submitted_orders",
+            "submitted_order_count",
+            "order_submit_users",
+            "order_submit_count",
+            "submit_order_count",
+        ),
+        "peer_keys": (
+            "peer_submitted_orders",
+            "competitor_submitted_orders",
+            "competitor_avg_submitted_orders",
+        ),
+        "aliases": (
+            "订单提交人数",
+            "提交订单人数",
+            "提交订单",
+            "订单提交",
+            "submit_order",
+            "submitted_order",
+            "order_submit",
+        ),
+    },
+    {
+        "key": "completed_orders",
+        "label": "成交订单数",
+        "hotel_keys": (
+            "paid_orders",
+            "paid_order_count",
+            "booking_order_count",
+            "completed_orders",
+            "completed_order_count",
+        ),
+        "peer_keys": (
+            "peer_paid_orders",
+            "competitor_paid_orders",
+            "peer_booking_order_count",
+            "competitor_avg",
+            "competitor_avg_orders",
+        ),
+        "aliases": (
+            "成交订单",
+            "支付订单",
+            "预订订单",
+            "booking_order_count",
+            "paid_order_count",
+            "completed_order",
+        ),
+    },
+)
+
 
 def _diagnostics(dataset: dict[str, Any]) -> dict[str, Any] | None:
     records = dataset.get("__source_diagnostics__") or []
@@ -37,9 +177,13 @@ def _text(value: Any) -> str:
 def _number(value: Any) -> float | None:
     if value in (None, ""):
         return None
+    text = str(value).strip().replace(",", "")
+    match = re.search(r"[-+]?\d+(?:\.\d+)?", text)
+    if not match:
+        return None
     try:
-        number = float(str(value).strip().replace(",", "").rstrip("%"))
-    except (TypeError, ValueError):
+        number = float(match.group(0))
+    except ValueError:
         return None
     return None if number != number else number
 
@@ -78,6 +222,29 @@ def _latest_by_metric(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [value[1] for value in selected.values()]
 
 
+def _combined_metric_text(row: dict[str, Any]) -> str:
+    return " ".join(
+        _text(row.get(key)).lower()
+        for key in ("metric_group", "metric_name", "metric_label", "metric_code")
+        if _text(row.get(key))
+    )
+
+
+def _funnel_definition(row: dict[str, Any]) -> dict[str, Any] | None:
+    combined = _combined_metric_text(row)
+    if not combined or "流失" in combined or "转化" in combined:
+        return None
+
+    # More specific stages must be checked before generic visitor/order wording.
+    for definition in (_FUNNEL_DEFINITIONS[2], _FUNNEL_DEFINITIONS[3], _FUNNEL_DEFINITIONS[4], _FUNNEL_DEFINITIONS[0]):
+        if any(alias.lower() in combined for alias in definition["aliases"]):
+            return definition
+    definition = _FUNNEL_DEFINITIONS[1]
+    if any(alias.lower() in combined for alias in definition["aliases"]):
+        return definition
+    return None
+
+
 def _load_competition_metrics(
     cursor,
     table: str,
@@ -97,7 +264,11 @@ def _load_competition_metrics(
         }
     order_candidates = tuple(
         [f"{name} DESC" for name in _ORDER_COLUMNS if name in columns]
-        + [value for value in ("metric_code ASC", "metric_name ASC") if value.rsplit(" ", 1)[0] in columns]
+        + [
+            value
+            for value in ("metric_code ASC", "metric_name ASC")
+            if value.rsplit(" ", 1)[0] in columns
+        ]
     )
     rows, diag = base._profiled_fetch(
         cursor,
@@ -111,6 +282,49 @@ def _load_competition_metrics(
         **diag,
         "rows_read": len(rows),
         "rows_used": len(latest),
+        "selection_rule": "latest row per metric_code + metric_name",
+    }
+
+
+def _load_business_funnel_metrics(
+    cursor,
+    table: str,
+    limit: int,
+    hotel_id: str | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    columns, schema_error = base._table_columns(cursor, table)
+    if schema_error:
+        return [], {"table": table, "rows": 0, "status": "error", "error": schema_error}
+    if not ({"metric_code", "metric_name"} & columns):
+        return [], {
+            "table": table,
+            "rows": 0,
+            "status": "error",
+            "error": "required column missing: metric_code or metric_name",
+            "table_columns": sorted(columns),
+        }
+    order_candidates = tuple(
+        [f"{name} DESC" for name in _ORDER_COLUMNS if name in columns]
+        + [
+            value
+            for value in ("stats_period_type DESC", "period_type DESC", "metric_name ASC")
+            if value.rsplit(" ", 1)[0] in columns
+        ]
+    )
+    rows, diag = base._profiled_fetch(
+        cursor,
+        table,
+        max(limit, 20000),
+        hotel_id=hotel_id,
+        order_candidates=order_candidates,
+    )
+    filtered = [row for row in rows if _funnel_definition(row) is not None]
+    latest = _latest_by_metric(filtered)
+    return latest, {
+        **diag,
+        "rows_read": len(rows),
+        "rows_used": len(latest),
+        "row_filter": "recognized exposure/visitor/order funnel metric",
         "selection_rule": "latest row per metric_code + metric_name",
     }
 
@@ -188,7 +402,11 @@ def _load_order_loss(
         }
     order_candidates = tuple(
         [f"{name} DESC" for name in _ORDER_COLUMNS if name in columns]
-        + [value for value in ("platform_scope ASC", "ranking_position ASC") if value.rsplit(" ", 1)[0] in columns]
+        + [
+            value
+            for value in ("platform_scope ASC", "ranking_position ASC")
+            if value.rsplit(" ", 1)[0] in columns
+        ]
     )
     rows, diag = base._profiled_fetch(
         cursor,
@@ -197,7 +415,11 @@ def _load_order_loss(
         hotel_id=hotel_id,
         order_candidates=order_candidates,
     )
-    rows = [row for row in rows if _text(row.get("platform_scope")).lower() in {"ctrip", "qunar"}]
+    rows = [
+        row
+        for row in rows
+        if _text(row.get("platform_scope")).lower() in {"ctrip", "qunar"}
+    ]
     return rows, {
         **diag,
         "rows_used": len(rows),
@@ -229,6 +451,7 @@ def load_mysql_dsn_dataset(
 
     if "ctrip" not in base._enabled_platforms(platform):
         dataset.setdefault("ctrip_competition_metrics_30d", [])
+        dataset.setdefault("ctrip_business_metrics_funnel", [])
         dataset.setdefault("ctrip_business_metrics_loss", [])
         dataset.setdefault("ctrip_order_loss_monthly", [])
         return dataset
@@ -239,6 +462,12 @@ def load_mysql_dsn_dataset(
             competition, competition_diag = _load_competition_metrics(
                 cursor,
                 table_map["ctrip_competition_metrics_30d"],
+                limit,
+                ctrip_id,
+            )
+            funnel_metrics, funnel_metrics_diag = _load_business_funnel_metrics(
+                cursor,
+                table_map["ctrip_funnel"],
                 limit,
                 ctrip_id,
             )
@@ -258,6 +487,10 @@ def load_mysql_dsn_dataset(
         competition,
         table_map["ctrip_competition_metrics_30d"],
     )
+    dataset["ctrip_business_metrics_funnel"] = base._tag_rows(
+        funnel_metrics,
+        table_map["ctrip_funnel"],
+    )
     dataset["ctrip_business_metrics_loss"] = base._tag_rows(
         loss_metrics,
         table_map["ctrip_funnel"],
@@ -272,6 +505,7 @@ def load_mysql_dsn_dataset(
         diagnostics.setdefault("tables", {}).update(
             {
                 "ctrip_competition_metrics_30d": competition_diag,
+                "ctrip_business_metrics_funnel": funnel_metrics_diag,
                 "ctrip_business_metrics_loss": loss_metrics_diag,
                 "ctrip_order_loss_monthly": loss_competitors_diag,
             }
@@ -282,6 +516,11 @@ def load_mysql_dsn_dataset(
                     "section": "ctrip_competition_metrics_30d",
                     "rows": len(competition),
                     "rule": "latest row per metric_code + metric_name",
+                },
+                {
+                    "section": "ctrip_business_metrics_funnel",
+                    "rows": len(funnel_metrics),
+                    "rule": "latest recognized funnel metric from ctrip_ota_business_metrics",
                 },
                 {
                     "section": "ctrip_business_metrics_loss",
@@ -318,62 +557,112 @@ def load_database_dataset(config_path):
     )
 
 
-def _metric_label(row: dict[str, Any]) -> str:
+def _metric_label(row: dict[str, Any]) -> str | None:
     name = _text(row.get("metric_name") or row.get("metric_label"))
     code = _text(row.get("metric_code"))
-    combined = f"{name} {code}".lower()
-    if "订单" in name or "booking_order" in combined:
-        return "订单量"
-    if "销售额" in name or "销售金额" in name or any(key in combined for key in ("sales_amount", "sale_amount", "sales_revenue", "revenue", "gmv")):
+    name_lower = name.lower()
+    code_lower = code.lower()
+
+    # The source can reuse booking_order_count for several rows. Chinese metric
+    # name therefore has priority over metric_code.
+    if "销售" in name or "金额" in name:
         return "销售额"
-    if "出租率" in name or "occupancy" in combined:
+    if "出租率" in name or "入住率" in name:
         return "出租率"
-    if "转化" in name or "conversion" in combined:
+    if "转化" in name:
         return "转化率"
-    return name or code or "竞争圈指标"
+    if "订单" in name and "流失" not in name:
+        return "订单量"
+
+    if any(key in code_lower for key in ("sales_amount", "sale_amount", "sales_revenue", "revenue", "gmv")):
+        return "销售额"
+    if "occupancy" in code_lower:
+        return "出租率"
+    if "conversion" in code_lower:
+        return "转化率"
+    if "booking_order" in code_lower or "paid_order" in code_lower:
+        return "订单量"
+    if name_lower in {"order", "orders"}:
+        return "订单量"
+    return None
 
 
 def _metric_unit(row: dict[str, Any], label: str) -> str:
-    explicit = _text(row.get("metric_unit") or row.get("unit"))
-    if explicit:
-        return explicit
-    if "率" in label:
-        return "%"
-    if "销售" in label or "金额" in label:
+    # Display unit follows the business meaning, not raw English unit codes.
+    if label == "销售额":
         return "元"
-    if "订单" in label:
+    if label == "订单量":
         return "单"
-    return ""
+    if label in {"出租率", "转化率"}:
+        return "%"
+
+    explicit = _text(row.get("metric_unit") or row.get("unit")).lower()
+    aliases = {
+        "cny": "元",
+        "rmb": "元",
+        "yuan": "元",
+        "order": "单",
+        "orders": "单",
+        "room_night": "间夜",
+        "room_nights": "间夜",
+        "person": "人",
+        "people": "人",
+        "percent": "%",
+        "percentage": "%",
+        "pct": "%",
+    }
+    return aliases.get(explicit, _text(row.get("metric_unit") or row.get("unit")))
+
+
+def _rank_and_count(row: dict[str, Any]) -> tuple[float | None, float | None]:
+    raw_rank = _first(row, "competitor_rank", "ranking_position", "rank_position", "rank")
+    rank = _number(raw_rank)
+    count = _number(_first(row, "competitor_count", "circle_hotel_count", "peer_hotel_count"))
+    text = _text(raw_rank)
+    if count is None and "/" in text:
+        count = _number(text.split("/", 1)[1])
+    return rank, count
 
 
 def _competition_entries(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    priority = {"订单量": 0, "销售额": 1, "出租率": 2, "转化率": 3}
-    entries: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
+    priority = {label: index for index, label in enumerate(_CORE_METRICS)}
+    selected: dict[str, tuple[int, dict[str, Any]]] = {}
     for row in rows:
         label = _metric_label(row)
-        code = _text(row.get("metric_code"))
-        key = (label, code)
-        if key in seen:
+        if label not in priority:
             continue
-        seen.add(key)
-        entries.append(
-            {
-                "label": label,
-                "metric_code": code,
-                "hotel_value": _number(_first(row, "metric_value", "hotel_value", "current_value", "my_value")),
-                "competitor_avg": _number(_first(row, "competitor_avg", "competitor_average", "peer_average", "avg_value")),
-                "competitor_rank": _number(_first(row, "competitor_rank", "ranking_position", "rank_position", "rank")),
-                "competitor_count": _number(_first(row, "competitor_count", "circle_hotel_count", "peer_hotel_count")),
-                "unit": _metric_unit(row, label),
-            }
+        rank, count = _rank_and_count(row)
+        entry = {
+            "label": label,
+            "metric_code": _text(row.get("metric_code")),
+            "hotel_value": _number(
+                _first(row, "metric_value", "hotel_value", "hotel_metric_value", "current_value", "my_value")
+            ),
+            "competitor_avg": _number(
+                _first(row, "competitor_avg", "competitor_average", "peer_average", "avg_value")
+            ),
+            "competitor_rank": rank,
+            "competitor_count": count,
+            "unit": _metric_unit(row, label),
+        }
+        completeness = sum(
+            entry.get(key) is not None
+            for key in ("hotel_value", "competitor_avg", "competitor_rank")
         )
-    entries.sort(key=lambda entry: (priority.get(str(entry.get("label")), 99), str(entry.get("label"))))
-    return entries
+        current = selected.get(label)
+        if current is None or completeness > current[0]:
+            selected[label] = (completeness, entry)
+    output = [value[1] for value in selected.values()]
+    output.sort(key=lambda entry: priority[str(entry.get("label"))])
+    return output
 
 
 def _latest_funnel(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
-    ctrip_rows = [row for row in rows if _text(row.get("platform")).lower() == "ctrip"]
+    ctrip_rows = [
+        row
+        for row in rows
+        if _text(row.get("platform")).lower() in {"ctrip", "携程"}
+    ]
     if not ctrip_rows:
         return None
     ctrip_rows.sort(
@@ -386,32 +675,115 @@ def _latest_funnel(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     return dict(ctrip_rows[0])
 
 
-def _funnel_stages(rows: list[dict[str, Any]], existing: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-    existing_stages = (existing or {}).get("funnel_stages")
-    if isinstance(existing_stages, list) and existing_stages:
-        return [dict(stage) for stage in existing_stages if isinstance(stage, dict)]
+def _funnel_from_wide_rows(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     row = _latest_funnel(rows)
     if not row:
-        return []
-    definitions = (
-        ("列表页曝光量", ("exposure", "list_exposure", "list_page_exposure"), ("peer_exposure", "competitor_exposure")),
-        ("详情页访客量", ("views", "detail_visitors", "detail_page_visitors"), ("peer_views", "competitor_views")),
-        ("订单页访客量", ("order_page_visitors", "order_visitors"), ("peer_order_page_visitors", "competitor_order_page_visitors")),
-        ("订单提交人数", ("submitted_orders", "order_submit_users", "submit_order_count"), ("peer_submitted_orders", "competitor_submitted_orders")),
-        ("成交订单数", ("paid_orders", "booking_order_count", "completed_orders"), ("peer_paid_orders", "competitor_paid_orders")),
-    )
-    stages: list[dict[str, Any]] = []
-    for label, hotel_keys, peer_keys in definitions:
-        hotel_value = _number(_first(row, *hotel_keys))
-        peer_value = _number(_first(row, *peer_keys))
-        if hotel_value is None and peer_value is None:
+        return {}
+    output: dict[str, dict[str, Any]] = {}
+    for definition in _FUNNEL_DEFINITIONS:
+        hotel_value = _number(_first(row, *definition["hotel_keys"]))
+        competitor_avg = _number(_first(row, *definition["peer_keys"]))
+        if hotel_value is not None or competitor_avg is not None:
+            output[str(definition["key"])] = {
+                "label": definition["label"],
+                "hotel_value": hotel_value,
+                "competitor_avg": competitor_avg,
+            }
+    return output
+
+
+def _funnel_from_metric_rows(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    output: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        definition = _funnel_definition(row)
+        if definition is None:
             continue
-        stages.append({"label": label, "hotel_value": hotel_value, "competitor_avg": peer_value})
-    return stages
+        key = str(definition["key"])
+        candidate = {
+            "label": definition["label"],
+            "hotel_value": _number(
+                _first(row, "metric_value", "hotel_value", "hotel_metric_value", "current_value", "my_value")
+            ),
+            "competitor_avg": _number(
+                _first(row, "competitor_avg", "competitor_average", "peer_average", "avg_value")
+            ),
+        }
+        current = output.get(key)
+        if current is None:
+            output[key] = candidate
+            continue
+        for value_key in ("hotel_value", "competitor_avg"):
+            if current.get(value_key) is None and candidate.get(value_key) is not None:
+                current[value_key] = candidate[value_key]
+    return output
+
+
+def _merge_funnel_source(
+    merged: dict[str, dict[str, Any]],
+    source: dict[str, dict[str, Any]],
+) -> None:
+    for key, candidate in source.items():
+        current = merged.setdefault(
+            key,
+            {
+                "label": candidate.get("label"),
+                "hotel_value": None,
+                "competitor_avg": None,
+            },
+        )
+        for value_key in ("hotel_value", "competitor_avg"):
+            if current.get(value_key) is None and candidate.get(value_key) is not None:
+                current[value_key] = candidate[value_key]
+
+
+def _funnel_stages(
+    ota_rows: list[dict[str, Any]],
+    business_rows: list[dict[str, Any]],
+    competition_rows: list[dict[str, Any]],
+    existing: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    existing_stages = (existing or {}).get("funnel_stages")
+    if isinstance(existing_stages, list):
+        for stage in existing_stages:
+            if not isinstance(stage, dict):
+                continue
+            label = _text(stage.get("label"))
+            definition = next(
+                (item for item in _FUNNEL_DEFINITIONS if item["label"] == label),
+                None,
+            )
+            if definition is not None:
+                merged[str(definition["key"])] = dict(stage)
+
+    _merge_funnel_source(merged, _funnel_from_wide_rows(ota_rows))
+    _merge_funnel_source(merged, _funnel_from_metric_rows(business_rows))
+    _merge_funnel_source(merged, _funnel_from_metric_rows(competition_rows))
+
+    if not any(
+        entry.get("hotel_value") is not None or entry.get("competitor_avg") is not None
+        for entry in merged.values()
+    ):
+        return []
+
+    # Once at least one real funnel metric exists, retain the fixed five-stage
+    # structure. Missing individual stages stay visibly marked as 待接入.
+    return [
+        {
+            "label": definition["label"],
+            "hotel_value": (merged.get(str(definition["key"])) or {}).get("hotel_value"),
+            "competitor_avg": (merged.get(str(definition["key"])) or {}).get("competitor_avg"),
+        }
+        for definition in _FUNNEL_DEFINITIONS
+    ]
 
 
 def _loss_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {"order_count": None, "order_amount": None, "business_date": None}
+    result: dict[str, Any] = {
+        "order_count": None,
+        "order_amount": None,
+        "business_date": None,
+    }
     for row in rows:
         name = _text(row.get("metric_name"))
         value = _number(_first(row, "metric_value", "value", "current_value"))
@@ -450,29 +822,54 @@ def _period_key(row: dict[str, Any]) -> str:
 def _loss_competitors(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     output: dict[str, list[dict[str, Any]]] = {"ctrip": [], "qunar": []}
     for platform in output:
-        platform_rows = [row for row in rows if _platform(row.get("platform_scope")) == platform]
+        platform_rows = [
+            row
+            for row in rows
+            if _platform(row.get("platform_scope")) == platform
+        ]
         if not platform_rows:
             continue
         periods = [_period_key(row) for row in platform_rows if _period_key(row)]
         latest = max(periods) if periods else ""
         if latest:
-            platform_rows = [row for row in platform_rows if _period_key(row) == latest]
+            platform_rows = [
+                row for row in platform_rows if _period_key(row) == latest
+            ]
         normalized: list[dict[str, Any]] = []
         for row in platform_rows:
             name = _text(row.get("competitor_hotel_name"))
             if not name:
                 continue
-            rank = _number(_first(row, "ranking_position", "rank_position", "competitor_rank", "rank"))
+            rank = _number(
+                _first(
+                    row,
+                    "ranking_position",
+                    "rank_position",
+                    "competitor_rank",
+                    "rank",
+                )
+            )
             normalized.append(
                 {
                     "ranking_position": rank,
                     "competitor_hotel_name": name,
-                    "loss_order_count": _number(_first(row, "loss_order_count", "order_count", "lost_order_count")),
-                    "loss_order_amount": _number(_first(row, "loss_order_amount", "loss_amount", "order_amount")),
+                    "loss_order_count": _number(
+                        _first(row, "loss_order_count", "order_count", "lost_order_count")
+                    ),
+                    "loss_order_amount": _number(
+                        _first(row, "loss_order_amount", "loss_amount", "order_amount")
+                    ),
                     "period": latest,
                 }
             )
-        normalized.sort(key=lambda row: (row.get("ranking_position") if row.get("ranking_position") is not None else 999999, row.get("competitor_hotel_name")))
+        normalized.sort(
+            key=lambda row: (
+                row.get("ranking_position")
+                if row.get("ranking_position") is not None
+                else 999999,
+                row.get("competitor_hotel_name"),
+            )
+        )
         output[platform] = normalized[:5]
     return output
 
@@ -481,15 +878,41 @@ def build_competition_item(
     sections: dict[str, Any],
     existing: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    competition_rows = [dict(row) for row in sections.get("ctrip_competition_metrics_30d") or [] if isinstance(row, dict)]
-    loss_rows = [dict(row) for row in sections.get("ctrip_business_metrics_loss") or [] if isinstance(row, dict)]
-    competitor_rows = [dict(row) for row in sections.get("ctrip_order_loss_monthly") or [] if isinstance(row, dict)]
-    funnel_rows = [dict(row) for row in sections.get("ota_funnel") or [] if isinstance(row, dict)]
+    competition_rows = [
+        dict(row)
+        for row in sections.get("ctrip_competition_metrics_30d") or []
+        if isinstance(row, dict)
+    ]
+    business_funnel_rows = [
+        dict(row)
+        for row in sections.get("ctrip_business_metrics_funnel") or []
+        if isinstance(row, dict)
+    ]
+    loss_rows = [
+        dict(row)
+        for row in sections.get("ctrip_business_metrics_loss") or []
+        if isinstance(row, dict)
+    ]
+    competitor_rows = [
+        dict(row)
+        for row in sections.get("ctrip_order_loss_monthly") or []
+        if isinstance(row, dict)
+    ]
+    ota_funnel_rows = [
+        dict(row)
+        for row in sections.get("ota_funnel") or []
+        if isinstance(row, dict)
+    ]
 
     competition_metrics = _competition_entries(competition_rows)
     loss_summary = _loss_summary(loss_rows)
     loss_competitors = _loss_competitors(competitor_rows)
-    funnel_stages = _funnel_stages(funnel_rows, existing)
+    funnel_stages = _funnel_stages(
+        ota_funnel_rows,
+        business_funnel_rows,
+        competition_rows,
+        existing,
+    )
     has_data = bool(
         competition_metrics
         or funnel_stages
@@ -513,7 +936,10 @@ def build_competition_item(
         "participates_in_score": True,
         "full_score": 15,
         "data_status": "success" if has_data else "missing",
-        "source": "ctrip_ota_competition_metrics_30d、ctrip_ota_business_metrics、ctrip_ota_order_loss_monthly",
+        "source": (
+            "ctrip_ota_competition_metrics_30d、"
+            "ctrip_ota_business_metrics、ctrip_ota_order_loss_monthly"
+        ),
         "source_path": "携程 eBooking -> 数据中心 -> 竞争圈动态",
         "fields": fields,
         "fields_complete": True,
@@ -521,7 +947,12 @@ def build_competition_item(
         "competition_metrics": competition_metrics,
         "loss_summary": loss_summary,
         "loss_competitors": loss_competitors,
-        "records": competition_rows + loss_rows + competitor_rows,
+        "records": (
+            competition_rows
+            + business_funnel_rows
+            + loss_rows
+            + competitor_rows
+        ),
     }
     for key in ("item_score", "diagnosis_score", "score", "current_score"):
         if isinstance(existing, dict) and existing.get(key) not in (None, ""):
