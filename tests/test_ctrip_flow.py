@@ -32,7 +32,7 @@ def flow_row(platform="ctrip"):
         "list_exposure_peer_rank": 22,
         "detail_exposure_peer_rank": 18,
         "detail_to_order_rate_peer_rank": 20,
-        "peer_hotel_count": 48,
+        "competition_circle_hotel_count": 48,
     }
 
 
@@ -106,7 +106,13 @@ def test_final_rule_wrapper_replaces_old_item_03_and_refreshes_total():
     }
     result = process(data)
     item = result["ctrip_items"]["3"]
+    rank_subitem = item["platforms"]["ctrip"]["subitems"][4]
 
     assert item["source"] == "ctrip_ota_flow_conversion_30d"
     assert item["item_score"] == 3.1
+    assert rank_subitem["subitem_score"] == 2.2
+    assert all(
+        metric["competition_circle_hotel_count"] == 48
+        for metric in rank_subitem["metrics"]
+    )
     assert "platforms" in item
