@@ -28,17 +28,18 @@ STYLE = """
 .ctrip-flow-table .flow-score{width:105px;color:#16845b;font-size:16px;font-weight:900;white-space:nowrap}
 .ctrip-flow-table .flow-score span{color:#77848d;font-size:12px;font-weight:650}
 .ctrip-flow-table .flow-missing{color:#8a969e;font-weight:650}
-.ctrip-flow-rank-shell{margin-top:14px;padding-top:14px;border-top:1px solid #e4ebe8}
-.ctrip-flow-rank-shell h4{display:flex;align-items:center;gap:8px;margin:0 0 10px;color:#26343d;font-size:15px}
-.ctrip-flow-rank-shell h4 span{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:24px;padding:0 7px;border-radius:999px;background:#e8f5ef;color:#16845b;font-size:12px;font-weight:900}
-.ctrip-flow-rank-table{width:100%;min-width:760px;border-collapse:collapse;table-layout:fixed;background:#fff}
+.ctrip-flow-rank-shell{margin-top:14px}
+.ctrip-flow-rank-table{width:100%;min-width:1040px;border-collapse:collapse;table-layout:fixed;background:#fff}
 .ctrip-flow-rank-table th,.ctrip-flow-rank-table td{padding:10px 12px;border-right:1px solid #e2e8e5;border-bottom:1px solid #e2e8e5;text-align:center;color:#34424b;font-size:12px;line-height:1.35}
 .ctrip-flow-rank-table th:last-child,.ctrip-flow-rank-table td:last-child{border-right:0}.ctrip-flow-rank-table tbody tr:last-child td{border-bottom:0}
 .ctrip-flow-rank-table th{background:#f1f8f5;color:#53616b;font-weight:850}
-.ctrip-flow-rank-table .flow-rank-metric{text-align:left;padding-left:20px;font-weight:800}
+.ctrip-flow-rank-table .flow-rank-index{width:54px;font-size:15px;font-weight:900;color:#20303a}
+.ctrip-flow-rank-table .flow-rank-subitem{width:155px;font-weight:850;color:#26343d}
+.ctrip-flow-rank-table .flow-rank-metric{text-align:left;padding-left:18px;font-weight:800}
 .ctrip-flow-rank-table .flow-rank-number,.ctrip-flow-rank-table .flow-rank-count,.ctrip-flow-rank-table .flow-rank-percentile{font-variant-numeric:tabular-nums;white-space:nowrap}
-.ctrip-flow-rank-table .flow-score{width:120px;color:#16845b;font-size:16px;font-weight:900;white-space:nowrap}
+.ctrip-flow-rank-table .flow-score{width:105px;color:#16845b;font-size:16px;font-weight:900;white-space:nowrap}
 .ctrip-flow-rank-table .flow-score span{color:#77848d;font-size:12px;font-weight:650}
+.ctrip-flow-rank-table .flow-missing{color:#8a969e;font-weight:650}
 .ctrip-flow-platform-status{margin-bottom:10px;padding:9px 11px;border-radius:8px;background:#f4faf7;color:#315b4c;font-size:12px}
 @media(max-width:760px){.ctrip-flow-tabs{grid-template-columns:1fr}.ctrip-flow-current{grid-column:auto;text-align:left}.ctrip-flow-tab{width:100%}}
 @media print{.ctrip-flow-tabs{display:none}.ctrip-flow-panel[hidden]{display:block!important}.ctrip-flow-panel+.ctrip-flow-panel{margin-top:18px}.ctrip-flow-table,.ctrip-flow-rank-table{min-width:0;font-size:9px}.ctrip-flow-table th,.ctrip-flow-table td,.ctrip-flow-rank-table th,.ctrip-flow-rank-table td{padding:5px 4px;font-size:9px}}
@@ -181,22 +182,32 @@ def _rank_table(subitems: list[dict[str, Any]]) -> str:
         count_text = "待接入" if count is None else f"{count:g} 家"
         percentile_text = _percentile(metric.get("rank_percentile"))
         missing_class = " flow-missing" if "待接入" in {rank_text, count_text} else ""
-        cells = [
-            f"<td class='flow-rank-metric'>{upstream.e(metric.get('label') or '排名指标')}</td>",
-            f"<td class='flow-rank-number{missing_class}'>{upstream.e(rank_text)}</td>",
-            f"<td class='flow-rank-count{missing_class}'>{upstream.e(count_text)}</td>",
-            f"<td class='flow-rank-percentile'>{upstream.e(percentile_text)}</td>",
-        ]
+        cells: list[str] = []
+        if offset == 0:
+            cells.extend(
+                [
+                    f"<td class='flow-rank-index' rowspan='{rowspan}'>{upstream.e(rank_subitem.get('index') or 5)}</td>",
+                    f"<td class='flow-rank-subitem' rowspan='{rowspan}'>{upstream.e(rank_subitem.get('name') or '竞争圈排名表现')}</td>",
+                ]
+            )
+        cells.extend(
+            [
+                f"<td class='flow-rank-metric'>{upstream.e(metric.get('label') or '排名指标')}</td>",
+                f"<td class='flow-rank-number{missing_class}'>{upstream.e(rank_text)}</td>",
+                f"<td class='flow-rank-count{missing_class}'>{upstream.e(count_text)}</td>",
+                f"<td class='flow-rank-percentile'>{upstream.e(percentile_text)}</td>",
+            ]
+        )
         if offset == 0:
             cells.append(f"<td class='flow-score' rowspan='{rowspan}'>{_score(rank_subitem.get('subitem_score'))}</td>")
         rows.append("<tr>" + "".join(cells) + "</tr>")
     if not rows:
-        rows.append("<tr><td colspan='5' class='flow-missing'>竞争圈排名数据待接入</td></tr>")
+        rows.append("<tr><td colspan='7' class='flow-missing'>竞争圈排名数据待接入</td></tr>")
     return (
         "<div class='ctrip-flow-rank-shell'>"
-        "<h4><span>5</span>竞争圈排名表现</h4>"
         "<div class='ctrip-flow-table-scroll'><table class='ctrip-flow-rank-table'>"
-        "<thead><tr><th>排名指标</th><th>竞争圈排名</th><th>竞争圈酒店数</th><th>排名分位</th><th>子项得分</th></tr></thead>"
+        "<thead><tr><th>序号</th><th>评分子项</th><th>子项指标</th><th>竞争圈排名</th>"
+        "<th>竞争圈酒店数</th><th>排名分位</th><th>子项得分</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table></div></div>"
     )
 
