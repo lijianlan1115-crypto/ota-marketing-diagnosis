@@ -36,6 +36,11 @@ _COMPETITION_CARD_RE = re.compile(
     r"<div class='psi-summary-card-v53'><small>竞争圈排名</small>.*?</div>",
     re.S,
 )
+_TOTAL_DETAILS_RE = re.compile(
+    r"(<div class='psi-total-v53'><small>PSI 服务质量总分</small>"
+    r"<strong>.*?</strong>)<em>.*?</em><b>.*?</b>(</div>)",
+    re.S,
+)
 
 
 def rows(data: dict[str, Any]) -> str:
@@ -82,7 +87,8 @@ def rows(data: dict[str, Any]) -> str:
 
 def card(result: dict[str, Any], anchor: str) -> str:
     html_text = _ORIGINAL_CARD(result, anchor).replace(_OLD_HEADER, _NEW_HEADER, 1)
-    return _COMPETITION_CARD_RE.sub("", html_text, count=1)
+    html_text = _COMPETITION_CARD_RE.sub("", html_text, count=1)
+    return _TOTAL_DETAILS_RE.sub(r"\1\2", html_text, count=1)
 
 
 psi.rows = rows
