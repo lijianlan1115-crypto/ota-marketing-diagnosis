@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from marketing_diagnosis import ctrip_psi_v53 as psi
+from marketing_diagnosis import ctrip_report as stable_report
 from marketing_diagnosis import ctrip_report_v54 as report
 
 
@@ -70,6 +71,7 @@ def card(result: dict[str, Any], anchor: str) -> str:
 psi.rows = rows
 psi.card = card
 report.psi_card = card
+stable_report.psi_card = card
 report.PSI_STYLE += """
 <style id='CTRIP_PSI_COMPACT_TABLE'>
 .psi-table-v53{min-width:680px;table-layout:fixed}
