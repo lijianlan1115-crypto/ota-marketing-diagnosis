@@ -97,7 +97,35 @@ report.psi_card = card
 stable_report.psi_card = card
 report.PSI_STYLE += """
 <style id='CTRIP_PSI_COMPACT_TABLE'>
-.psi-summary-grid-v53{grid-template-columns:repeat(3,minmax(0,1fr))}
+.psi-overview-v53{
+  grid-template-columns:minmax(210px,.72fr) minmax(0,1.8fr);
+  gap:10px;
+  align-items:stretch;
+  padding:12px 14px 10px;
+}
+.psi-total-v53{
+  min-height:126px;
+  padding:15px 18px;
+  justify-content:center;
+}
+.psi-total-v53 strong{
+  margin-top:6px;
+  font-size:42px;
+}
+.psi-summary-grid-v53{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  align-items:stretch;
+}
+.psi-summary-card-v53{
+  display:flex;
+  min-height:126px;
+  flex-direction:column;
+  justify-content:center;
+  padding:14px 16px;
+}
+.psi-summary-card-v53 strong{margin-top:7px;font-size:20px}
+.psi-summary-card-v53 span{margin-top:5px}
 .psi-table-v53{min-width:680px;table-layout:fixed}
 .psi-table-v53 th,.psi-table-v53 td{padding:12px 14px}
 .psi-table-v53 .psi-col-type-v53{width:16%}
@@ -115,6 +143,14 @@ report.PSI_STYLE += """
 .psi-table-v53 .psi-weight-v53,
 .psi-table-v53 .psi-score-v53{text-align:center}
 .psi-table-v53 .psi-unit-v53{color:#718078}
+@media(max-width:1100px){
+  .psi-overview-v53{grid-template-columns:1fr}
+  .psi-summary-grid-v53{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .psi-summary-grid-v53{grid-template-columns:1fr}
+  .psi-total-v53,.psi-summary-card-v53{min-height:auto}
+}
 </style>
 """
 
