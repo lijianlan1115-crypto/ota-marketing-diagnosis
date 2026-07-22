@@ -38,6 +38,17 @@ SIDEBAR_STYLE = """
 """
 
 
+CTRIP_CLEANUP_STYLE = """
+<style id='CTRIP_VISIBLE_EXPLANATION_CLEANUP_STYLE'>
+.page[data-channel-view='ctrip'] .ctrip-source-v55,
+.page[data-channel-view='ctrip'] .ctrip-competition-source,
+.page[data-channel-view='ctrip'] .psi-source-v53{
+  display:none!important;
+}
+</style>
+"""
+
+
 SIDEBAR_SCRIPT = r"""
 <script id='OTA_COLLAPSIBLE_SIDEBAR_SCRIPT_STABLE'>
 (function(){
@@ -122,6 +133,91 @@ PROFILE_INTERACTION_FIX_SCRIPT = r"""
 """
 
 
+CTRIP_CONTENT_CLEANUP_SCRIPT = r"""
+<script id='CTRIP_VISIBLE_EXPLANATION_CLEANUP_SCRIPT'>
+(function(){
+  const labels=[
+    '携程数据来源',
+    '数据来源',
+    '数据口径',
+    '页面数据来源',
+    '数据库来源与计分口径',
+    '重点结论'
+  ];
+  const boundaries='article,.result-area,main,.page';
+
+  function cleanText(value){
+    return String(value||'').replace(/\s+/g,' ').trim();
+  }
+
+  function matchedLabel(node){
+    const text=cleanText(node&&node.textContent);
+    return labels.find(function(label){return text.startsWith(label);})||'';
+  }
+
+  function safeContainer(node,label,root){
+    let target=node;
+    while(target.parentElement&&target.parentElement!==root){
+      const parent=target.parentElement;
+      if(parent.matches(boundaries)) break;
+      if(!cleanText(parent.textContent).startsWith(label)) break;
+      target=parent;
+    }
+    if(target.matches('b,strong,span,small,h1,h2,h3,h4,h5,h6')){
+      const parent=target.parentElement;
+      if(parent&&parent!==root&&!parent.matches(boundaries)) target=parent;
+    }
+    return target;
+  }
+
+  function removeSummarySourceColumn(root){
+    root.querySelectorAll('table').forEach(function(table){
+      const headers=Array.from(table.querySelectorAll('thead th'));
+      const index=headers.findIndex(function(header){
+        return cleanText(header.textContent).includes('数据来源');
+      });
+      if(index<0) return;
+      table.querySelectorAll('tr').forEach(function(row){
+        const cells=row.children;
+        if(cells&&cells[index]) cells[index].remove();
+      });
+    });
+  }
+
+  function setup(){
+    const root=document.querySelector('.page[data-channel-view="ctrip"]');
+    if(!root) return;
+
+    root.querySelectorAll('.ctrip-source-v55,.ctrip-competition-source,.psi-source-v53').forEach(function(node){
+      node.remove();
+    });
+    removeSummarySourceColumn(root);
+
+    let changed=true;
+    while(changed){
+      changed=false;
+      const candidates=Array.from(root.querySelectorAll('section,aside,div,p,h1,h2,h3,h4,h5,h6,b,strong,span,small'));
+      for(const node of candidates){
+        if(!node.isConnected) continue;
+        const label=matchedLabel(node);
+        if(!label) continue;
+        const target=safeContainer(node,label,root);
+        if(target&&target!==root&&!target.matches(boundaries)){
+          target.remove();
+          changed=true;
+          break;
+        }
+      }
+    }
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',setup);
+  else setup();
+})();
+</script>
+"""
+
+
 _PSI_SOURCE_RE = re.compile(
     r"<div class=['\"]psi-source-v53['\"]>\s*"
     r"<div><b>页面数据来源</b>.*?</div>\s*"
@@ -129,27 +225,26 @@ _PSI_SOURCE_RE = re.compile(
     r"</div>",
     re.DOTALL | re.IGNORECASE,
 )
-_YOYO_CARD_RE = re.compile(
-    r"<article\b(?=[^>]*data-title=['\"]YOYO 卡 / 扫码住['\"])[^>]*>.*?</article>",
-    re.DOTALL | re.IGNORECASE,
-)
 _CTRIP_SOURCE_RE = re.compile(
     r"<div class=['\"]ctrip-source-v55['\"]>.*?</div>",
+    re.DOTALL | re.IGNORECASE,
+)
+_CTRIP_COMPETITION_SOURCE_RE = re.compile(
+    r"<div class=['\"]ctrip-competition-source['\"]>.*?</div>",
     re.DOTALL | re.IGNORECASE,
 )
 
 
 def _strip_hidden_source_details(document: str) -> str:
-    """Remove selected source explanations from visible report HTML only."""
+    """Remove known Ctrip source/scope blocks from visible report HTML only."""
 
     document = _PSI_SOURCE_RE.sub("", document)
+    document = _CTRIP_SOURCE_RE.sub("", document)
+    document = _CTRIP_COMPETITION_SOURCE_RE.sub("", document)
 
-    def strip_yoyo_source(match: re.Match[str]) -> str:
-        return _CTRIP_SOURCE_RE.sub("", match.group(0), count=1)
-
-    document = _YOYO_CARD_RE.sub(strip_yoyo_source, document, count=1)
-
-    # The collapsed diagnosis summary should not expose the same source strings.
+    # The collapsed diagnosis summary is cleaned in the browser by removing the
+    # whole source column. These replacements prevent the two previously known
+    # strings from appearing before that script runs.
     document = document.replace("ctrip_ota_psi_score、ctrip_ota_psi_metric<br>", "")
     document = document.replace("携程 eBooking / YOYO卡或扫码住<br>", "")
     return document
@@ -165,10 +260,18 @@ def build_html(result: dict[str, Any]) -> str:
     upstream.build_ctrip_page = build_ctrip_page
     output = upstream.build_html(result)
     output = _strip_hidden_source_details(output)
-    output = output.replace("</head>", SIDEBAR_STYLE + FLOW_STYLE + "</head>", 1)
+    output = output.replace(
+        "</head>",
+        SIDEBAR_STYLE + FLOW_STYLE + CTRIP_CLEANUP_STYLE + "</head>",
+        1,
+    )
     output = output.replace(
         "</body>",
-        SIDEBAR_SCRIPT + PROFILE_INTERACTION_FIX_SCRIPT + FLOW_SCRIPT + "</body>",
+        SIDEBAR_SCRIPT
+        + PROFILE_INTERACTION_FIX_SCRIPT
+        + FLOW_SCRIPT
+        + CTRIP_CONTENT_CLEANUP_SCRIPT
+        + "</body>",
         1,
     )
     return output
