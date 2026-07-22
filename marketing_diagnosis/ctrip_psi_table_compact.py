@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+from typing import Any
+
+from marketing_diagnosis import ctrip_psi_v53 as psi
+from marketing_diagnosis import ctrip_report_v54 as report
+
+
+_ORIGINAL_CARD = report.psi_card
+_OLD_HEADER = (
+    "<th>指标类型</th><th>诊断指标</th><th>单位</th><th>实际值</th>"
+    "<th>权重</th><th>PSI得分</th><th>竞争表现/排名</th>"
+    "<th>与目标差距</th><th>统计周期</th>"
+)
+_NEW_HEADER = (
+    "<th>指标类型</th><th>诊断指标</th><th>实际值</th>"
+    "<th>权重</th><th>PSI得分</th>"
+)
+
+
+def rows(data: dict[str, Any]) -> str:
+    metric_values = psi._metric_map(data)
+    groups = {metric[1] for metric in psi.METRICS}
+    counts = {
+        group: sum(
+            1
+            for _, metric_group, _, _, _ in psi.METRICS
+            if metric_group == group
+        )
+        for group in groups
+    }
+    seen: set[str] = set()
+    output: list[str] = []
+
+    for code, group, label, default_unit, _ in psi.METRICS:
+        value = metric_values.get(code) or {}
+        unit = str(value.get("unit") or default_unit)
+        group_cell = ""
+        if group not in seen:
+            seen.add(group)
+            group_cell = (
+                f"<td class='psi-type-v53' rowspan='{counts[group]}'>"
+                f"{psi.e(group)}</td>"
+            )
+
+        weight = psi.num(value.get("weight_pct"))
+        weight_text = "待接入" if weight is None else f"{weight:g}%"
+        score_text = psi._plain(value.get("psi_score"))
+        actual_value = psi._metric_value(value.get("metric_value"), unit)
+
+        output.append(
+            f"<tr>{group_cell}"
+            f"<td class='psi-index-v53'>{psi.e(value.get('metric_name') or label)}</td>"
+            f"<td>{psi.e(actual_value)}</td>"
+            f"<td>{psi.e(weight_text)}</td>"
+            f"<td><strong>{psi.e(score_text)}</strong></td></tr>"
+        )
+
+    return "".join(output)
+
+
+def card(result: dict[str, Any], anchor: str) -> str:
+    return _ORIGINAL_CARD(result, anchor).replace(_OLD_HEADER, _NEW_HEADER, 1)
+
+
+psi.rows = rows
+psi.card = card
+report.psi_card = card
+report.PSI_STYLE += """
+<style id='CTRIP_PSI_COMPACT_TABLE'>
+.psi-table-v53{min-width:560px}
+</style>
+"""
+
+
+__all__ = ["card", "rows"]
