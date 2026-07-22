@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from marketing_diagnosis import ctrip_psi_v53 as psi
@@ -19,6 +20,10 @@ _NEW_HEADER = (
     "<th class='psi-col-value-v53'>实际值</th>"
     "<th class='psi-col-weight-v53'>权重</th>"
     "<th class='psi-col-score-v53'>PSI得分</th>"
+)
+_COMPETITION_CARD_RE = re.compile(
+    r"<div class='psi-summary-card-v53'><small>竞争圈排名</small>.*?</div>",
+    re.S,
 )
 
 
@@ -65,7 +70,8 @@ def rows(data: dict[str, Any]) -> str:
 
 
 def card(result: dict[str, Any], anchor: str) -> str:
-    return _ORIGINAL_CARD(result, anchor).replace(_OLD_HEADER, _NEW_HEADER, 1)
+    html_text = _ORIGINAL_CARD(result, anchor).replace(_OLD_HEADER, _NEW_HEADER, 1)
+    return _COMPETITION_CARD_RE.sub("", html_text, count=1)
 
 
 psi.rows = rows
@@ -74,6 +80,7 @@ report.psi_card = card
 stable_report.psi_card = card
 report.PSI_STYLE += """
 <style id='CTRIP_PSI_COMPACT_TABLE'>
+.psi-summary-grid-v53{grid-template-columns:repeat(3,minmax(0,1fr))}
 .psi-table-v53{min-width:680px;table-layout:fixed}
 .psi-table-v53 th,.psi-table-v53 td{padding:12px 14px}
 .psi-table-v53 .psi-col-type-v53{width:16%}
