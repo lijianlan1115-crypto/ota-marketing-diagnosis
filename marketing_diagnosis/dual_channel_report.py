@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from marketing_diagnosis import dual_channel_report_v56 as upstream
@@ -115,6 +116,39 @@ PROFILE_INTERACTION_FIX_SCRIPT = r"""
 """
 
 
+_PSI_SOURCE_RE = re.compile(
+    r"<div class=['\"]psi-source-v53['\"]>\s*"
+    r"<div><b>页面数据来源</b>.*?</div>\s*"
+    r"<div><b>数据库来源与计分口径</b>.*?</div>\s*"
+    r"</div>",
+    re.DOTALL | re.IGNORECASE,
+)
+_YOYO_CARD_RE = re.compile(
+    r"<article\b(?=[^>]*data-title=['\"]YOYO 卡 / 扫码住['\"])[^>]*>.*?</article>",
+    re.DOTALL | re.IGNORECASE,
+)
+_CTRIP_SOURCE_RE = re.compile(
+    r"<div class=['\"]ctrip-source-v55['\"]>.*?</div>",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _strip_hidden_source_details(document: str) -> str:
+    """Remove selected source explanations from visible report HTML only."""
+
+    document = _PSI_SOURCE_RE.sub("", document)
+
+    def strip_yoyo_source(match: re.Match[str]) -> str:
+        return _CTRIP_SOURCE_RE.sub("", match.group(0), count=1)
+
+    document = _YOYO_CARD_RE.sub(strip_yoyo_source, document, count=1)
+
+    # The collapsed diagnosis summary should not expose the same source strings.
+    document = document.replace("ctrip_ota_psi_score、ctrip_ota_psi_metric<br>", "")
+    document = document.replace("携程 eBooking / YOYO卡或扫码住<br>", "")
+    return document
+
+
 def build_html(result: dict[str, Any]) -> str:
     """Build the existing dual report and add stable shared interactions in place."""
 
@@ -122,6 +156,7 @@ def build_html(result: dict[str, Any]) -> str:
     # the original dual-channel implementation while using the stable Ctrip page.
     upstream.build_ctrip_page = build_ctrip_page
     output = upstream.build_html(result)
+    output = _strip_hidden_source_details(output)
     output = output.replace("</head>", SIDEBAR_STYLE + "</head>", 1)
     output = output.replace(
         "</body>",
