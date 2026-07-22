@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from typing import Any
 
 from marketing_diagnosis import ctrip_report_v54 as upstream
@@ -40,66 +39,6 @@ def _tone(rating: float | None) -> tuple[str, str]:
     if rating >= 4.5:
         return "fair", "接近达标"
     return "low", "未达标"
-
-
-def _radar_chart(entry: dict[str, Any]) -> str:
-    dimensions = (
-        ("环境", "environment_score", -90),
-        ("服务", "service_score", 0),
-        ("卫生", "hygiene_score", 90),
-        ("设施", "facility_score", 180),
-    )
-    cx, cy, radius = 72.0, 72.0, 43.0
-
-    def point(angle: float, score: float) -> tuple[float, float]:
-        radian = math.radians(angle)
-        distance = radius * min(5.0, max(0.0, score)) / 5.0
-        return cx + math.cos(radian) * distance, cy + math.sin(radian) * distance
-
-    values = {key: _number(entry.get(key)) for _, key, _ in dimensions}
-    polygon = " ".join(
-        f"{x:.1f},{y:.1f}"
-        for label, key, angle in dimensions
-        for x, y in [point(angle, values[key] or 0.0)]
-    )
-
-    def ring(scale: float) -> str:
-        points = (
-            (cx, cy - radius * scale),
-            (cx + radius * scale, cy),
-            (cx, cy + radius * scale),
-            (cx - radius * scale, cy),
-        )
-        return " ".join(f"{x:.1f},{y:.1f}" for x, y in points)
-
-    value_grid = "".join(
-        "<div class='rep-dim'>"
-        f"<small>{upstream.e(label)}</small>"
-        f"<strong>{upstream.e(_value(entry, key))}</strong>"
-        "</div>"
-        for label, key, _ in dimensions
-    )
-
-    return (
-        "<div class='rep-dims' style='grid-template-columns:150px minmax(0,1fr);align-items:center'>"
-        "<svg viewBox='0 0 144 144' width='144' height='144' role='img' aria-label='口碑维度雷达图'>"
-        f"<polygon points='{ring(1)}' fill='none' stroke='#dce6e2' stroke-width='1'/>"
-        f"<polygon points='{ring(.75)}' fill='none' stroke='#e7eeeb' stroke-width='1'/>"
-        f"<polygon points='{ring(.5)}' fill='none' stroke='#edf3f0' stroke-width='1'/>"
-        f"<polygon points='{ring(.25)}' fill='none' stroke='#f3f6f5' stroke-width='1'/>"
-        f"<line x1='{cx}' y1='{cy}' x2='{cx}' y2='{cy-radius}' stroke='#e1e9e6'/>"
-        f"<line x1='{cx}' y1='{cy}' x2='{cx+radius}' y2='{cy}' stroke='#e1e9e6'/>"
-        f"<line x1='{cx}' y1='{cy}' x2='{cx}' y2='{cy+radius}' stroke='#e1e9e6'/>"
-        f"<line x1='{cx}' y1='{cy}' x2='{cx-radius}' y2='{cy}' stroke='#e1e9e6'/>"
-        f"<polygon points='{polygon}' fill='rgba(22,132,91,.18)' stroke='#16845b' stroke-width='2'/>"
-        "<text x='72' y='12' text-anchor='middle' fill='#68747f' font-size='10'>环境</text>"
-        "<text x='132' y='76' text-anchor='middle' fill='#68747f' font-size='10'>服务</text>"
-        "<text x='72' y='141' text-anchor='middle' fill='#68747f' font-size='10'>卫生</text>"
-        "<text x='12' y='76' text-anchor='middle' fill='#68747f' font-size='10'>设施</text>"
-        "</svg>"
-        f"<div style='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px'>{value_grid}</div>"
-        "</div>"
-    )
 
 
 def build_content(payload: dict[str, Any]) -> str:
@@ -153,40 +92,44 @@ def build_content(payload: dict[str, Any]) -> str:
     else:
         insight = "<b>重点结论：</b>当前已接入平台均达到目标线，继续关注新增差评和回复时效。"
 
-    cards: list[str] = []
+    detail_rows: list[str] = []
     for entry in platforms:
         rating = _number(entry.get("rating"))
         tone, state = _tone(rating)
-        gap = None if rating is None else rating - TARGET
-        gap_text = "—" if gap is None else f"{gap:+.2f}"
-        cards.append(
-            "<section class='rep-card'>"
-            "<div class='rep-head'><div>"
-            f"<div class='rep-title'>{upstream.e(entry.get('platform_name') or '平台')}</div>"
-            f"<span class='rep-weight'>权重 {_value(entry, 'full_score', '分')}</span></div>"
-            f"<span class='rep-badge {tone}'>{upstream.e(state)}</span></div>"
-            "<div class='rep-main'>"
-            f"<div class='rep-rating'><small>平台点评分</small><strong>{upstream.e(_value(entry, 'rating'))}</strong></div>"
-            f"<div><small>距达标</small><strong class='{'rep-pos' if gap is not None and gap >= 0 else 'rep-neg'}'>{upstream.e(gap_text)}</strong></div>"
-            f"<div><small>贡献分</small><strong>{upstream.e(_value(entry, 'score'))} / {upstream.e(_value(entry, 'full_score'))}</strong></div>"
-            "</div>"
-            "<div class='rep-facts'>"
-            f"<div class='rep-fact'><small>点评数</small><strong>{upstream.e(_value(entry, 'review_count', '条'))}</strong></div>"
-            f"<div class='rep-fact'><small>回复率</small><strong>{upstream.e(_percent(entry))}</strong></div>"
-            f"<div class='rep-fact'><small>差评数</small><strong>{upstream.e(_value(entry, 'negative_review_count', '条'))}</strong></div>"
-            f"<div class='rep-fact'><small>昨日新增</small><strong>{upstream.e(_value(entry, 'yesterday_new_review_count', '条'))}</strong></div>"
-            "</div>"
-            f"{_radar_chart(entry)}</section>"
+        detail_rows.append(
+            "<tr>"
+            "<td class='rep-platform-cell'>"
+            f"<b>{upstream.e(entry.get('platform_name') or '平台')}</b>"
+            f"<small>权重 {_value(entry, 'full_score', '分')}</small></td>"
+            f"<td class='rep-rating-cell {tone}'><strong>{upstream.e(_value(entry, 'rating'))}</strong>"
+            f"<span class='rep-state {tone}'>{upstream.e(state)}</span></td>"
+            f"<td>{upstream.e(_value(entry, 'environment_score'))}</td>"
+            f"<td>{upstream.e(_value(entry, 'facility_score'))}</td>"
+            f"<td>{upstream.e(_value(entry, 'service_score'))}</td>"
+            f"<td>{upstream.e(_value(entry, 'hygiene_score'))}</td>"
+            f"<td>{upstream.e(_value(entry, 'review_count', '条'))}</td>"
+            f"<td>{upstream.e(_percent(entry))}</td>"
+            f"<td>{upstream.e(_value(entry, 'unreplied_review_count', '条'))}</td>"
+            f"<td>{upstream.e(_value(entry, 'negative_review_count', '条'))}</td>"
+            f"<td>{upstream.e(_value(entry, 'yesterday_new_review_count', '条'))}</td>"
+            f"<td class='rep-contribution'>{upstream.e(_value(entry, 'score'))} / {upstream.e(_value(entry, 'full_score'))}</td>"
+            "</tr>"
         )
+
+    details = (
+        "<div class='rep-table-wrap'><table class='rep-table'>"
+        "<thead><tr><th>平台</th><th>点评分</th><th>环境</th><th>设施</th><th>服务</th><th>卫生</th>"
+        "<th>点评数</th><th>回复率</th><th>未回复</th><th>差评</th><th>昨日新增</th><th>得分</th></tr></thead>"
+        f"<tbody>{''.join(detail_rows)}</tbody></table></div>"
+    )
 
     return (
         "<div class='rep-wrap'>"
         + kpis
         + comparison
         + f"<div class='rep-insight'>{insight}</div>"
-        + "<div class='rep-cards'>"
-        + "".join(cards)
-        + "</div></div>"
+        + details
+        + "</div>"
     )
 
 

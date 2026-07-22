@@ -4,6 +4,7 @@ from typing import Any
 
 
 _ACTIVITY_CODES = {
+    8: "information_completeness",
     14: "points_alliance",
     15: "preferred_club",
     16: "business_travel_price",
@@ -130,6 +131,35 @@ def _rights_item(rows: list[dict[str, Any]]) -> dict[str, Any]:
     )
     item["rights_list"] = names
     return item
+
+
+def _information_item(row: dict[str, Any] | None) -> dict[str, Any]:
+    source = "携程 eBooking / 信息维护 / 信息完整度"
+    if not row:
+        return _item(8, None, "missing", source, [], "等待信息完整度状态快照。")
+    completeness = _number(row.get("metric_value"))
+    fields = [
+        _field(
+            "信息完整度",
+            None if completeness is None else f"{completeness:g}%",
+        ),
+        _field(
+            "完整度结果",
+            "已达标" if completeness is not None and completeness >= 100 else "未达标"
+            if completeness is not None
+            else "待核验",
+        ),
+    ]
+    if completeness is None:
+        return _item(8, None, "pending_rule", source, fields, "信息完整度数值无法由现有字段确认。")
+    return _item(
+        8,
+        4.0 if completeness >= 100 else 0.0,
+        "success",
+        source,
+        fields,
+        "信息完整度达到100得4分，低于100得0分。",
+    )
 
 
 
@@ -287,6 +317,7 @@ def build_configuration_items(sections: dict[str, Any]) -> dict[str, dict[str, A
         else None
     )
     items = {
+        "8": _information_item(_activity(statuses, 8)),
         "13": _rights_item(rights),
         "14": _points_item(_activity(statuses, 14)),
         "15": _preferred_item(_activity(statuses, 15)),

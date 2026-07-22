@@ -5,6 +5,7 @@ from typing import Any
 
 from marketing_diagnosis import reporting_v30, reporting_v35, reporting_v37
 from marketing_diagnosis import ctrip_report_v54 as upstream
+from marketing_diagnosis import ctrip_reputation_report as _ctrip_reputation_report
 from marketing_diagnosis.ctrip_psi_v53 import card as psi_card
 from marketing_diagnosis.ctrip_user_profile_report import STYLE as PROFILE_STYLE
 from marketing_diagnosis.ctrip_user_profile_report import card as profile_card

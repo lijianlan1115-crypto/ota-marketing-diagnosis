@@ -13,6 +13,7 @@ def test_configuration_scores_follow_ctrip_rules():
             for name in ("免费取消", "提前入住", "延迟退房", "欢迎水果", "早餐")
         ],
         "ctrip_promotion_status": [
+            _row("information_completeness", metric_value=100),
             _row("points_alliance", orders_30d=2, platform_scope="携程,Trip.com,去哪儿"),
             _row("preferred_club", status_detail="PSI restricted"),
             _row("business_travel_price", room_type_count=0),
@@ -25,6 +26,11 @@ def test_configuration_scores_follow_ctrip_rules():
 
     items = build_configuration_items(sections)
 
+    assert items["8"]["item_score"] == 4
+    assert items["8"]["fields"] == [
+        {"label": "信息完整度", "value": "100%", "note": ""},
+        {"label": "完整度结果", "value": "已达标", "note": ""},
+    ]
     assert items["13"]["item_score"] == 4
     assert {field["label"] for field in items["13"]["fields"]} == {"已报名权益", "权益清单"}
     assert items["13"]["fields"][0]["value"] == "5项"

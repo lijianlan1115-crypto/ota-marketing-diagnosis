@@ -1,5 +1,5 @@
 from marketing_diagnosis.ctrip_reputation_v64 import build_reputation_item
-from marketing_diagnosis.ctrip_report_v54 import build_html
+from marketing_diagnosis.ctrip_report import build_html
 
 
 def _overview(channel, score, total, **values):
@@ -36,7 +36,7 @@ def test_ctrip_reputation_scores_platforms_and_reply_rate():
     assert item["platforms"][1]["environment_score"] is None
 
 
-def test_ctrip_reputation_page_has_four_clear_platform_cards():
+def test_ctrip_reputation_page_uses_a_cross_platform_detail_table():
     item = build_reputation_item(
         {
             "ctrip_review_overview": [
@@ -51,9 +51,10 @@ def test_ctrip_reputation_page_has_four_clear_platform_cards():
     output = build_html({"hotel_name": "测试酒店", "ctrip_items": {"12": item}})
     card = output.split("id='rule-12'", 1)[1].split("id='rule-13'", 1)[0]
 
-    assert "ctrip-reputation-grid-v64" in card
-    assert card.count("ctrip-reputation-card-v64") == 4
-    assert "点评回复率" in card
+    assert "rep-table" in card
+    assert card.count("<tr>") >= 5
+    assert "回复率" in card and "未回复" in card
     assert "环境" in card and "设施" in card and "服务" in card and "卫生" in card
-    assert "暂无数据" in card
+    assert "<svg" not in card and "雷达图" not in card
+    assert "—" in card
     assert "ENABLED" not in card and "NOT_JOINED" not in card
