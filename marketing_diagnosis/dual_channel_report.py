@@ -67,15 +67,67 @@ SIDEBAR_SCRIPT = r"""
 """
 
 
+PROFILE_INTERACTION_FIX_SCRIPT = r"""
+<script id='CTRIP_USER_PROFILE_INTERACTION_FIX_STABLE'>
+(function(){
+  function profileRoot(node){
+    return node && node.closest ? node.closest('[data-ctrip-profile]') : null;
+  }
+
+  document.addEventListener('click',function(event){
+    const toggle=event.target.closest('[data-profile-toggle]');
+    if(toggle){
+      const root=profileRoot(toggle);
+      if(!root) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const code=toggle.getAttribute('data-profile-toggle');
+      const expanded=toggle.getAttribute('aria-expanded')==='true';
+      root.querySelectorAll('[data-profile-detail="'+CSS.escape(code)+'"]').forEach(function(row){
+        row.hidden=expanded;
+      });
+      toggle.setAttribute('aria-expanded',expanded?'false':'true');
+      toggle.textContent=expanded?'展开详情':'收起详情';
+      return;
+    }
+
+    const tab=event.target.closest('[data-profile-tab]');
+    if(tab){
+      const root=profileRoot(tab);
+      if(!root) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const name=tab.getAttribute('data-profile-tab');
+      root.querySelectorAll('[data-profile-tab]').forEach(function(item){
+        const active=item.getAttribute('data-profile-tab')===name;
+        item.classList.toggle('active',active);
+        item.setAttribute('aria-selected',active?'true':'false');
+      });
+      root.querySelectorAll('[data-profile-panel]').forEach(function(panel){
+        panel.hidden=panel.getAttribute('data-profile-panel')!==name;
+      });
+    }
+  },true);
+})();
+</script>
+"""
+
+
 def build_html(result: dict[str, Any]) -> str:
-    """Build the existing dual report and add a collapsible sidebar in place."""
+    """Build the existing dual report and add stable shared interactions in place."""
 
     # dual_channel_report_v56 resolves this global at call time. Replacing it keeps
     # the original dual-channel implementation while using the stable Ctrip page.
     upstream.build_ctrip_page = build_ctrip_page
     output = upstream.build_html(result)
     output = output.replace("</head>", SIDEBAR_STYLE + "</head>", 1)
-    output = output.replace("</body>", SIDEBAR_SCRIPT + "</body>", 1)
+    output = output.replace(
+        "</body>",
+        SIDEBAR_SCRIPT + PROFILE_INTERACTION_FIX_SCRIPT + "</body>",
+        1,
+    )
     return output
 
 
