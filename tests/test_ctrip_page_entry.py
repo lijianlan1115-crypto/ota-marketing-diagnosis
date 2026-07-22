@@ -3,11 +3,12 @@ from marketing_diagnosis.ctrip_report import build_html
 
 
 def test_page_entry_uses_hotel_name_and_keeps_missing_page_fields_pending():
+    hotel_name = "贵阳智町·栖筑优品酒店(紫林庵站妇幼保健院店)"
     item = build_page_entry_item(
         {
             "ctrip_promotion_performance_30d": [
                 {
-                    "hotel_name": "贵阳智町·栖筑优品酒店(紫林庵站妇幼保健院店)",
+                    "hotel_name": hotel_name,
                     "snapshot_time": "2026-07-21 20:14:00",
                 }
             ]
@@ -16,7 +17,9 @@ def test_page_entry_uses_hotel_name_and_keeps_missing_page_fields_pending():
 
     assert item["item_score"] == 2.0
     assert item["data_status"] == "partial"
-    assert item["fields"][1]["value"] == "已命中"
+    assert item["fields"][0]["value"] == hotel_name
+    assert item["fields"][1]["label"] == "门店后缀"
+    assert item["fields"][1]["value"] == "紫林庵站妇幼保健院店"
     assert "站" in item["fields"][2]["value"]
     assert item["fields"][3]["value"] == "待接入"
 
