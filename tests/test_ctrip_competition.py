@@ -1,6 +1,9 @@
 from marketing_diagnosis.ctrip_competition import build_competition_item
 from marketing_diagnosis.ctrip_report import competition_analysis_card, funnel_card
-from marketing_diagnosis.rules_v5 import _split_competition_payload
+from marketing_diagnosis.rules_v5 import (
+    _competition_metric_entries,
+    _split_competition_payload,
+)
 
 
 def sections():
@@ -21,48 +24,57 @@ def sections():
         "ctrip_business_metrics_funnel": [],
         "ctrip_competition_metrics_30d": [
             {
+                "metric_code": "competition_rank",
+                "metric_name": "竞争圈排名",
+                "competitor_rank": 6,
+            },
+            {
                 "metric_code": "booking_order_count",
-                "metric_name": "订单量",
-                "metric_value": 9,
-                "competitor_avg": 78,
+                "hotel_value": 54,
+                "competitor_avg": 1457,
+                "competitor_rank": 8,
+                "competitor_count": 48,
+            },
+            {
+                "metric_code": "booking_sales_amount",
+                "hotel_value": 11354.26,
+                "competitor_avg": 712560,
+                "competitor_rank": 10,
+                "competitor_count": 48,
+            },
+            {
+                "metric_code": "occupancy_ratet",
+                "hotel_value": 63.2,
+                "competitor_avg": 82.1,
+                "competitor_rank": 9,
+                "competitor_count": 48,
+            },
+            {
+                "metric_code": "ctrip_app_conversion_ratet",
+                "hotel_value": 2.4,
+                "competitor_avg": 2.68,
+                "competitor_rank": 7,
+                "competitor_count": 48,
+            },
+            {
+                "metric_code": "inhouse_room_night",
+                "hotel_value": 63,
+                "competitor_avg": 665.09,
                 "competitor_rank": 22,
                 "competitor_count": 48,
-                "metric_unit": "order",
             },
             {
-                "metric_code": "booking_order_count",
-                "metric_name": "销售额",
-                "metric_value": 2380,
-                "competitor_avg": 16300,
-                "competitor_rank": 20,
-                "competitor_count": 48,
-                "metric_unit": "CNY",
-            },
-            {
-                "metric_code": "booking_order_count",
-                "metric_name": "出租率",
-                "metric_value": 56.2,
-                "competitor_avg": 72.4,
-                "competitor_rank": 18,
-                "competitor_count": 48,
-                "metric_unit": "%",
-            },
-            {
-                "metric_code": "booking_order_count",
-                "metric_name": "转化率",
-                "metric_value": 4.76,
-                "competitor_avg": 6.55,
-                "competitor_rank": 23,
-                "competitor_count": 48,
-                "metric_unit": "%",
-            },
-            {
-                "metric_code": "visitor_count",
-                "metric_name": "访客量",
-                "metric_value": 916,
+                "metric_code": "ctrip_app_visitor_count",
+                "hotel_value": 916,
                 "competitor_avg": 5576.3,
                 "competitor_rank": 22,
-                "metric_unit": "person",
+                "competitor_count": 48,
+            },
+            {
+                "metric_code": "unrelated_metric",
+                "metric_name": "不应展示",
+                "competitor_avg": 999,
+                "competitor_rank": 1,
             },
         ],
         "ctrip_business_metrics_loss": [
@@ -101,7 +113,9 @@ def sections():
 
 
 def split_items():
-    combined = build_competition_item(sections(), {"item_score": 11.4})
+    source = sections()
+    combined = build_competition_item(source, {"item_score": 11.4})
+    combined["competition_metrics"] = _competition_metric_entries(source)
     return _split_competition_payload(combined, {"item_score": 11.4})
 
 
@@ -123,17 +137,30 @@ def test_item_03_keeps_only_funnel_and_score():
     assert "昨日流失与主要流失竞对" not in output
 
 
-def test_item_05_keeps_core_rankings_loss_and_channel_tabs():
-    item_three, item_five = split_items()
+def test_item_05_uses_exact_six_metrics_without_generic_rank_row():
+    _, item_five = split_items()
 
     assert item_five["standard_item_id"] == 5
     assert item_five["participates_in_score"] is False
-    assert [entry["label"] for entry in item_five["competition_metrics"]] == [
-        "订单量",
-        "销售额",
-        "出租率",
-        "转化率",
+    assert [entry["metric_code"] for entry in item_five["competition_metrics"]] == [
+        "booking_order_count",
+        "booking_sales_amount",
+        "occupancy_ratet",
+        "ctrip_app_conversion_ratet",
+        "inhouse_room_night",
+        "ctrip_app_visitor_count",
     ]
+    assert [entry["label"] for entry in item_five["competition_metrics"]] == [
+        "竞争圈平均预订订单量",
+        "竞争圈平均预订销售额",
+        "竞争圈平均出租率",
+        "竞争圈平均携程APP转化率",
+        "竞争圈平均在店间夜",
+        "竞争圈平均携程APP访客",
+    ]
+    assert item_five["competition_metrics"][0]["hotel_value"] == 54
+    assert item_five["competition_metrics"][0]["competitor_avg"] == 1457
+    assert item_five["competition_metrics"][0]["competitor_rank"] == 8
     assert item_five["loss_summary"]["order_count"] == 13
     assert item_five["loss_summary"]["order_amount"] == 4567.89
     assert len(item_five["loss_competitors"]["ctrip"]) == 5
@@ -146,18 +173,41 @@ def test_item_05_keeps_core_rankings_loss_and_channel_tabs():
     assert "data-loss-tab='qunar'" in output
     assert "携程竞对酒店5" in output
     assert "去哪儿竞对酒店5" in output
-    assert "订单量（单）" in output
-    assert "销售额（元）" in output
+    assert "竞争圈平均预订订单量（单）" in output
+    assert "竞争圈平均预订销售额（元）" in output
+    assert "竞争圈平均在店间夜（间夜）" in output
+    assert "竞争圈平均携程APP访客（人）" in output
+    assert ">竞争圈排名（" not in output
+    assert ">竞争圈排名</td>" not in output
+    assert "competition_rank" not in output
+    assert "不应展示" not in output
     assert "CNY" not in output
+    assert "room_night" not in output
     assert "person" not in output
-    assert "9单" not in output
     assert "流量漏斗" not in output
 
 
-def test_unknown_competition_metrics_are_not_rendered():
-    _, item_five = split_items()
-    output = competition_analysis_card({"ctrip_items": {"5": item_five}})
+def test_confirmed_metric_code_aliases_remain_compatible():
+    source = sections()
+    source["ctrip_competition_metrics_30d"] = [
+        {
+            "metric_code": "occupancy_rate",
+            "competitor_avg": 80,
+            "competitor_rank": 3,
+        },
+        {
+            "metric_code": "ctrip_app_conversion_rate",
+            "competitor_avg": 4.2,
+            "competitor_rank": 4,
+        },
+    ]
+    entries = _competition_metric_entries(source)
 
-    assert "访客量" not in output
-    assert "room_night" not in output
-    assert "评分明细" not in output
+    occupancy = next(entry for entry in entries if entry["metric_code"] == "occupancy_ratet")
+    conversion = next(
+        entry
+        for entry in entries
+        if entry["metric_code"] == "ctrip_app_conversion_ratet"
+    )
+    assert occupancy["competitor_avg"] == 80
+    assert conversion["competitor_avg"] == 4.2
