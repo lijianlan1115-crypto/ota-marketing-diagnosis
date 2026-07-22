@@ -28,11 +28,20 @@ STYLE = """
 .ctrip-flow-table .flow-score{width:105px;color:#16845b;font-size:16px;font-weight:900;white-space:nowrap}
 .ctrip-flow-table .flow-score span{color:#77848d;font-size:12px;font-weight:650}
 .ctrip-flow-table .flow-missing{color:#8a969e;font-weight:650}
-.ctrip-flow-note{margin-top:12px;color:#78858e;font-size:12px;line-height:1.65}
-.ctrip-flow-note b{color:#53616b}
+.ctrip-flow-rank-shell{margin-top:14px;padding-top:14px;border-top:1px solid #e4ebe8}
+.ctrip-flow-rank-shell h4{display:flex;align-items:center;gap:8px;margin:0 0 10px;color:#26343d;font-size:15px}
+.ctrip-flow-rank-shell h4 span{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:24px;padding:0 7px;border-radius:999px;background:#e8f5ef;color:#16845b;font-size:12px;font-weight:900}
+.ctrip-flow-rank-table{width:100%;min-width:760px;border-collapse:collapse;table-layout:fixed;background:#fff}
+.ctrip-flow-rank-table th,.ctrip-flow-rank-table td{padding:10px 12px;border-right:1px solid #e2e8e5;border-bottom:1px solid #e2e8e5;text-align:center;color:#34424b;font-size:12px;line-height:1.35}
+.ctrip-flow-rank-table th:last-child,.ctrip-flow-rank-table td:last-child{border-right:0}.ctrip-flow-rank-table tbody tr:last-child td{border-bottom:0}
+.ctrip-flow-rank-table th{background:#f1f8f5;color:#53616b;font-weight:850}
+.ctrip-flow-rank-table .flow-rank-metric{text-align:left;padding-left:20px;font-weight:800}
+.ctrip-flow-rank-table .flow-rank-number,.ctrip-flow-rank-table .flow-rank-count,.ctrip-flow-rank-table .flow-rank-percentile{font-variant-numeric:tabular-nums;white-space:nowrap}
+.ctrip-flow-rank-table .flow-score{width:120px;color:#16845b;font-size:16px;font-weight:900;white-space:nowrap}
+.ctrip-flow-rank-table .flow-score span{color:#77848d;font-size:12px;font-weight:650}
 .ctrip-flow-platform-status{margin-bottom:10px;padding:9px 11px;border-radius:8px;background:#f4faf7;color:#315b4c;font-size:12px}
 @media(max-width:760px){.ctrip-flow-tabs{grid-template-columns:1fr}.ctrip-flow-current{grid-column:auto;text-align:left}.ctrip-flow-tab{width:100%}}
-@media print{.ctrip-flow-tabs{display:none}.ctrip-flow-panel[hidden]{display:block!important}.ctrip-flow-panel+.ctrip-flow-panel{margin-top:18px}.ctrip-flow-table{min-width:0;font-size:9px}.ctrip-flow-table th,.ctrip-flow-table td{padding:5px 4px;font-size:9px}}
+@media print{.ctrip-flow-tabs{display:none}.ctrip-flow-panel[hidden]{display:block!important}.ctrip-flow-panel+.ctrip-flow-panel{margin-top:18px}.ctrip-flow-table,.ctrip-flow-rank-table{min-width:0;font-size:9px}.ctrip-flow-table th,.ctrip-flow-table td,.ctrip-flow-rank-table th,.ctrip-flow-rank-table td{padding:5px 4px;font-size:9px}}
 </style>
 """
 
@@ -108,26 +117,24 @@ def _score(value: Any) -> str:
     return f"{upstream.e(_trim_number(number, 1))} <span>/ 3</span>"
 
 
-def _platform_panel(platform: str, payload: dict[str, Any], *, hidden: bool) -> str:
+def _ratio_rows(subitems: list[dict[str, Any]]) -> str:
     rows: list[str] = []
-    for subitem in payload.get("subitems") or []:
-        if not isinstance(subitem, dict):
+    for subitem in subitems:
+        metrics = [
+            metric
+            for metric in subitem.get("metrics") or []
+            if isinstance(metric, dict) and str(metric.get("value_type") or "count") != "rank"
+        ]
+        if not metrics:
             continue
-        metrics = [metric for metric in subitem.get("metrics") or [] if isinstance(metric, dict)]
-        rowspan = max(len(metrics), 1)
-        for offset, metric in enumerate(metrics or [{}]):
+        rowspan = len(metrics)
+        for offset, metric in enumerate(metrics):
             value_type = str(metric.get("value_type") or "count")
-            if value_type == "rank":
-                hotel_text = _value(metric.get("rank"), "rank")
-                count = _number(metric.get("competition_hotel_count"))
-                peer_text = "待接入" if count is None else f"{count:g} 家"
-                ratio_text = _percentile(metric.get("rank_percentile"))
-            else:
-                hotel_text = _value(metric.get("hotel_value"), value_type)
-                peer_text = _value(metric.get("peer_value"), value_type)
-                ratio_text = _ratio(metric.get("ratio"))
+            hotel_text = _value(metric.get("hotel_value"), value_type)
+            peer_text = _value(metric.get("peer_value"), value_type)
+            ratio_text = _ratio(metric.get("ratio"))
             missing_class = " flow-missing" if "待接入" in {hotel_text, peer_text} else ""
-            cells = []
+            cells: list[str] = []
             if offset == 0:
                 cells.extend(
                     [
@@ -144,13 +151,61 @@ def _platform_panel(platform: str, payload: dict[str, Any], *, hidden: bool) -> 
                 ]
             )
             if offset == 0:
-                cells.append(
-                    f"<td class='flow-score' rowspan='{rowspan}'>{_score(subitem.get('subitem_score'))}</td>"
-                )
+                cells.append(f"<td class='flow-score' rowspan='{rowspan}'>{_score(subitem.get('subitem_score'))}</td>")
             rows.append("<tr>" + "".join(cells) + "</tr>")
+    return "".join(rows)
 
+
+def _rank_table(subitems: list[dict[str, Any]]) -> str:
+    rank_subitem = next(
+        (
+            subitem
+            for subitem in subitems
+            if any(
+                isinstance(metric, dict) and str(metric.get("value_type") or "") == "rank"
+                for metric in subitem.get("metrics") or []
+            )
+        ),
+        {},
+    )
+    metrics = [
+        metric
+        for metric in rank_subitem.get("metrics") or []
+        if isinstance(metric, dict) and str(metric.get("value_type") or "") == "rank"
+    ]
+    rows: list[str] = []
+    rowspan = max(len(metrics), 1)
+    for offset, metric in enumerate(metrics):
+        rank_text = _value(metric.get("rank"), "rank")
+        count = _number(metric.get("competition_hotel_count"))
+        count_text = "待接入" if count is None else f"{count:g} 家"
+        percentile_text = _percentile(metric.get("rank_percentile"))
+        missing_class = " flow-missing" if "待接入" in {rank_text, count_text} else ""
+        cells = [
+            f"<td class='flow-rank-metric'>{upstream.e(metric.get('label') or '排名指标')}</td>",
+            f"<td class='flow-rank-number{missing_class}'>{upstream.e(rank_text)}</td>",
+            f"<td class='flow-rank-count{missing_class}'>{upstream.e(count_text)}</td>",
+            f"<td class='flow-rank-percentile'>{upstream.e(percentile_text)}</td>",
+        ]
+        if offset == 0:
+            cells.append(f"<td class='flow-score' rowspan='{rowspan}'>{_score(rank_subitem.get('subitem_score'))}</td>")
+        rows.append("<tr>" + "".join(cells) + "</tr>")
     if not rows:
-        rows.append("<tr><td colspan='7' class='flow-missing'>该平台数据待接入</td></tr>")
+        rows.append("<tr><td colspan='5' class='flow-missing'>竞争圈排名数据待接入</td></tr>")
+    return (
+        "<div class='ctrip-flow-rank-shell'>"
+        "<h4><span>5</span>竞争圈排名表现</h4>"
+        "<div class='ctrip-flow-table-scroll'><table class='ctrip-flow-rank-table'>"
+        "<thead><tr><th>排名指标</th><th>竞争圈排名</th><th>竞争圈酒店数</th><th>排名分位</th><th>子项得分</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div></div>"
+    )
+
+
+def _platform_panel(platform: str, payload: dict[str, Any], *, hidden: bool) -> str:
+    subitems = [subitem for subitem in payload.get("subitems") or [] if isinstance(subitem, dict)]
+    ratio_rows = _ratio_rows(subitems)
+    if not ratio_rows:
+        ratio_rows = "<tr><td colspan='7' class='flow-missing'>该平台比例类数据待接入</td></tr>"
     platform_name = str(payload.get("platform_name") or ("携程" if platform == "ctrip" else "去哪儿"))
     score = _number(payload.get("item_score"))
     status_text = (
@@ -164,12 +219,10 @@ def _platform_panel(platform: str, payload: dict[str, Any], *, hidden: bool) -> 
         "<div class='ctrip-flow-table-shell'><h4>关键指标评分明细表</h4>"
         "<div class='ctrip-flow-table-scroll'><table class='ctrip-flow-table'>"
         "<thead><tr><th>序号</th><th>评分子项</th><th>子项指标</th><th>我的酒店</th>"
-        "<th>竞争圈平均</th><th>ratio / 排名分位</th><th>子项得分</th></tr></thead>"
-        f"<tbody>{''.join(rows)}</tbody></table></div>"
-        "<div class='ctrip-flow-note'>"
-        "<b>计分说明：</b>比例类先计算 ratio，再按档位换算为指标得分；同一子项内各指标得分相加。"
-        "排名类按 rank_percentile 分档后相加。当前数据终点为“提交订单”。"
-        "</div></div></div>"
+        "<th>竞争圈平均</th><th>ratio对比值</th><th>子项得分</th></tr></thead>"
+        f"<tbody>{ratio_rows}</tbody></table></div>"
+        f"{_rank_table(subitems)}"
+        "</div></div>"
     )
 
 
