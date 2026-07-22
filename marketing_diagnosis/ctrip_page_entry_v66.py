@@ -32,6 +32,17 @@ def _clean_name(name: str) -> str:
     return re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+$", "", name)
 
 
+def _store_suffix(name: str) -> str:
+    """Return the final non-empty Chinese or ASCII parenthesized name suffix."""
+
+    matches = re.findall(r"[（(]([^（）()]*)[）)]", name)
+    for value in reversed(matches):
+        suffix = value.strip()
+        if suffix:
+            return suffix
+    return ""
+
+
 def _first_name_hits(name: str) -> list[str]:
     clean = _clean_name(name)
     suffix_hits = [suffix for suffix in _STORE_SUFFIXES if clean.endswith(suffix)]
@@ -65,15 +76,16 @@ def build_page_entry_item(sections: dict[str, Any]) -> dict[str, Any]:
             "note": "等待携程酒店名称快照接入。",
         }
 
+    store_suffix = _store_suffix(name)
     first_hits = _first_name_hits(name)
     entry_hits = _entry_hits(name)
-    score = float(bool(first_hits)) + float(bool(entry_hits))
+    score = float(bool(store_suffix or first_hits)) + float(bool(entry_hits))
     fields = [
         {"label": "酒店展示名称", "value": name},
         {
-            "label": "门店后缀 / 地标商圈词",
-            "value": "已命中" if first_hits else "未命中",
-            "note": "、".join(first_hits) or "未识别到门店后缀或地标商圈词",
+            "label": "门店后缀",
+            "value": store_suffix or "未识别",
+            "note": "直接取酒店名称括号内的完整内容",
         },
         {
             "label": "命中入口词",
@@ -94,7 +106,7 @@ def build_page_entry_item(sections: dict[str, Any]) -> dict[str, Any]:
         "source": "ctrip_ota_promotion_performance_30d.hotel_name",
         "fields_complete": True,
         "fields": fields,
-        "note": "当前按酒店名称判断门店后缀、地标商圈词和入口词；推荐词、标签、卖点字段待接入。",
+        "note": "酒店展示名称保持原值；门店后缀直接取名称括号内容；入口词按酒店名称识别。",
     }
 
 
