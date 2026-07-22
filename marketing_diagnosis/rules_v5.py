@@ -16,6 +16,46 @@ from marketing_diagnosis.rules_v4 import process as _base_process
 from marketing_diagnosis.visual_diagnosis_v20 import build_visual_diagnosis
 
 
+_COMPETITION_METRIC_SPECS = (
+    {
+        "metric_code": "booking_order_count",
+        "aliases": ("booking_order_count",),
+        "label": "竞争圈平均预订订单量",
+        "unit": "单",
+    },
+    {
+        "metric_code": "booking_sales_amount",
+        "aliases": ("booking_sales_amount",),
+        "label": "竞争圈平均预订销售额",
+        "unit": "元",
+    },
+    {
+        "metric_code": "occupancy_ratet",
+        "aliases": ("occupancy_ratet", "occupancy_rate"),
+        "label": "竞争圈平均出租率",
+        "unit": "%",
+    },
+    {
+        "metric_code": "ctrip_app_conversion_ratet",
+        "aliases": ("ctrip_app_conversion_ratet", "ctrip_app_conversion_rate"),
+        "label": "竞争圈平均携程APP转化率",
+        "unit": "%",
+    },
+    {
+        "metric_code": "inhouse_room_night",
+        "aliases": ("inhouse_room_night", "inhouse_room_nights"),
+        "label": "竞争圈平均在店间夜",
+        "unit": "间夜",
+    },
+    {
+        "metric_code": "ctrip_app_visitor_count",
+        "aliases": ("ctrip_app_visitor_count", "ctrip_app_visitors"),
+        "label": "竞争圈平均携程APP访客",
+        "unit": "人",
+    },
+)
+
+
 def _number(value: Any) -> float | None:
     if value in (None, ""):
         return None
@@ -24,6 +64,131 @@ def _number(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return None if number != number else number
+
+
+def _text(value: Any) -> str:
+    return "" if value in (None, "") else str(value).strip()
+
+
+def _first(row: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        value = row.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _competition_metric_entries(sections: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = [
+        dict(row)
+        for row in sections.get("ctrip_competition_metrics_30d") or []
+        if isinstance(row, dict)
+    ]
+    rows_by_code: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        code = _text(row.get("metric_code")).lower()
+        if code:
+            rows_by_code.setdefault(code, []).append(row)
+
+    entries: list[dict[str, Any]] = []
+    for spec in _COMPETITION_METRIC_SPECS:
+        candidates: list[dict[str, Any]] = []
+        for alias in spec["aliases"]:
+            candidates.extend(rows_by_code.get(str(alias).lower(), []))
+
+        selected: dict[str, Any] | None = None
+        best_completeness = -1
+        for row in candidates:
+            values = (
+                _number(
+                    _first(
+                        row,
+                        "hotel_value",
+                        "metric_value",
+                        "hotel_metric_value",
+                        "current_value",
+                        "my_value",
+                    )
+                ),
+                _number(
+                    _first(
+                        row,
+                        "competitor_avg",
+                        "competitor_average",
+                        "peer_average",
+                        "avg_value",
+                    )
+                ),
+                _number(
+                    _first(
+                        row,
+                        "competitor_rank",
+                        "ranking_position",
+                        "rank_position",
+                        "rank",
+                    )
+                ),
+            )
+            completeness = sum(value is not None for value in values)
+            if selected is None or completeness > best_completeness:
+                selected = row
+                best_completeness = completeness
+
+        selected = selected or {}
+        raw_rank = _first(
+            selected,
+            "competitor_rank",
+            "ranking_position",
+            "rank_position",
+            "rank",
+        )
+        competitor_count = _number(
+            _first(
+                selected,
+                "competitor_count",
+                "circle_hotel_count",
+                "peer_hotel_count",
+            )
+        )
+        if competitor_count is None and "/" in _text(raw_rank):
+            competitor_count = _number(_text(raw_rank).split("/", 1)[1])
+
+        hotel_value = _number(
+            _first(
+                selected,
+                "hotel_value",
+                "metric_value",
+                "hotel_metric_value",
+                "current_value",
+                "my_value",
+            )
+        )
+        competitor_avg = _number(
+            _first(
+                selected,
+                "competitor_avg",
+                "competitor_average",
+                "peer_average",
+                "avg_value",
+            )
+        )
+        competitor_rank = _number(raw_rank)
+        entries.append(
+            {
+                "label": spec["label"],
+                "metric_code": spec["metric_code"],
+                "hotel_value": hotel_value,
+                "competitor_avg": competitor_avg,
+                "competitor_rank": competitor_rank,
+                "competitor_count": competitor_count,
+                "unit": spec["unit"],
+                "connected": any(
+                    value is not None
+                    for value in (hotel_value, competitor_avg, competitor_rank)
+                ),
+            }
+        )
+    return entries
 
 
 def _has_funnel_data(stages: list[dict[str, Any]]) -> bool:
@@ -89,7 +254,7 @@ def _split_competition_payload(
             break
 
     has_competition_data = bool(
-        competition_metrics
+        any(entry.get("connected") for entry in competition_metrics)
         or loss_summary.get("order_count") is not None
         or loss_summary.get("order_amount") is not None
         or list(loss_competitors.get("ctrip") or [])
@@ -102,7 +267,10 @@ def _split_competition_payload(
         "full_score": 0,
         "item_score": 0,
         "data_status": "success" if has_competition_data else "missing",
-        "source": "待确认",
+        "source": (
+            "ctrip_ota_competition_metrics_30d、"
+            "ctrip_ota_business_metrics、ctrip_ota_order_loss_monthly"
+        ),
         "source_path": "携程 eBooking -> 数据中心 -> 竞争圈动态",
         "fields": [
             {
@@ -180,6 +348,10 @@ def process(data: dict[str, Any]) -> dict[str, Any]:
         sections,
         existing_item_three if isinstance(existing_item_three, dict) else None,
     )
+    # Item 05 uses the six confirmed metric codes only. This deliberately
+    # replaces the old fuzzy label matching that produced an extra generic
+    # "竞争圈排名" row and omitted in-house nights / APP visitors.
+    combined["competition_metrics"] = _competition_metric_entries(sections)
     item_three, item_five = _split_competition_payload(
         combined,
         existing_item_three if isinstance(existing_item_three, dict) else None,
