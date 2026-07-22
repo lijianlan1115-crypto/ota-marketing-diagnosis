@@ -26,6 +26,14 @@ COMPETITION_STYLE = """
 .ctrip-overview-score small{color:#68747f;font-size:15px;font-weight:800}
 .ctrip-overview-score strong{display:block;margin-top:14px;font-size:54px;line-height:1;font-variant-numeric:tabular-nums}
 .ctrip-overview-score span{display:block;margin-top:15px;color:#68747f;font-size:17px}
+.ctrip-summary-head{align-items:center}
+.ctrip-summary-head>div{min-width:0}
+.ctrip-summary-toggle{display:inline-flex;min-width:116px;height:40px;align-items:center;justify-content:center;padding:0 16px;border:1px solid #bdd8cc;border-radius:9px;background:#f3faf7;color:#16845b;font-weight:850;cursor:pointer;white-space:nowrap}
+.ctrip-summary-toggle:hover{background:#e8f5ef}
+.ctrip-summary-toggle:focus-visible{outline:3px solid rgba(22,132,91,.2);outline-offset:2px}
+.ctrip-summary-toolbar-row{display:flex;justify-content:flex-end;padding:15px 18px 0}
+.ctrip-summary-content[hidden]{display:none!important}
+.ctrip-summary-section.is-collapsed .section-head{border-bottom:0}
 .ctrip-funnel-panel{padding:15px;border:1px solid #dfe7e4;border-radius:10px;background:#fff}
 .ctrip-funnel-head{display:grid;grid-template-columns:minmax(150px,1fr) 150px minmax(150px,1fr);align-items:center;gap:12px;margin-bottom:10px;text-align:center;font-size:13px;font-weight:850}
 .ctrip-funnel-head .hotel{color:#2563eb}.ctrip-funnel-head .peer{color:#16845b}.ctrip-funnel-head .stage{color:#53616b}
@@ -66,7 +74,7 @@ COMPETITION_STYLE = """
 .ctrip-competition-empty{padding:18px;color:#89959e;text-align:center}
 @media(max-width:1100px){.ctrip-overview-grid{grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr)}.ctrip-overview-copy h2{font-size:28px}.ctrip-overview-score{min-height:205px;padding:28px}.ctrip-overview-score strong{font-size:48px}}
 @media(max-width:980px){.ctrip-overview-grid,.ctrip-competition-bottom{grid-template-columns:1fr}.ctrip-overview-score{min-height:auto}.ctrip-overview-period{width:100%;justify-content:space-between}}
-@media(max-width:760px){.ctrip-overview-copy h2{font-size:24px}.ctrip-overview-copy p{font-size:14px}.ctrip-overview-period{align-items:flex-start;flex-direction:column;gap:4px}.ctrip-funnel-panel{overflow-x:auto}.ctrip-funnel-head,.ctrip-funnel-row{min-width:650px}.ctrip-loss-summary{grid-template-columns:1fr}}
+@media(max-width:760px){.ctrip-overview-copy h2{font-size:24px}.ctrip-overview-copy p{font-size:14px}.ctrip-overview-period{align-items:flex-start;flex-direction:column;gap:4px}.ctrip-summary-head{align-items:stretch;flex-direction:column}.ctrip-summary-toggle{width:100%}.ctrip-summary-toolbar-row{justify-content:stretch}.ctrip-summary-toolbar-row .toolbar{width:100%}.ctrip-summary-toolbar-row .search,.ctrip-summary-toolbar-row .filter{width:100%;min-width:0}.ctrip-funnel-panel{overflow-x:auto}.ctrip-funnel-head,.ctrip-funnel-row{min-width:650px}.ctrip-loss-summary{grid-template-columns:1fr}}
 </style>
 """
 
@@ -86,6 +94,28 @@ LOSS_TAB_SCRIPT = """
         });
       });
     });
+  });
+})();
+</script>
+"""
+
+SUMMARY_TOGGLE_SCRIPT = """
+<script id='CTRIP_SUMMARY_TOGGLE_SCRIPT'>
+(function(){
+  document.querySelectorAll('[data-ctrip-summary]').forEach(function(section){
+    var button = section.querySelector('[data-summary-toggle]');
+    var content = section.querySelector('[data-summary-content]');
+    if(!button || !content) return;
+    function setExpanded(expanded){
+      content.hidden = !expanded;
+      section.classList.toggle('is-collapsed', !expanded);
+      button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      button.textContent = expanded ? '收起总览' : '展开总览';
+    }
+    button.addEventListener('click', function(){
+      setExpanded(button.getAttribute('aria-expanded') !== 'true');
+    });
+    setExpanded(false);
   });
 })();
 </script>
@@ -138,6 +168,28 @@ def overview_html(result: dict[str, Any]) -> str:
         f"<strong>{upstream.e(total_text)}</strong>"
         f"<span>满分{full_score:g}分</span>"
         "</div></div></div></section>"
+    )
+
+
+def summary_html(result: dict[str, Any]) -> str:
+    rows = "".join(upstream.summary_row(result, item_spec) for item_spec in SPECS)
+    return (
+        "<section id='summary' class='ctrip-summary-section is-collapsed' data-ctrip-summary>"
+        "<div class='section-head ctrip-summary-head'><div>"
+        "<h2>携程诊断结果总览</h2>"
+        "<p>携程目录、满分、得分和数据状态独立于美团页面。</p></div>"
+        "<button class='ctrip-summary-toggle' type='button' aria-expanded='false' "
+        "aria-controls='ctripSummaryContent' data-summary-toggle>展开总览</button></div>"
+        "<div class='ctrip-summary-content' id='ctripSummaryContent' data-summary-content hidden>"
+        "<div class='ctrip-summary-toolbar-row'><div class='toolbar'>"
+        "<input class='search' id='ruleSearch' placeholder='搜索诊断项'/>"
+        "<select class='filter' id='statusFilter'><option value='all'>全部状态</option>"
+        "<option value='success'>已形成结果</option><option value='missing'>数据待接入</option>"
+        "<option value='pending_rule'>规则待确认</option></select></div></div>"
+        "<div class='section-body'><div class='table-scroll'><table class='summary-table'>"
+        "<thead><tr><th>编号</th><th>携程诊断项目</th><th>满分</th><th>当前得分</th>"
+        "<th>当前状态</th><th>数据来源/诊断内容</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table></div></div></div></section>"
     )
 
 
@@ -335,8 +387,9 @@ def build_html(result: dict[str, Any]) -> str:
         "<option>携程 eBooking 数据</option></select>"
         "<button class='btn primary' onclick='window.print()'>导出报告</button>"
         "</div></div></header>"
-        f"<div class='page'>{upstream.nav_html()}<main>{overview_html(result)}{upstream.summary_html(result)}"
-        f"{cards_html(result)}</main></div>{upstream.search_script()}{reporting_v37._script()}{LOSS_TAB_SCRIPT}</body></html>"
+        f"<div class='page'>{upstream.nav_html()}<main>{overview_html(result)}{summary_html(result)}"
+        f"{cards_html(result)}</main></div>{upstream.search_script()}{reporting_v37._script()}"
+        f"{LOSS_TAB_SCRIPT}{SUMMARY_TOGGLE_SCRIPT}</body></html>"
     )
     return build_head() + body
 
@@ -351,4 +404,5 @@ __all__ = [
     "competition_card",
     "funnel_card",
     "overview_html",
+    "summary_html",
 ]
