@@ -73,14 +73,22 @@ def test_item_03_uses_exact_wide_fields_and_scores_each_metric_then_sums():
     assert item["item_score"] == 3.1
 
 
-def test_flow_table_removes_ratio_score_column_and_keeps_subitem_score():
+def test_flow_table_splits_ranking_into_a_separate_header():
     item = build_flow_item({"ctrip_business_metrics_funnel": [flow_row()]})
     output = card({"ctrip_items": {"3": item}})
 
     assert "关键指标评分明细表" in output
-    assert "ratio / 排名分位" in output
-    assert "子项得分" in output
+    assert "ratio对比值" in output
+    assert "竞争圈排名表现" in output
+    assert "<th>排名指标</th>" in output
+    assert "<th>竞争圈排名</th>" in output
+    assert "<th>竞争圈酒店数</th>" in output
+    assert "<th>排名分位</th>" in output
+    assert "<th>子项得分</th>" in output
     assert "ratio得分" not in output
+    assert "ratio / 排名分位" not in output
+    assert "计分说明" not in output
+    assert "比例类先计算" not in output
     assert "订单页到提交转化" in output
     assert "成交订单" not in output
     assert "data-flow-tab='ctrip'" in output
