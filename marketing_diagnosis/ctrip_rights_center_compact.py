@@ -22,26 +22,28 @@ RIGHTS_STYLE = """
 .ctrip-rights-summary-main-v66 strong{color:#16845b;font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
 .ctrip-rights-summary-v66>span{color:#74827c;font-size:12px}
 .ctrip-rights-table-wrap-v66{overflow-x:auto;border:1px solid #dfe7e4;border-radius:11px;background:#fff}
-.ctrip-rights-table-v66{width:100%;min-width:700px;border-collapse:collapse;table-layout:fixed}
-.ctrip-rights-table-v66 th,.ctrip-rights-table-v66 td{padding:13px 16px;border-bottom:1px solid #e8efec;text-align:left;vertical-align:middle}
+.ctrip-rights-table-v66{width:100%;min-width:820px;border-collapse:collapse;table-layout:fixed}
+.ctrip-rights-table-v66 th,.ctrip-rights-table-v66 td{padding:13px 15px;border-bottom:1px solid #e8efec;text-align:left;vertical-align:middle}
 .ctrip-rights-table-v66 th{background:#f4f9f6;color:#5f6e67;font-size:12px;font-weight:800}
 .ctrip-rights-table-v66 tbody tr:last-child td{border-bottom:0}
 .ctrip-rights-table-v66 tbody tr.inactive{background:#fafafa}
 .ctrip-rights-table-v66 tbody tr.pending{background:#fffdf8}
-.ctrip-rights-table-v66 .col-name{width:24%}
-.ctrip-rights-table-v66 .col-rule{width:56%}
-.ctrip-rights-table-v66 .col-status{width:20%;text-align:center}
+.ctrip-rights-table-v66 .col-name{width:20%}
+.ctrip-rights-table-v66 .col-rule{width:38%}
+.ctrip-rights-table-v66 .col-room{width:26%}
+.ctrip-rights-table-v66 .col-status{width:16%;text-align:center}
 .ctrip-rights-name-v66{display:flex;align-items:center;gap:9px;color:#293b33;font-size:13px;font-weight:850}
 .ctrip-rights-dot-v66{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:#2fa66a}
 tr.inactive .ctrip-rights-dot-v66{background:#9aa5a0}
 tr.pending .ctrip-rights-dot-v66{background:#e0a23b}
-.ctrip-rights-rule-v66{color:#53645c;font-size:12px;line-height:1.55;overflow-wrap:anywhere}
-tr.inactive .ctrip-rights-rule-v66{color:#87928d}
+.ctrip-rights-rule-v66,.ctrip-rights-room-v66{color:#53645c;font-size:12px;line-height:1.55;overflow-wrap:anywhere}
+.ctrip-rights-room-v66{color:#425b50;font-weight:700}
+tr.inactive .ctrip-rights-rule-v66,tr.inactive .ctrip-rights-room-v66{color:#87928d}
 .ctrip-rights-status-v66{display:inline-flex;align-items:center;justify-content:center;min-width:58px;padding:5px 10px;border-radius:999px;background:#e1f4ea;color:#16845b;font-size:11px;font-style:normal;font-weight:850;white-space:nowrap}
 .ctrip-rights-status-v66.inactive{background:#ecefee;color:#6f7974}
 .ctrip-rights-status-v66.pending{background:#fff1d8;color:#9b6517}
 .ctrip-rights-empty-v66{padding:20px!important;text-align:center!important;color:#8a9791!important;font-size:12px!important}
-@media(max-width:700px){.ctrip-rights-summary-v66{align-items:flex-start;flex-direction:column;gap:8px}.ctrip-rights-table-v66{min-width:620px}}
+@media(max-width:820px){.ctrip-rights-summary-v66{align-items:flex-start;flex-direction:column;gap:8px}.ctrip-rights-table-v66{min-width:760px}}
 </style>
 """
 
@@ -86,6 +88,7 @@ def _rights_data(
                 {
                     "name": name,
                     "rules": str(value.get("rights_rules") or value.get("rules") or "规则待补充").strip(),
+                    "room_types": str(value.get("applicable_room_types") or value.get("room_types") or "参与房型待补充").strip(),
                     "status": status,
                     "kind": str(value.get("status_kind") or _status_kind(status)).strip(),
                 }
@@ -103,6 +106,7 @@ def _rights_data(
             {
                 "name": str(value).strip(),
                 "rules": "规则待补充",
+                "room_types": "参与房型待补充",
                 "status": "状态待确认",
                 "kind": "pending",
             }
@@ -134,6 +138,7 @@ def _rights_content(item_spec: tuple[Any, ...], payload: dict[str, Any]) -> str:
             "<span class='ctrip-rights-dot-v66'></span>"
             f"<strong>{report.e(detail['name'])}</strong></div></td>"
             f"<td class='ctrip-rights-rule-v66'>{report.e(detail['rules'])}</td>"
+            f"<td class='ctrip-rights-room-v66'>{report.e(detail['room_types'])}</td>"
             "<td class='col-status'>"
             f"<em class='ctrip-rights-status-v66 {kind}'>{report.e(detail['status'])}</em>"
             "</td></tr>"
@@ -142,7 +147,7 @@ def _rights_content(item_spec: tuple[Any, ...], payload: dict[str, Any]) -> str:
     if not table_rows:
         empty_text = "待接入权益清单" if payload.get("data_status") == "missing" else "暂无已报名权益"
         table_rows.append(
-            f"<tr><td colspan='3' class='ctrip-rights-empty-v66'>{report.e(empty_text)}</td></tr>"
+            f"<tr><td colspan='4' class='ctrip-rights-empty-v66'>{report.e(empty_text)}</td></tr>"
         )
 
     return (
@@ -157,6 +162,7 @@ def _rights_content(item_spec: tuple[Any, ...], payload: dict[str, Any]) -> str:
         "<thead><tr>"
         "<th class='col-name'>权益名称</th>"
         "<th class='col-rule'>权益规则</th>"
+        "<th class='col-room'>参与房型</th>"
         "<th class='col-status'>当前状态</th>"
         "</tr></thead>"
         f"<tbody>{''.join(table_rows)}</tbody></table></div></div>"
