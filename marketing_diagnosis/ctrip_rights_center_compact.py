@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -16,34 +17,36 @@ _RESULT_AREA_RE = re.compile(
 RIGHTS_STYLE = """
 <style id='CTRIP_RIGHTS_CENTER_COMPACT'>
 .ctrip-rights-overview-v66{display:grid;gap:12px}
-.ctrip-rights-summary-v66{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 17px;border:1px solid #d6e8df;border-radius:11px;background:linear-gradient(135deg,#edf8f3,#fbfdfc)}
+.ctrip-rights-summary-v66{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 18px;border:1px solid #d6e8df;border-radius:11px;background:linear-gradient(135deg,#edf8f3,#fbfdfc)}
 .ctrip-rights-summary-main-v66{display:flex;align-items:baseline;gap:12px}
 .ctrip-rights-summary-main-v66 small{color:#587067;font-size:12px;font-weight:800}
 .ctrip-rights-summary-main-v66 strong{color:#16845b;font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
 .ctrip-rights-summary-v66>span{color:#74827c;font-size:12px}
 .ctrip-rights-table-wrap-v66{overflow-x:auto;border:1px solid #dfe7e4;border-radius:11px;background:#fff}
-.ctrip-rights-table-v66{width:100%;min-width:820px;border-collapse:collapse;table-layout:fixed}
-.ctrip-rights-table-v66 th,.ctrip-rights-table-v66 td{padding:13px 15px;border-bottom:1px solid #e8efec;text-align:left;vertical-align:middle}
-.ctrip-rights-table-v66 th{background:#f4f9f6;color:#5f6e67;font-size:12px;font-weight:800}
+.ctrip-rights-table-v66{width:100%;min-width:860px;border-collapse:collapse;table-layout:fixed}
+.ctrip-rights-table-v66 th,.ctrip-rights-table-v66 td{padding:12px 18px;border-bottom:1px solid #e8efec;text-align:left;vertical-align:middle}
+.ctrip-rights-table-v66 th{background:#f4f9f6;color:#5f6e67;font-size:12px;font-weight:800;line-height:1.3}
+.ctrip-rights-table-v66 td{min-height:54px}
 .ctrip-rights-table-v66 tbody tr:last-child td{border-bottom:0}
 .ctrip-rights-table-v66 tbody tr.inactive{background:#fafafa}
 .ctrip-rights-table-v66 tbody tr.pending{background:#fffdf8}
 .ctrip-rights-table-v66 .col-name{width:20%}
-.ctrip-rights-table-v66 .col-rule{width:38%}
-.ctrip-rights-table-v66 .col-room{width:26%}
+.ctrip-rights-table-v66 .col-rule{width:30%}
+.ctrip-rights-table-v66 .col-room{width:34%}
 .ctrip-rights-table-v66 .col-status{width:16%;text-align:center}
-.ctrip-rights-name-v66{display:flex;align-items:center;gap:9px;color:#293b33;font-size:13px;font-weight:850}
+.ctrip-rights-name-v66{display:flex;align-items:center;gap:9px;color:#293b33;font-size:13px;font-weight:850;line-height:1.45}
 .ctrip-rights-dot-v66{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:#2fa66a}
 tr.inactive .ctrip-rights-dot-v66{background:#9aa5a0}
 tr.pending .ctrip-rights-dot-v66{background:#e0a23b}
 .ctrip-rights-rule-v66,.ctrip-rights-room-v66{color:#53645c;font-size:12px;line-height:1.55;overflow-wrap:anywhere}
 .ctrip-rights-room-v66{color:#425b50;font-weight:700}
+.ctrip-rights-room-text-v66{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 tr.inactive .ctrip-rights-rule-v66,tr.inactive .ctrip-rights-room-v66{color:#87928d}
 .ctrip-rights-status-v66{display:inline-flex;align-items:center;justify-content:center;min-width:58px;padding:5px 10px;border-radius:999px;background:#e1f4ea;color:#16845b;font-size:11px;font-style:normal;font-weight:850;white-space:nowrap}
 .ctrip-rights-status-v66.inactive{background:#ecefee;color:#6f7974}
 .ctrip-rights-status-v66.pending{background:#fff1d8;color:#9b6517}
 .ctrip-rights-empty-v66{padding:20px!important;text-align:center!important;color:#8a9791!important;font-size:12px!important}
-@media(max-width:820px){.ctrip-rights-summary-v66{align-items:flex-start;flex-direction:column;gap:8px}.ctrip-rights-table-v66{min-width:760px}}
+@media(max-width:860px){.ctrip-rights-summary-v66{align-items:flex-start;flex-direction:column;gap:8px}.ctrip-rights-table-v66{min-width:780px}}
 </style>
 """
 
@@ -68,6 +71,35 @@ def _status_kind(value: Any) -> str:
     if any(word in text for word in ("已生效", "已报名", "生效中", "active", "enabled", "joined", "open")):
         return "active"
     return "pending"
+
+
+def _room_type_parts(value: Any) -> list[str]:
+    text = str(value or "").strip()
+    if not text:
+        return []
+    try:
+        parsed = json.loads(text)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        parsed = None
+    if isinstance(parsed, list):
+        candidates = [str(item).strip() for item in parsed]
+    else:
+        candidates = [part.strip() for part in re.split(r"[；;|\n]+", text)]
+    result: list[str] = []
+    for candidate in candidates:
+        if candidate and candidate not in result:
+            result.append(candidate)
+    return result
+
+
+def _room_types_display(value: Any) -> tuple[str, str]:
+    full_text = str(value or "").strip() or "参与房型待补充"
+    parts = _room_type_parts(full_text)
+    if len(parts) > 2:
+        return f"{'、'.join(parts[:2])} 等 {len(parts)} 个房型", full_text
+    if parts:
+        return "、".join(parts), full_text
+    return full_text, full_text
 
 
 def _rights_data(
@@ -132,13 +164,16 @@ def _rights_content(item_spec: tuple[Any, ...], payload: dict[str, Any]) -> str:
     table_rows: list[str] = []
     for detail in details:
         kind = detail["kind"] if detail["kind"] in {"active", "inactive", "pending"} else "pending"
+        room_display, room_full = _room_types_display(detail["room_types"])
         table_rows.append(
             f"<tr class='{kind}'>"
             "<td><div class='ctrip-rights-name-v66'>"
             "<span class='ctrip-rights-dot-v66'></span>"
             f"<strong>{report.e(detail['name'])}</strong></div></td>"
             f"<td class='ctrip-rights-rule-v66'>{report.e(detail['rules'])}</td>"
-            f"<td class='ctrip-rights-room-v66'>{report.e(detail['room_types'])}</td>"
+            "<td class='ctrip-rights-room-v66'>"
+            f"<span class='ctrip-rights-room-text-v66' title='{report.e(room_full)}'>{report.e(room_display)}</span>"
+            "</td>"
             "<td class='col-status'>"
             f"<em class='ctrip-rights-status-v66 {kind}'>{report.e(detail['status'])}</em>"
             "</td></tr>"
