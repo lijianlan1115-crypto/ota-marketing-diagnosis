@@ -168,7 +168,7 @@ def _platform_panel(platform: str, payload: dict[str, Any], *, hidden: bool) -> 
         f"<tbody>{''.join(rows)}</tbody></table></div>"
         "<div class='ctrip-flow-note'>"
         "<b>计分说明：</b>比例类先计算 ratio，再按档位换算为指标得分；同一子项内各指标得分相加。"
-        "排名类按 rank_percentile 分档后相加。当前数据终点为“提交订单”，不将其标记为支付或成交订单。"
+        "排名类按 rank_percentile 分档后相加。当前数据终点为“提交订单”。"
         "</div></div></div>"
     )
 
