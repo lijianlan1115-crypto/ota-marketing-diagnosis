@@ -3,8 +3,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from marketing_diagnosis import ctrip_report as stable_ctrip_report
 from marketing_diagnosis import dual_channel_report_v56 as upstream
-from marketing_diagnosis.ctrip_report import build_html as build_ctrip_page
+from marketing_diagnosis.ctrip_flow_report import SCRIPT as FLOW_SCRIPT
+from marketing_diagnosis.ctrip_flow_report import STYLE as FLOW_STYLE
+from marketing_diagnosis.ctrip_flow_report import card as flow_card
+
+
+build_ctrip_page = stable_ctrip_report.build_html
 
 
 SIDEBAR_STYLE = """
@@ -152,15 +158,17 @@ def _strip_hidden_source_details(document: str) -> str:
 def build_html(result: dict[str, Any]) -> str:
     """Build the existing dual report and add stable shared interactions in place."""
 
-    # dual_channel_report_v56 resolves this global at call time. Replacing it keeps
-    # the original dual-channel implementation while using the stable Ctrip page.
+    # ctrip_report.cards_html resolves funnel_card at runtime. Replacing this
+    # global keeps the stable Ctrip report while rendering item 03 with the exact
+    # ctrip_ota_flow_conversion_30d score table.
+    stable_ctrip_report.funnel_card = flow_card
     upstream.build_ctrip_page = build_ctrip_page
     output = upstream.build_html(result)
     output = _strip_hidden_source_details(output)
-    output = output.replace("</head>", SIDEBAR_STYLE + "</head>", 1)
+    output = output.replace("</head>", SIDEBAR_STYLE + FLOW_STYLE + "</head>", 1)
     output = output.replace(
         "</body>",
-        SIDEBAR_SCRIPT + PROFILE_INTERACTION_FIX_SCRIPT + "</body>",
+        SIDEBAR_SCRIPT + PROFILE_INTERACTION_FIX_SCRIPT + FLOW_SCRIPT + "</body>",
         1,
     )
     return output
