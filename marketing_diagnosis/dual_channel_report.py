@@ -45,6 +45,25 @@ CTRIP_CLEANUP_STYLE = """
 .page[data-channel-view='ctrip'] .psi-source-v53{
   display:none!important;
 }
+.page[data-channel-view='ctrip'] .ctrip-loss-platform h5{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.page[data-channel-view='ctrip'] .ctrip-loss-period-tag{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:2px 7px;
+  border:1px solid #b9dfcf;
+  border-radius:999px;
+  background:#eaf7f1;
+  color:#16845b;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.2;
+  white-space:nowrap;
+}
 </style>
 """
 
@@ -241,6 +260,16 @@ def _strip_hidden_source_details(document: str) -> str:
     document = _PSI_SOURCE_RE.sub("", document)
     document = _CTRIP_SOURCE_RE.sub("", document)
     document = _CTRIP_COMPETITION_SOURCE_RE.sub("", document)
+
+    # Mark the monthly time scope directly beside each competitor Top5 title.
+    document = document.replace(
+        "<h5>携程 Top5</h5>",
+        "<h5><span>携程 Top5</span><small class='ctrip-loss-period-tag'>上月</small></h5>",
+    )
+    document = document.replace(
+        "<h5>去哪儿 Top5</h5>",
+        "<h5><span>去哪儿 Top5</span><small class='ctrip-loss-period-tag'>上月</small></h5>",
+    )
 
     # The collapsed diagnosis summary is cleaned in the browser by removing the
     # whole source column. These replacements prevent the two previously known
