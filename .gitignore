@@ -16,3 +16,6 @@ reports/
 s14-reports/
 public/
 *.local.html
+
+# Local preview reports and their JSON/Markdown inputs.
+preview/

@@ -16,10 +16,11 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from marketing_diagnosis.customer_excel_result import enrich_customer_excel_result
-from marketing_diagnosis.data_v2 import normalize_dataset
-from marketing_diagnosis.db_loader_v9 import load_mysql_dsn_dataset
+from marketing_diagnosis.data_v4 import normalize_dataset
+from marketing_diagnosis.db_loader_v16 import load_mysql_dsn_dataset
 from marketing_diagnosis.excel_loader import load_excel_dataset
 from marketing_diagnosis.reporting_v2 import write_reports
+from marketing_diagnosis.runtime_env import load_local_s14_env
 from marketing_diagnosis.room_name_manual_v43 import (
     normalize_room_type_names,
     parse_room_type_names_from_text,
@@ -273,6 +274,7 @@ class S14OperationDiagnosis:
                 dsn,
                 limit=int(self.config.get("limit") or prepared.get("limit") or 5000),
                 hotel_id=prepared.get("hotel_id"),
+                ctrip_hotel_id=prepared.get("ctrip_hotel_id"),
                 platform=prepared.get("platform"),
                 period_start=prepared.get("period_start"),
                 period_end=prepared.get("period_end"),
@@ -322,6 +324,7 @@ class S14OperationDiagnosis:
         return _json_safe(skill_result)
 
     def _resolve_dsn(self) -> str | None:
+        load_local_s14_env()
         env_name = self.config.get("db_dsn_env") or "S14_DB_DSN"
         return self.config.get("db_dsn") or os.environ.get(env_name) or os.environ.get("S14_DB_DSN")
 
@@ -341,6 +344,7 @@ class S14OperationDiagnosis:
             "data_source_mode": inputs.get("data_source_mode") or "source_selection",
             "input_excel_path": inputs.get("input_excel_path"),
             "hotel_id": inputs.get("hotel_id") or "puyue",
+            "ctrip_hotel_id": inputs.get("ctrip_hotel_id") or self.config.get("ctrip_hotel_id") or os.environ.get("S14_CTRIP_HOTEL_ID"),
             "hotel_name": inputs.get("hotel_name"),
             "platform": "multi",
             "period_start": inputs.get("period_start") or str(start),
