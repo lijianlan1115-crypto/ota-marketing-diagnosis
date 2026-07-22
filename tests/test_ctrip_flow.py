@@ -79,12 +79,13 @@ def test_flow_table_splits_ranking_into_a_separate_header():
 
     assert "关键指标评分明细表" in output
     assert "ratio对比值" in output
-    assert "竞争圈排名表现" in output
-    assert "<th>排名指标</th>" in output
-    assert "<th>竞争圈排名</th>" in output
-    assert "<th>竞争圈酒店数</th>" in output
-    assert "<th>排名分位</th>" in output
-    assert "<th>子项得分</th>" in output
+    assert (
+        "<thead><tr><th>序号</th><th>评分子项</th><th>子项指标</th>"
+        "<th>竞争圈排名</th><th>竞争圈酒店数</th><th>排名分位</th>"
+        "<th>子项得分</th></tr></thead>"
+    ) in output
+    assert "class='flow-rank-index' rowspan='3'>5</td>" in output
+    assert "class='flow-rank-subitem' rowspan='3'>竞争圈排名表现</td>" in output
     assert "ratio得分" not in output
     assert "ratio / 排名分位" not in output
     assert "计分说明" not in output
