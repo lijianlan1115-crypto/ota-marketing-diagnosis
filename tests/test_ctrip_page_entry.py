@@ -20,7 +20,8 @@ def test_page_entry_uses_hotel_name_and_keeps_missing_page_fields_pending():
     assert item["fields"][0]["value"] == hotel_name
     assert item["fields"][1]["label"] == "门店后缀"
     assert item["fields"][1]["value"] == "紫林庵站妇幼保健院店"
-    assert "站" in item["fields"][2]["value"]
+    assert item["fields"][2]["label"] == "热门商圈词命中"
+    assert item["fields"][2]["value"] == "紫林庵站、妇幼保健院"
     assert item["fields"][3]["value"] == "待接入"
 
 
