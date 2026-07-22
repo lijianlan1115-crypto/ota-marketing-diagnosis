@@ -11,25 +11,40 @@ COLORS = ("#2fa66a", "#3f8fe8", "#f2a521", "#9368d8", "#ef6a4c", "#2aa8b8")
 
 STYLE = """
 <style id='CTRIP_USER_PROFILE_STABLE'>
+.ctrip-profile-tabs{display:flex;gap:8px;margin-bottom:12px;padding:4px;border-radius:10px;background:#f1f6f4}
+.ctrip-profile-tab{flex:1;min-height:42px;padding:8px 16px;border:1px solid transparent;border-radius:8px;background:transparent;color:#68757e;font-size:13px;font-weight:850;cursor:pointer}
+.ctrip-profile-tab:hover{background:#f8fbfa;color:#16845b}
+.ctrip-profile-tab.active{border-color:#91cdb4;background:#fff;color:#16845b;box-shadow:0 2px 8px rgba(31,91,69,.08)}
+.ctrip-profile-tab:focus-visible,.ctrip-profile-toggle:focus-visible{outline:3px solid rgba(22,132,91,.18);outline-offset:2px}
+.ctrip-profile-panel[hidden],.ctrip-profile-detail-row[hidden]{display:none!important}
 .ctrip-profile-table-scroll{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;padding-bottom:2px}
-.ctrip-profile-table{width:100%;min-width:760px;border:1px solid #dfe7e4;border-radius:10px;border-collapse:separate;border-spacing:0;overflow:hidden;background:#fff}
-.ctrip-profile-table th,.ctrip-profile-table td{position:static;padding:10px 12px;border:0;border-bottom:1px solid #e8eeeb;vertical-align:middle;background:#fff}
+.ctrip-profile-table{width:100%;min-width:820px;border:1px solid #dfe7e4;border-radius:10px;border-collapse:separate;border-spacing:0;overflow:hidden;background:#fff}
+.ctrip-profile-table th,.ctrip-profile-table td{position:static;padding:15px 14px;border:0;border-bottom:1px solid #e8eeeb;vertical-align:middle;background:#fff}
 .ctrip-profile-table th{background:#f5f9f7;color:#52616b;font-size:12px;font-weight:800;text-align:left}
-.ctrip-profile-table th:nth-child(1){width:165px}.ctrip-profile-table th:nth-child(2){width:230px}.ctrip-profile-table th:nth-child(3){width:90px;text-align:right}.ctrip-profile-table th:nth-child(4){width:auto}
+.ctrip-profile-table th:nth-child(1){width:170px}.ctrip-profile-table th:nth-child(2){width:260px}.ctrip-profile-table th:nth-child(3){width:100px;text-align:right}.ctrip-profile-table th:nth-child(4){width:auto}.ctrip-profile-table th:nth-child(5){width:118px;text-align:right}
 .ctrip-profile-table tbody tr:last-child td{border-bottom:0}
-.ctrip-profile-table tbody tr:hover td:not(.ctrip-profile-dimension){background:#f8fbfa}
-.ctrip-profile-table tr.ctrip-profile-group-start td{border-top:5px solid #f3f6f5}
-.ctrip-profile-table tr.ctrip-profile-group-start:first-child td{border-top:0}
-.ctrip-profile-dimension{background:#fbfdfc!important;color:#27343d;font-size:13px;font-weight:850;vertical-align:top!important}
-.ctrip-profile-dimension-inner{display:flex;min-height:38px;flex-direction:column;justify-content:center;gap:3px}
+.ctrip-profile-summary-row:hover td:not(.ctrip-profile-dimension){background:#f8fbfa}
+.ctrip-profile-dimension{background:#fbfdfc!important;color:#27343d;font-size:13px;font-weight:850}
+.ctrip-profile-dimension-inner{display:flex;min-height:48px;flex-direction:column;justify-content:center;gap:5px}
 .ctrip-profile-average{color:#16845b;font-size:11px;font-weight:750;line-height:1.35}
-.ctrip-profile-item{color:#3a4650;font-size:12px;font-weight:650;overflow-wrap:anywhere}
-.ctrip-profile-item-line{display:flex;align-items:center;gap:8px}
+.ctrip-profile-main{color:#34424b;font-size:13px;font-weight:800}
+.ctrip-profile-main-line{display:flex;align-items:center;gap:8px}
+.ctrip-profile-secondary{display:block;margin-top:7px;color:#7a8790;font-size:11px;line-height:1.45}
 .ctrip-profile-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:var(--profile-color)}
-.ctrip-profile-value{text-align:right;color:#34434d;font-size:12px;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ctrip-profile-value{text-align:right;color:#34434d;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 .ctrip-profile-bar-track{width:100%;min-width:150px;height:10px;overflow:hidden;border-radius:999px;background:#edf2f0}
 .ctrip-profile-bar-fill{display:block;height:100%;min-width:3px;border-radius:inherit;background:var(--profile-color)}
-.ctrip-profile-table-empty{padding:18px!important;color:#87939b!important;text-align:center}
+.ctrip-profile-action{text-align:right}
+.ctrip-profile-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:88px;padding:7px 11px;border:1px solid #cfe2da;border-radius:7px;background:#f5faf8;color:#16845b;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap}
+.ctrip-profile-toggle:hover{border-color:#91cdb4;background:#eaf6f0}
+.ctrip-profile-table-empty{padding:22px!important;color:#87939b!important;text-align:center}
+.ctrip-profile-detail-row td{padding-top:10px;padding-bottom:10px;background:#fafcfb;color:#4c5962}
+.ctrip-profile-detail-row:hover td{background:#f5faf7}
+.ctrip-profile-detail-label{color:#8a969e;font-size:10px;font-weight:750}
+.ctrip-profile-detail-item{font-size:12px;font-weight:650}
+.ctrip-profile-detail-item-line{display:flex;align-items:center;gap:8px}
+.ctrip-profile-detail-value{text-align:right;font-size:12px;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ctrip-profile-detail-row .ctrip-profile-bar-track{height:8px}
 .ctrip-profile-bottom{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:12px;margin-top:12px}
 .ctrip-profile-city,.ctrip-profile-peak{min-width:0;padding:14px;border:1px solid #dfe7e4;border-radius:10px;background:#fff}
 .ctrip-profile-city h4,.ctrip-profile-peak h4{margin:0 0 12px;color:#27343d;font-size:14px}
@@ -51,7 +66,9 @@ STYLE = """
 .ctrip-profile-source{margin-top:12px;padding:10px 12px;border:1px solid #d9e6e1;border-radius:9px;background:#f4faf7;color:#315b4c;font-size:12px;overflow-wrap:anywhere}
 .ctrip-profile-source b{margin-right:6px}
 @media(max-width:760px){
-  .ctrip-profile-table{min-width:680px}
+  .ctrip-profile-tabs{overflow-x:auto;justify-content:flex-start}
+  .ctrip-profile-tab{min-width:120px;flex:0 0 auto}
+  .ctrip-profile-table{min-width:760px}
   .ctrip-profile-bottom{grid-template-columns:1fr}
   .ctrip-profile-peak-layout{grid-template-columns:1fr}
   .ctrip-profile-peak-summary{min-height:92px}
@@ -59,7 +76,49 @@ STYLE = """
 @media(max-width:480px){
   .ctrip-profile-city-row{grid-template-columns:22px minmax(50px,72px) minmax(72px,1fr) 54px}
 }
+@media print{
+  .ctrip-profile-tabs,.ctrip-profile-toggle{display:none!important}
+  .ctrip-profile-panel[hidden]{display:block!important}
+  .ctrip-profile-panel{margin-top:10px}
+  .ctrip-profile-detail-row{display:none!important}
+}
 </style>
+"""
+
+SCRIPT = """
+<script id='CTRIP_USER_PROFILE_INTERACTION'>
+(function(){
+  document.querySelectorAll('[data-ctrip-profile]').forEach(function(root){
+    var tabs = Array.prototype.slice.call(root.querySelectorAll('[data-profile-tab]'));
+    var panels = Array.prototype.slice.call(root.querySelectorAll('[data-profile-panel]'));
+    function activate(name){
+      tabs.forEach(function(tab){
+        var active = tab.getAttribute('data-profile-tab') === name;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      panels.forEach(function(panel){
+        panel.hidden = panel.getAttribute('data-profile-panel') !== name;
+      });
+    }
+    tabs.forEach(function(tab){
+      tab.addEventListener('click', function(){ activate(tab.getAttribute('data-profile-tab')); });
+    });
+    root.querySelectorAll('[data-profile-toggle]').forEach(function(button){
+      button.addEventListener('click', function(){
+        var code = button.getAttribute('data-profile-toggle');
+        var expanded = button.getAttribute('aria-expanded') === 'true';
+        root.querySelectorAll('[data-profile-detail="' + code + '"]').forEach(function(row){
+          row.hidden = expanded;
+        });
+        button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        button.textContent = expanded ? '展开详情' : '收起详情';
+      });
+    });
+    activate('basic');
+  });
+})();
+</script>
 """
 
 
@@ -86,75 +145,144 @@ def _average_html(value: str | None) -> str:
     return f"<span class='ctrip-profile-average'>{e(value)}</span>" if value else ""
 
 
+def _dimension_entries(charts: dict[str, Any], code: str) -> list[dict[str, Any]]:
+    chart = charts.get(code) if isinstance(charts.get(code), dict) else {}
+    entries = [
+        dict(entry)
+        for entry in list(chart.get("entries") or [])
+        if isinstance(entry, dict) and (number(entry.get("rate_pct")) or 0) > 0
+    ]
+    entries.sort(key=lambda entry: -(number(entry.get("rate_pct")) or 0))
+    return entries
+
+
+def _dimension_rows(
+    charts: dict[str, Any],
+    dimensions: tuple[tuple[str, str, str | None], ...],
+) -> str:
+    rows: list[str] = []
+    for code, label, average in dimensions:
+        entries = _dimension_entries(charts, code)
+        if not entries:
+            rows.append(
+                "<tr class='ctrip-profile-summary-row'>"
+                f"<td class='ctrip-profile-dimension'><div class='ctrip-profile-dimension-inner'><span>{e(label)}</span>{_average_html(average)}</div></td>"
+                "<td class='ctrip-profile-table-empty' colspan='4'>待接入</td></tr>"
+            )
+            continue
+
+        main = entries[0]
+        secondary = entries[1] if len(entries) > 1 else None
+        main_value = number(main.get("rate_pct")) or 0
+        width = min(100.0, max(0.0, main_value))
+        secondary_html = (
+            f"<span class='ctrip-profile-secondary'>次要：{e(secondary.get('label'))} {e(pct(secondary.get('rate_pct')))}</span>"
+            if secondary
+            else ""
+        )
+        toggle = (
+            f"<button class='ctrip-profile-toggle' type='button' aria-expanded='false' data-profile-toggle='{e(code)}'>展开详情</button>"
+            if len(entries) > 1
+            else ""
+        )
+        rows.append(
+            "<tr class='ctrip-profile-summary-row'>"
+            f"<td class='ctrip-profile-dimension'><div class='ctrip-profile-dimension-inner'><span>{e(label)}</span>{_average_html(average)}</div></td>"
+            "<td class='ctrip-profile-main'><div class='ctrip-profile-main-line' style='--profile-color:#2fa66a'>"
+            f"<i class='ctrip-profile-dot'></i><span>{e(main.get('label'))}</span></div>{secondary_html}</td>"
+            f"<td class='ctrip-profile-value'>{e(pct(main_value))}</td>"
+            f"<td><div class='ctrip-profile-bar-track'><i class='ctrip-profile-bar-fill' style='--profile-color:#2fa66a;width:{width:.2f}%'></i></div></td>"
+            f"<td class='ctrip-profile-action'>{toggle}</td></tr>"
+        )
+
+        for index, entry in enumerate(entries):
+            value = number(entry.get("rate_pct")) or 0
+            detail_width = min(100.0, max(0.0, value))
+            color = COLORS[index % len(COLORS)]
+            detail_label = "完整明细" if index == 0 else ""
+            rows.append(
+                f"<tr class='ctrip-profile-detail-row' data-profile-detail='{e(code)}' hidden>"
+                f"<td class='ctrip-profile-detail-label'>{detail_label}</td>"
+                f"<td class='ctrip-profile-detail-item'><div class='ctrip-profile-detail-item-line' style='--profile-color:{color}'>"
+                f"<i class='ctrip-profile-dot'></i><span>{e(entry.get('label'))}</span></div></td>"
+                f"<td class='ctrip-profile-detail-value'>{e(pct(value))}</td>"
+                f"<td><div class='ctrip-profile-bar-track'><i class='ctrip-profile-bar-fill' style='--profile-color:{color};width:{detail_width:.2f}%'></i></div></td>"
+                "<td></td></tr>"
+            )
+    return "".join(rows)
+
+
+def _profile_panel(
+    key: str,
+    charts: dict[str, Any],
+    dimensions: tuple[tuple[str, str, str | None], ...],
+    *,
+    hidden: bool,
+) -> str:
+    hidden_attr = " hidden" if hidden else ""
+    return (
+        f"<div class='ctrip-profile-panel' data-profile-panel='{e(key)}'{hidden_attr}>"
+        "<div class='ctrip-profile-table-scroll'><table class='ctrip-profile-table'><thead><tr>"
+        "<th>画像维度</th><th>主要细分项</th><th>占比</th><th>占比展示</th><th>操作</th>"
+        "</tr></thead><tbody>"
+        f"{_dimension_rows(charts, dimensions)}"
+        "</tbody></table></div></div>"
+    )
+
+
 def profile_table(
     charts: dict[str, Any],
     average_advance: float | None,
     average_stay: float | None,
 ) -> str:
-    dimensions = (
-        ("gender", "性别", None),
-        ("age_group", "年龄段", None),
-        ("city_origin", "本地 / 异地", None),
-        ("travel_type", "出行目的", None),
-        ("travel_time", "工作日 / 周末偏好", None),
-        ("consumption_price", "消费价格带", None),
+    categories = (
         (
-            "booking_advance_days",
-            "提前预订天数",
-            f"平均提前 {average_advance:g} 天" if average_advance is not None else None,
+            "basic",
+            "基础画像",
+            (
+                ("gender", "性别", None),
+                ("age_group", "年龄段", None),
+                ("city_origin", "本地 / 异地", None),
+            ),
         ),
         (
-            "stay_days",
-            "入住晚数",
-            f"平均入住 {average_stay:g} 晚" if average_stay is not None else None,
+            "preference",
+            "消费偏好",
+            (
+                ("travel_type", "出行目的", None),
+                ("travel_time", "工作日 / 周末偏好", None),
+                ("consumption_price", "消费价格带", None),
+            ),
+        ),
+        (
+            "booking",
+            "预订行为",
+            (
+                (
+                    "booking_advance_days",
+                    "提前预订天数",
+                    f"平均提前 {average_advance:g} 天" if average_advance is not None else None,
+                ),
+                (
+                    "stay_days",
+                    "入住晚数",
+                    f"平均入住 {average_stay:g} 晚" if average_stay is not None else None,
+                ),
+            ),
         ),
     )
-
-    rows: list[str] = []
-    for code, label, average in dimensions:
-        chart = charts.get(code) if isinstance(charts.get(code), dict) else {}
-        entries = [
-            entry
-            for entry in list(chart.get("entries") or [])
-            if (number(entry.get("rate_pct")) or 0) > 0
-        ]
-
-        if not entries:
-            rows.append(
-                "<tr class='ctrip-profile-group-start'>"
-                f"<td class='ctrip-profile-dimension'><div class='ctrip-profile-dimension-inner'><span>{e(label)}</span>{_average_html(average)}</div></td>"
-                "<td class='ctrip-profile-table-empty' colspan='3'>待接入</td></tr>"
-            )
-            continue
-
-        rowspan = len(entries)
-        for index, entry in enumerate(entries):
-            value = number(entry.get("rate_pct")) or 0
-            width = min(100.0, max(0.0, value))
-            color = COLORS[index % len(COLORS)]
-            group_class = " class='ctrip-profile-group-start'" if index == 0 else ""
-            dimension_cell = ""
-            if index == 0:
-                dimension_cell = (
-                    f"<td class='ctrip-profile-dimension' rowspan='{rowspan}'>"
-                    f"<div class='ctrip-profile-dimension-inner'><span>{e(label)}</span>{_average_html(average)}</div></td>"
-                )
-            rows.append(
-                f"<tr{group_class}>{dimension_cell}"
-                f"<td class='ctrip-profile-item'><div class='ctrip-profile-item-line' style='--profile-color:{color}'>"
-                f"<i class='ctrip-profile-dot'></i><span>{e(entry.get('label'))}</span></div></td>"
-                f"<td class='ctrip-profile-value'>{e(pct(value))}</td>"
-                f"<td><div class='ctrip-profile-bar-track'><i class='ctrip-profile-bar-fill' style='--profile-color:{color};width:{width:.2f}%'></i></div></td>"
-                "</tr>"
-            )
-
+    tabs = "".join(
+        f"<button class='ctrip-profile-tab{' active' if index == 0 else ''}' type='button' role='tab' "
+        f"aria-selected='{'true' if index == 0 else 'false'}' data-profile-tab='{e(key)}'>{e(label)}</button>"
+        for index, (key, label, _) in enumerate(categories)
+    )
+    panels = "".join(
+        _profile_panel(key, charts, dimensions, hidden=index != 0)
+        for index, (key, _, dimensions) in enumerate(categories)
+    )
     return (
-        "<div class='ctrip-profile-table-scroll'>"
-        "<table class='ctrip-profile-table'><thead><tr>"
-        "<th>画像维度</th><th>细分项</th><th>占比</th><th>占比展示</th>"
-        "</tr></thead><tbody>"
-        + "".join(rows)
-        + "</tbody></table></div>"
+        "<div class='ctrip-profile-explorer' data-ctrip-profile>"
+        f"<div class='ctrip-profile-tabs' role='tablist'>{tabs}</div>{panels}</div>"
     )
 
 
@@ -299,8 +427,8 @@ def card(result: dict[str, Any]) -> str:
         f"<div class='ctrip-profile-bottom'>{city_card(list(payload.get('city_top5') or []))}"
         f"{peak_card(payload.get('peak_time') if isinstance(payload.get('peak_time'), dict) else None, list(payload.get('hourly_distribution') or []))}</div>"
         f"<div class='ctrip-profile-source'><b>携程数据来源：</b>{e(source_path)}（{e(source_text)}）</div>"
-        "</div></article>"
+        f"</div>{SCRIPT}</article>"
     )
 
 
-__all__ = ["STYLE", "card", "profile_table"]
+__all__ = ["STYLE", "SCRIPT", "card", "profile_table"]
