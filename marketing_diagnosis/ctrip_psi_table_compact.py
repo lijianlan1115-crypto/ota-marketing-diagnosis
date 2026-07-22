@@ -8,13 +8,16 @@ from marketing_diagnosis import ctrip_report_v54 as report
 
 _ORIGINAL_CARD = report.psi_card
 _OLD_HEADER = (
-    "<th>指标类型</th><th>诊断指标</th><th>单位</th><th>实际值</th>"
-    "<th>权重</th><th>PSI得分</th><th>竞争表现/排名</th>"
-    "<th>与目标差距</th><th>统计周期</th>"
-)
-_NEW_HEADER = (
     "<th>指标类型</th><th>诊断指标</th><th>实际值</th>"
     "<th>权重</th><th>PSI得分</th>"
+)
+_NEW_HEADER = (
+    "<th class='psi-col-type-v53'>指标类型</th>"
+    "<th class='psi-col-index-v53'>诊断指标</th>"
+    "<th class='psi-col-unit-v53'>单位</th>"
+    "<th class='psi-col-value-v53'>实际值</th>"
+    "<th class='psi-col-weight-v53'>权重</th>"
+    "<th class='psi-col-score-v53'>PSI得分</th>"
 )
 
 
@@ -51,9 +54,10 @@ def rows(data: dict[str, Any]) -> str:
         output.append(
             f"<tr>{group_cell}"
             f"<td class='psi-index-v53'>{psi.e(value.get('metric_name') or label)}</td>"
-            f"<td>{psi.e(actual_value)}</td>"
-            f"<td>{psi.e(weight_text)}</td>"
-            f"<td><strong>{psi.e(score_text)}</strong></td></tr>"
+            f"<td class='psi-unit-v53'>{psi.e(unit)}</td>"
+            f"<td class='psi-value-v53'>{psi.e(actual_value)}</td>"
+            f"<td class='psi-weight-v53'>{psi.e(weight_text)}</td>"
+            f"<td class='psi-score-v53'><strong>{psi.e(score_text)}</strong></td></tr>"
         )
 
     return "".join(output)
@@ -68,7 +72,23 @@ psi.card = card
 report.psi_card = card
 report.PSI_STYLE += """
 <style id='CTRIP_PSI_COMPACT_TABLE'>
-.psi-table-v53{min-width:560px}
+.psi-table-v53{min-width:680px;table-layout:fixed}
+.psi-table-v53 th,.psi-table-v53 td{padding:12px 14px}
+.psi-table-v53 .psi-col-type-v53{width:16%}
+.psi-table-v53 .psi-col-index-v53{width:27%}
+.psi-table-v53 .psi-col-unit-v53{width:11%}
+.psi-table-v53 .psi-col-value-v53{width:18%}
+.psi-table-v53 .psi-col-weight-v53{width:13%}
+.psi-table-v53 .psi-col-score-v53{width:15%}
+.psi-table-v53 .psi-col-unit-v53,
+.psi-table-v53 .psi-col-value-v53,
+.psi-table-v53 .psi-col-weight-v53,
+.psi-table-v53 .psi-col-score-v53,
+.psi-table-v53 .psi-unit-v53,
+.psi-table-v53 .psi-value-v53,
+.psi-table-v53 .psi-weight-v53,
+.psi-table-v53 .psi-score-v53{text-align:center}
+.psi-table-v53 .psi-unit-v53{color:#718078}
 </style>
 """
 
