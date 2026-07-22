@@ -7,6 +7,7 @@ from marketing_diagnosis import ctrip_flow as upstream
 
 
 _COUNT_FIELD = "competition_circle_hotel_count"
+_PLATFORM_FIELDS = ("platform_scope", "platform", "source_platform")
 
 
 def _number(value: Any) -> float | None:
@@ -55,10 +56,41 @@ def _ratio(hotel_value: Any, peer_value: Any) -> float | None:
     return hotel / peer
 
 
+def _explicit_platform(row: dict[str, Any]) -> str | None:
+    raw = upstream._first(row, *_PLATFORM_FIELDS)
+    if raw in (None, ""):
+        return None
+    platform = upstream._platform(raw)
+    return platform if platform in {"ctrip", "qunar"} else None
+
+
+def _count_candidates(sections: dict[str, Any]) -> tuple[dict[str, float], float | None]:
+    """Find the confirmed hotel total even when it is stored outside funnel rows."""
+
+    by_platform: dict[str, float] = {}
+    shared: float | None = None
+    for section in (sections or {}).values():
+        if not isinstance(section, list):
+            continue
+        for source in section:
+            if not isinstance(source, dict):
+                continue
+            count = _number(source.get(_COUNT_FIELD))
+            if count is None or count <= 0:
+                continue
+            platform = _explicit_platform(source)
+            if platform:
+                by_platform[platform] = count
+            else:
+                shared = count
+    return by_platform, shared
+
+
 def _strict_rank_count_sections(sections: dict[str, Any]) -> dict[str, Any]:
     """Make rank scoring use only competition_circle_hotel_count."""
 
     normalized = dict(sections or {})
+    platform_counts, shared_count = _count_candidates(sections)
     rows: list[dict[str, Any]] = []
     for source in sections.get("ctrip_business_metrics_funnel") or []:
         if not isinstance(source, dict):
@@ -68,6 +100,15 @@ def _strict_rank_count_sections(sections: dict[str, Any]) -> dict[str, Any]:
         for alias in upstream._COUNT_ALIASES:
             if alias != _COUNT_FIELD:
                 row.pop(alias, None)
+
+        count = _number(row.get(_COUNT_FIELD))
+        if count is None or count <= 0:
+            platform = _explicit_platform(row) or "ctrip"
+            candidate = platform_counts.get(platform)
+            if candidate is None:
+                candidate = shared_count
+            if candidate is not None:
+                row[_COUNT_FIELD] = candidate
 
         # Do not obtain the denominator from legacy "rank/count" strings.
         for _, rank_key in upstream._RANK_METRICS:
@@ -105,7 +146,10 @@ def _rescore_ratio_subitem(subitem: dict[str, Any]) -> None:
     subitem["score_status"] = "success" if complete else "missing"
 
 
-def _rescore_rank_subitem(subitem: dict[str, Any]) -> None:
+def _rescore_rank_subitem(
+    subitem: dict[str, Any],
+    competition_circle_hotel_count: float | None,
+) -> None:
     metrics = [metric for metric in subitem.get("metrics") or [] if isinstance(metric, dict)]
     complete = bool(metrics)
     score = 0.0
@@ -113,14 +157,20 @@ def _rescore_rank_subitem(subitem: dict[str, Any]) -> None:
 
     for metric in metrics:
         rank = _number(metric.get("rank"))
-        count = _number(metric.get("competition_hotel_count"))
+        count = _number(metric.get(_COUNT_FIELD))
+        if count is None:
+            count = _number(metric.get("competition_hotel_count"))
+        if count is None:
+            count = competition_circle_hotel_count
+
         percentile = None
         if rank is not None and count is not None and count > 0:
             percentile = max(0.0, min(1.0, 1 - (rank - 1) / count))
         level = _rank_level(percentile)
         metric_full = _number(metric.get("metric_full_score")) or fallback_full
         metric_score = None if level is None else metric_full * level
-        metric["competition_circle_hotel_count"] = count
+        metric["competition_hotel_count"] = count
+        metric[_COUNT_FIELD] = count
         metric["rank_percentile"] = percentile
         metric["score_level"] = level
         metric["metric_full_score"] = metric_full
@@ -136,11 +186,16 @@ def _rescore_rank_subitem(subitem: dict[str, Any]) -> None:
 
 def _rescore_platform(payload: dict[str, Any]) -> None:
     subitems = [item for item in payload.get("subitems") or [] if isinstance(item, dict)]
+    record = payload.get("record") if isinstance(payload.get("record"), dict) else {}
+    platform_count = _number(record.get(_COUNT_FIELD))
+    if platform_count is None:
+        platform_count = _number(payload.get(_COUNT_FIELD))
+
     for subitem in subitems:
         metrics = [metric for metric in subitem.get("metrics") or [] if isinstance(metric, dict)]
         is_rank = any(str(metric.get("value_type") or "") == "rank" for metric in metrics)
         if is_rank:
-            _rescore_rank_subitem(subitem)
+            _rescore_rank_subitem(subitem, platform_count)
         else:
             _rescore_ratio_subitem(subitem)
 
