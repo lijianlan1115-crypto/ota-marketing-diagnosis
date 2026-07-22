@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from marketing_diagnosis.ctrip_flow import build_flow_item
+from marketing_diagnosis.ctrip_flow_rank_rules import build_flow_item
 from marketing_diagnosis.ctrip_rights_data import build_rights_item
 from marketing_diagnosis.rules_v5 import _refresh_ctrip_summary
 from marketing_diagnosis.rules_v5 import process as upstream_process
