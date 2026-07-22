@@ -8,6 +8,7 @@ def profile_rows():
         {"dimension_code": "gender", "bucket_label": "男", "rate_pct": 62.03},
         {"dimension_code": "gender", "bucket_label": "女", "rate_pct": 37.97},
         {"dimension_code": "age_group", "bucket_label": "25-34", "rate_pct": 42.68},
+        {"dimension_code": "age_group", "bucket_label": "25岁以下", "rate_pct": 35.67},
         {"dimension_code": "age_group", "bucket_label": ">=55", "rate_pct": 2.55},
         {"dimension_code": "city_origin", "bucket_label": "异地", "rate_pct": 84.93},
         {"dimension_code": "city_origin", "bucket_label": "本地", "rate_pct": 15.07},
@@ -20,8 +21,10 @@ def profile_rows():
         {"dimension_code": "consumption_price", "bucket_label": "501-1000", "rate_pct": 2.51},
         {"dimension_code": "consumption_price", "bucket_label": "1001-2000", "rate_pct": 0},
         {"dimension_code": "booking_advance_days", "bucket_label": "当天预订", "rate_pct": 70.84},
+        {"dimension_code": "booking_advance_days", "bucket_label": "提前1天", "rate_pct": 9.98},
         {"dimension_code": "booking_advance_days", "bucket_label": "avg_advance_booking_days", "metric_value": 1.6, "metric_unit": "days"},
         {"dimension_code": "stay_days", "bucket_label": "1天", "rate_pct": 84.87},
+        {"dimension_code": "stay_days", "bucket_label": "2天", "rate_pct": 8.25},
         {"dimension_code": "stay_days", "bucket_label": "6天以上", "rate_pct": 0.14},
         {"dimension_code": "stay_days", "bucket_label": "平均入住晚数", "metric_value": 1.2, "metric_unit": "nights"},
         {"dimension_code": "city_origin_top5", "bucket_label": "贵阳", "rate_pct": 15.07, "rank_position": 1},
@@ -47,7 +50,7 @@ def test_zero_percent_is_omitted_and_tiny_values_are_preserved():
     assert len(item["hourly_distribution"]) == 3
 
 
-def test_profile_table_uses_multiple_rows_for_each_dimension():
+def test_profile_table_uses_tabs_summaries_and_expandable_details():
     item = build_user_profile_item(profile_rows())
     output = profile_table(
         item["charts"],
@@ -55,22 +58,27 @@ def test_profile_table_uses_multiple_rows_for_each_dimension():
         item["average_stay_nights"],
     )
 
-    assert "ctrip-profile-table" in output
-    assert "画像维度" in output
-    assert "细分项" in output
-    assert "占比展示" in output
-    assert "rowspan='2'" in output
-    assert "rowspan='3'" in output
-    assert "男" in output and "女" in output
+    assert "data-ctrip-profile" in output
+    assert "data-profile-tab='basic'" in output
+    assert "data-profile-tab='preference'" in output
+    assert "data-profile-tab='booking'" in output
+    assert "基础画像" in output
+    assert "消费偏好" in output
+    assert "预订行为" in output
+    assert "主要细分项" in output
+    assert "次要：女 37.97%" in output
+    assert "次要：25岁以下 35.67%" in output
+    assert "展开详情" in output
+    assert "data-profile-detail='age_group' hidden" in output
     assert "501–1000元" in output
     assert "1001–2000元" not in output
     assert "0.14%" in output
     assert "平均提前 1.6 天" in output
     assert "平均入住 1.2 晚" in output
-    assert "ctrip-profile-bar-fill" in output
+    assert "rowspan=" not in output
 
 
-def test_report_uses_table_and_keeps_city_and_peak_modules():
+def test_report_keeps_city_peak_and_profile_interaction():
     item = build_user_profile_item(profile_rows())
     output = build_html(
         {
@@ -82,10 +90,12 @@ def test_report_uses_table_and_keeps_city_and_peak_modules():
     )
 
     assert "CTRIP_USER_PROFILE_STABLE" in output
-    assert "ctrip-profile-table-scroll" in output
+    assert "CTRIP_USER_PROFILE_INTERACTION" in output
+    assert "activate('basic')" in output
+    assert "button.textContent = expanded ? '展开详情' : '收起详情'" in output
+    assert ".ctrip-profile-panel[hidden]{display:block!important}" in output
+    assert ".ctrip-profile-detail-row{display:none!important}" in output
     assert "overflow-x:auto" in output
-    assert "501–1000元" in output
-    assert "1001–2000元" not in output
     assert "主要客源城市（Top5）" in output
     assert "主要预订时段" in output
     assert "17:00" in output
