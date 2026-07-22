@@ -28,7 +28,7 @@ STYLE = """
 .psi-summary-card-v53{padding:15px;border:1px solid #e1e9e6;border-radius:10px;background:#fbfcfc}.psi-summary-card-v53 small{display:block;color:#76847d;font-size:11px;font-weight:700}.psi-summary-card-v53 strong{display:block;margin-top:8px;color:#263a32;font-size:22px}.psi-summary-card-v53 span{display:block;margin-top:5px;color:#91a099;font-size:11px}
 .psi-grid-v53{display:grid;grid-template-columns:minmax(300px,.78fr) minmax(620px,1.55fr);gap:14px;padding:0 18px 16px}
 .psi-radar-box-v53{display:flex;align-items:center;justify-content:center;min-height:395px;border:1px solid #e4ebe7;border-radius:10px;background:#fbfdfc}.psi-radar-v53{width:min(100%,390px);height:auto}.psi-radar-grid-v53{fill:none;stroke:#d9e2de}.psi-radar-axis-v53{stroke:#cfdad5}.psi-radar-shape-v53{fill:rgba(31,157,108,.12);stroke:#1f9d6c;stroke-width:2.3}.psi-radar-dot-v53{fill:#fff;stroke:#1f9d6c;stroke-width:2}.psi-radar-label-v53{font-size:12px;fill:#354840;font-family:inherit}
-.psi-table-box-v53{overflow:auto;border:1px solid #dfe7e4;border-radius:10px}.psi-table-v53{width:100%;border-collapse:collapse;min-width:980px}.psi-table-v53 th,.psi-table-v53 td{padding:10px 9px;border-bottom:1px solid #e7eeeb;text-align:left;vertical-align:middle}.psi-table-v53 th{background:#f6faf8;color:#53645c;font-size:12px;font-weight:850;white-space:nowrap}.psi-table-v53 td{font-size:12px;color:#30433b}.psi-type-v53{width:68px;font-weight:900}.psi-index-v53{font-weight:800}.psi-muted-v53{color:#93a099}.psi-period-v53{white-space:nowrap}
+.psi-table-box-v53{overflow:auto;border:1px solid #dfe7e4;border-radius:10px}.psi-table-v53{width:100%;border-collapse:collapse;min-width:560px}.psi-table-v53 th,.psi-table-v53 td{padding:10px 9px;border-bottom:1px solid #e7eeeb;text-align:left;vertical-align:middle}.psi-table-v53 th{background:#f6faf8;color:#53645c;font-size:12px;font-weight:850;white-space:nowrap}.psi-table-v53 td{font-size:12px;color:#30433b}.psi-type-v53{width:68px;font-weight:900}.psi-index-v53{font-weight:800}.psi-muted-v53{color:#93a099}.psi-period-v53{white-space:nowrap}
 .psi-deduction-v53{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 18px 14px}.psi-deduction-v53 div{padding:12px 14px;border:1px solid #eadfdd;border-radius:9px;background:#fffafa}.psi-deduction-v53 small{display:block;color:#8b7772;font-size:11px}.psi-deduction-v53 strong{display:block;margin-top:6px;color:#b74d43;font-size:18px}
 .psi-history-v53{margin:0 18px 14px;padding:12px 14px;border:1px solid #e2eae6;border-radius:9px;background:#fafcfb}.psi-history-v53 b{display:block;margin-bottom:8px;color:#34483f}.psi-history-list-v53{display:flex;gap:8px;overflow-x:auto}.psi-history-item-v53{flex:0 0 auto;padding:8px 11px;border-radius:8px;background:#edf6f1;color:#31594a;font-size:11px}.psi-history-item-v53 strong{display:block;margin-top:3px;font-size:15px}
 .psi-source-v53{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 18px 18px}.psi-source-v53 div{padding:12px 14px;border:1px solid #dfe7e4;border-radius:9px;background:#f8fbfa}.psi-source-v53 b{display:block}.psi-source-v53 span{display:block;margin-top:5px;color:#66756e;font-size:12px;line-height:1.55}.psi-pending-v53{color:#8e9b95}
@@ -174,17 +174,10 @@ def rows(data: dict[str, Any]) -> str:
         weight = num(value.get("weight_pct"))
         weight_text = "待接入" if weight is None else f"{weight:g}%"
         score_text = _plain(value.get("psi_score"))
-        competition = str(value.get("competition_rank") or "待接入")
-        gap = num(value.get("score_gap"))
-        gap_text = "待接入" if gap is None else f"{gap:g}{value.get('score_gap_unit') or ''}"
-        start = str(value.get("period_start_date") or "")
-        end = str(value.get("period_end_date") or "")
-        period = f"{start} 至 {end}" if start and end else start or end or "待接入"
         output.append(
             f"<tr>{group_cell}<td class='psi-index-v53'>{e(value.get('metric_name') or label)}</td>"
-            f"<td>{e(unit)}</td><td>{e(_metric_value(value.get('metric_value'), unit))}</td>"
-            f"<td>{e(weight_text)}</td><td><strong>{e(score_text)}</strong></td>"
-            f"<td>{e(competition)}</td><td>{e(gap_text)}</td><td class='psi-period-v53'>{e(period)}</td></tr>"
+            f"<td>{e(_metric_value(value.get('metric_value'), unit))}</td>"
+            f"<td>{e(weight_text)}</td><td><strong>{e(score_text)}</strong></td></tr>"
         )
     return "".join(output)
 
@@ -227,7 +220,7 @@ def card(result: dict[str, Any], anchor: str) -> str:
         "</div></div>"
         f"<div class='psi-grid-v53'><div class='psi-radar-box-v53'>{radar(data)}</div>"
         "<div class='psi-table-box-v53'><table class='psi-table-v53'><thead><tr>"
-        "<th>指标类型</th><th>诊断指标</th><th>单位</th><th>实际值</th><th>权重</th><th>PSI得分</th><th>竞争表现/排名</th><th>与目标差距</th><th>统计周期</th>"
+        "<th>指标类型</th><th>诊断指标</th><th>实际值</th><th>权重</th><th>PSI得分</th>"
         f"</tr></thead><tbody>{rows(data)}</tbody></table></div></div>"
         "<div class='psi-deduction-v53'>"
         f"<div><small>服务扣分</small><strong>{e(_plain(data.get('service_deduction_score')))}</strong></div>"
