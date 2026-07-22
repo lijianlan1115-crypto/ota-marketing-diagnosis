@@ -14,6 +14,17 @@ SPECS = upstream.SPECS
 
 COMPETITION_STYLE = """
 <style id='CTRIP_COMPETITION_STABLE'>
+.ctrip-overview-grid{grid-template-columns:minmax(0,1.65fr) minmax(300px,.75fr);align-items:stretch;gap:30px}
+.ctrip-overview-copy{display:flex;min-width:0;flex-direction:column;justify-content:center;padding:12px 0}
+.ctrip-overview-copy h2{font-size:32px;line-height:1.25}
+.ctrip-overview-copy p{max-width:780px;margin-top:12px;font-size:16px;line-height:1.65}
+.ctrip-overview-period{display:inline-flex;width:max-content;max-width:100%;align-items:center;gap:14px;margin-top:26px;padding:14px 18px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.12)}
+.ctrip-overview-period small{color:rgba(255,255,255,.72);font-size:13px;font-weight:700}
+.ctrip-overview-period strong{color:#fff;font-size:18px;line-height:1.35;overflow-wrap:anywhere}
+.ctrip-overview-score{display:flex;min-height:230px;flex-direction:column;justify-content:center;padding:32px 38px;border-radius:20px;background:#fff;color:#1f2933;box-shadow:0 14px 34px rgba(14,48,39,.12)}
+.ctrip-overview-score small{color:#68747f;font-size:15px;font-weight:800}
+.ctrip-overview-score strong{display:block;margin-top:14px;font-size:54px;line-height:1;font-variant-numeric:tabular-nums}
+.ctrip-overview-score span{display:block;margin-top:15px;color:#68747f;font-size:17px}
 .ctrip-funnel-panel{padding:15px;border:1px solid #dfe7e4;border-radius:10px;background:#fff}
 .ctrip-funnel-head{display:grid;grid-template-columns:minmax(150px,1fr) 150px minmax(150px,1fr);align-items:center;gap:12px;margin-bottom:10px;text-align:center;font-size:13px;font-weight:850}
 .ctrip-funnel-head .hotel{color:#2563eb}.ctrip-funnel-head .peer{color:#16845b}.ctrip-funnel-head .stage{color:#53616b}
@@ -52,8 +63,9 @@ COMPETITION_STYLE = """
 .ctrip-loss-name{color:#3c4953;line-height:1.4;overflow-wrap:anywhere}
 .ctrip-competition-source{margin-top:12px;padding:10px 12px;border:1px solid #eadfc9;border-radius:9px;background:#fff9ef;color:#876429;font-size:12px;overflow-wrap:anywhere}
 .ctrip-competition-empty{padding:18px;color:#89959e;text-align:center}
-@media(max-width:980px){.ctrip-competition-bottom{grid-template-columns:1fr}}
-@media(max-width:760px){.ctrip-funnel-panel{overflow-x:auto}.ctrip-funnel-head,.ctrip-funnel-row{min-width:650px}.ctrip-loss-summary{grid-template-columns:1fr}}
+@media(max-width:1100px){.ctrip-overview-grid{grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr)}.ctrip-overview-copy h2{font-size:28px}.ctrip-overview-score{min-height:205px;padding:28px}.ctrip-overview-score strong{font-size:48px}}
+@media(max-width:980px){.ctrip-overview-grid,.ctrip-competition-bottom{grid-template-columns:1fr}.ctrip-overview-score{min-height:auto}.ctrip-overview-period{width:100%;justify-content:space-between}}
+@media(max-width:760px){.ctrip-overview-copy h2{font-size:24px}.ctrip-overview-copy p{font-size:14px}.ctrip-overview-period{align-items:flex-start;flex-direction:column;gap:4px}.ctrip-funnel-panel{overflow-x:auto}.ctrip-funnel-head,.ctrip-funnel-row{min-width:650px}.ctrip-loss-summary{grid-template-columns:1fr}}
 </style>
 """
 
@@ -102,6 +114,30 @@ def _metric_value(value: Any, unit: str = "") -> str:
     if unit == "元":
         return f"{number:,.2f}"
     return f"{number:,.0f}" if number.is_integer() else f"{number:,.2f}"
+
+
+def overview_html(result: dict[str, Any]) -> str:
+    payload = upstream.summary_payload(result)
+    total = _number(payload.get("total_score") or payload.get("score"))
+    total_text = "0.0" if total is None else f"{total:.1f}"
+    full_score = sum(float(item[2]) for item in SPECS if item[2] is not None)
+    start = result.get("period_start") or "未标注"
+    end = result.get("period_end") or "未标注"
+    return (
+        "<section id='overview'><div class='hero'>"
+        "<div class='hero-grid ctrip-overview-grid'>"
+        "<div class='ctrip-overview-copy'>"
+        "<h2>携程渠道经营与服务质量诊断</h2>"
+        "<p>覆盖经营趋势、流量、客群、推广、口碑及平台配置等22项诊断内容。</p>"
+        "<div class='ctrip-overview-period'><small>诊断周期</small>"
+        f"<strong>{upstream.e(start)} 至 {upstream.e(end)}</strong></div>"
+        "</div>"
+        "<div class='ctrip-overview-score'>"
+        "<small>携程综合得分</small>"
+        f"<strong>{upstream.e(total_text)}</strong>"
+        f"<span>满分{full_score:g}分</span>"
+        "</div></div></div></section>"
+    )
 
 
 def _funnel_content(payload: dict[str, Any]) -> str:
@@ -284,7 +320,7 @@ def build_head() -> str:
 
 
 def build_html(result: dict[str, Any]) -> str:
-    """Generate the Ctrip report with stable item-03, item-04 and item-05 renderers."""
+    """Generate the Ctrip report with stable custom renderers."""
 
     hotel = result.get("hotel_name") or result.get("hotel_id") or "酒店"
     start = result.get("period_start") or "未标注"
@@ -298,7 +334,7 @@ def build_html(result: dict[str, Any]) -> str:
         "<option>携程 eBooking 数据</option></select>"
         "<button class='btn primary' onclick='window.print()'>导出报告</button>"
         "</div></div></header>"
-        f"<div class='page'>{upstream.nav_html()}<main>{upstream.overview_html(result)}{upstream.summary_html(result)}"
+        f"<div class='page'>{upstream.nav_html()}<main>{overview_html(result)}{upstream.summary_html(result)}"
         f"{cards_html(result)}</main></div>{upstream.search_script()}{reporting_v37._script()}{LOSS_TAB_SCRIPT}</body></html>"
     )
     return build_head() + body
@@ -313,4 +349,5 @@ __all__ = [
     "competition_analysis_card",
     "competition_card",
     "funnel_card",
+    "overview_html",
 ]
