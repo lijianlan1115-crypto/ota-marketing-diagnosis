@@ -4,18 +4,43 @@ import re
 from typing import Any
 
 
-_STORE_SUFFIXES = (
-    "旗舰店", "分店", "直营店", "中心店", "店", "馆", "公寓", "民宿", "客栈", "驿站",
+_LANDMARK_ENDINGS = tuple(
+    sorted(
+        (
+            "妇幼保健院",
+            "购物中心",
+            "商业广场",
+            "火车站",
+            "高铁站",
+            "地铁站",
+            "客运站",
+            "公交站",
+            "医学院",
+            "风景区",
+            "步行街",
+            "保健院",
+            "医院",
+            "机场",
+            "车站",
+            "公园",
+            "景区",
+            "古镇",
+            "大学",
+            "学院",
+            "学校",
+            "中学",
+            "小学",
+            "商圈",
+            "广场",
+            "万达",
+            "吾悦",
+            "站",
+        ),
+        key=len,
+        reverse=True,
+    )
 )
-_LANDMARK_KEYWORDS = (
-    "商圈", "步行街", "广场", "大道", "地铁", "车站", "火车站", "高铁", "机场",
-    "公园", "景区", "医院", "妇幼", "学校", "大学", "学院", "万达", "吾悦",
-)
-_ENTRY_KEYWORDS = (
-    "地铁", "站", "机场", "高铁", "火车站", "客运站", "公交", "医院", "妇幼", "医学院", "诊所",
-    "景区", "公园", "风景区", "古镇", "大学", "学院", "学校", "中学", "小学", "商圈", "步行街",
-    "万达", "吾悦",
-)
+_LANDMARK_PATTERN = re.compile("|".join(re.escape(value) for value in _LANDMARK_ENDINGS))
 
 
 def _text(value: Any) -> str:
@@ -26,10 +51,6 @@ def _latest(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     if not rows:
         return None
     return max(rows, key=lambda row: str(row.get("snapshot_time") or row.get("period_end_date") or ""))
-
-
-def _clean_name(name: str) -> str:
-    return re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+$", "", name)
 
 
 def _store_suffix(name: str) -> str:
@@ -43,17 +64,20 @@ def _store_suffix(name: str) -> str:
     return ""
 
 
-def _first_name_hits(name: str) -> list[str]:
-    clean = _clean_name(name)
-    suffix_hits = [suffix for suffix in _STORE_SUFFIXES if clean.endswith(suffix)]
-    if clean.endswith("酒店"):
-        suffix_hits = [suffix for suffix in suffix_hits if suffix != "店"]
-    landmark_hits = [keyword for keyword in _LANDMARK_KEYWORDS if keyword in name]
-    return list(dict.fromkeys(suffix_hits + landmark_hits))
+def _landmark_hits(name: str, store_suffix: str) -> list[str]:
+    """Extract complete location phrases instead of isolated keyword fragments."""
 
-
-def _entry_hits(name: str) -> list[str]:
-    return list(dict.fromkeys(keyword for keyword in _ENTRY_KEYWORDS if keyword in name))
+    source = (store_suffix or name).strip()
+    source = re.sub(r"(?:旗舰店|分店|直营店|中心店|酒店|店)$", "", source)
+    hits: list[str] = []
+    start = 0
+    for match in _LANDMARK_PATTERN.finditer(source):
+        phrase = source[start : match.end()]
+        phrase = re.sub(r"^[\s·•,，、/|丨\-—_]+", "", phrase).strip()
+        if len(phrase) >= 2:
+            hits.append(phrase)
+        start = match.end()
+    return list(dict.fromkeys(hits))
 
 
 def build_page_entry_item(sections: dict[str, Any]) -> dict[str, Any]:
@@ -77,9 +101,8 @@ def build_page_entry_item(sections: dict[str, Any]) -> dict[str, Any]:
         }
 
     store_suffix = _store_suffix(name)
-    first_hits = _first_name_hits(name)
-    entry_hits = _entry_hits(name)
-    score = float(bool(store_suffix or first_hits)) + float(bool(entry_hits))
+    landmark_hits = _landmark_hits(name, store_suffix)
+    score = float(bool(store_suffix)) + float(bool(landmark_hits))
     fields = [
         {"label": "酒店展示名称", "value": name},
         {
@@ -88,9 +111,9 @@ def build_page_entry_item(sections: dict[str, Any]) -> dict[str, Any]:
             "note": "直接取酒店名称括号内的完整内容",
         },
         {
-            "label": "命中入口词",
-            "value": "、".join(entry_hits) or "未命中",
-            "note": "热门商圈、交通、医院、景区、学校等入口词",
+            "label": "热门商圈词命中",
+            "value": "、".join(landmark_hits) or "未命中",
+            "note": "从门店后缀中识别完整商圈、交通、医院、景区、学校词组",
         },
         {
             "label": "列表页推荐词 / 标签 / 卖点",
@@ -106,7 +129,7 @@ def build_page_entry_item(sections: dict[str, Any]) -> dict[str, Any]:
         "source": "ctrip_ota_promotion_performance_30d.hotel_name",
         "fields_complete": True,
         "fields": fields,
-        "note": "酒店展示名称保持原值；门店后缀直接取名称括号内容；入口词按酒店名称识别。",
+        "note": "酒店展示名称保持原值；门店后缀取名称括号内容；热门商圈词按完整地点词组识别。",
     }
 
 
