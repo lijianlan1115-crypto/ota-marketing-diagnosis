@@ -8,6 +8,17 @@ from marketing_diagnosis import ctrip_report as stable_report
 from marketing_diagnosis import ctrip_report_v54 as report
 
 
+psi.METRICS = tuple(
+    (
+        code,
+        group,
+        label,
+        unit,
+        "间夜量" if code == "historical_room_nights" else short_label,
+    )
+    for code, group, label, unit, short_label in psi.METRICS
+)
+
 _ORIGINAL_CARD = report.psi_card
 _OLD_HEADER = (
     "<th>指标类型</th><th>诊断指标</th><th>实际值</th>"
