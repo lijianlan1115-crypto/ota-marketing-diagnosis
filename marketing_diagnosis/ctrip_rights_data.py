@@ -96,6 +96,7 @@ def build_rights_item(
             {
                 "right_name": _text(row.get("right_name")) or f"权益{index + 1}",
                 "rights_rules": _text(row.get("rights_rules")) or "规则待补充",
+                "applicable_room_types": _text(row.get("applicable_room_types")) or "参与房型待补充",
                 "right_status": status or "状态待确认",
                 "status_kind": kind,
             }
