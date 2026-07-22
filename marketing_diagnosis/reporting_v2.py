@@ -10,6 +10,7 @@ from marketing_diagnosis.reporting_runtime_v52 import (
     write_reports,
 )
 from marketing_diagnosis import ctrip_psi_table_compact as _ctrip_psi_table_compact
+from marketing_diagnosis import ctrip_rights_center_compact as _ctrip_rights_center_compact
 
 __all__ = [
     "build_ctrip_html",
