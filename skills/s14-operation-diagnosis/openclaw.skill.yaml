@@ -80,6 +80,7 @@ outputs:
     type: text
   feishu_card:
     type: json
+    description: Legacy provider-native payload for a dedicated structured adapter only. Never forward serialized JSON as assistant text.
 
 config:
   required:
@@ -89,10 +90,12 @@ config:
     - db_dsn
     - db_dsn_env
     - limit
+    - feishu_card_callback_enabled
   example:
     db_dsn_env: S14_DB_DSN
     report_output_dir: /var/lib/ota-marketing-diagnosis/reports
     public_base_url: http://YOUR_SERVER:8081/s14-reports
+    feishu_card_callback_enabled: false
 
 data_policy:
   controlled_source_only: true

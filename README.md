@@ -104,10 +104,54 @@ skills/s14-operation-diagnosis/openclaw.skill.yaml
 如果先走飞书入口包装脚本，可调用：
 
 ```bash
-python scripts/s14_feishu_entry.py --text 'S14诊断' --format card
+python scripts/s14_feishu_entry.py --text 'S14诊断' --format text
 ```
 
-返回值优先使用 `feishu_card`，失败时 fallback 到 `feishu_message`。
+通过 OpenClaw 的 shell/exec 工具调用时必须使用纯文本输出，避免卡片 JSON
+被通道当作普通聊天内容。只有专用的结构化发送适配器才能使用
+`--format card --raw-card-json`；适配器必须解析 JSON 后调用消息通道，
+不得把 stdout 原样回复给用户。
+
+数据来源按钮依赖飞书应用的卡片回调。回调未配置时保持
+`S14_FEISHU_CARD_CALLBACK_ENABLED=0`，卡片只提示用户直接回复“数据库”或
+“上传Excel”，不会展示无法点击的按钮。
+
+当前 OpenClaw 飞书长连接负责接收普通消息，但不处理
+`card.action.trigger`。飞书长连接采用集群随机投递，同一应用不能再启动一个
+只处理卡片的长连接，否则事件可能被投递到错误的进程。S14 因此使用独立 HTTP
+回调服务处理卡片点击，普通消息仍由 OpenClaw 长连接处理。
+
+安装并启动回调服务：
+
+```bash
+pip install -e .
+python scripts/s14_feishu_card_callback.py
+```
+
+生产环境可参考：
+
+```text
+deploy/systemd/s14-feishu-card-callback.service.example
+deploy/nginx/s14-reports.conf.example
+```
+
+飞书后台的“回调配置”需要选择“将回调发送至开发者服务器”，请求地址指向：
+
+```text
+https://YOUR_PUBLIC_DOMAIN/s14/feishu/card-callback
+```
+
+并订阅、发布 `card.action.trigger`。服务端需要配置
+`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_VERIFICATION_TOKEN`，如启用
+加密还需配置 `FEISHU_ENCRYPT_KEY`。回调地址验证通过、服务启动后，才可设置：
+
+```bash
+export S14_FEISHU_CARD_CALLBACK_ENABLED=1
+```
+
+回调会在 3 秒内先返回中文提示，再异步生成报告并通过飞书消息 API 发送结构化
+卡片。卡片 JSON、命令输出和异常堆栈只用于进程内部或服务器日志，不会作为聊天
+消息发送给用户。
 
 ## 生成样例 Excel
 
@@ -233,7 +277,7 @@ python scripts/render_report_html.py \
 
 ```bash
 python -m unittest discover tests
-python scripts/s14_feishu_entry.py --text 'S14诊断' --format card
+python scripts/s14_feishu_entry.py --text 'S14诊断' --format text
 ```
 
 ## 后续计划

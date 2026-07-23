@@ -139,21 +139,15 @@ def _status_text(item: dict[str, Any]) -> str:
 
 
 def _overview_lines(result: dict[str, Any]) -> list[str]:
-    visual = _visual(result)
-    normalized = _num(visual.get("normalized_score"))
-    raw_score = _num(visual.get("raw_score"))
-    connected_base = _num(visual.get("connected_base_score"))
-    missing = sum(
-        1
+    scored_items = [
+        item
         for item in _items(result)
-        if str(item.get("data_status") or "") in {"missing", "error"}
-    )
-    return [
-        f"- 折算得分：{'待计算' if normalized is None else f'{normalized:.1f}'}/100",
-        f"- 原始得分：{'待计算' if raw_score is None else f'{raw_score:g}'}/100",
-        f"- 已接入基础分：{'待计算' if connected_base is None else f'{connected_base:g}'}/100",
-        f"- 未取到数据：{missing}项",
+        if item.get("participates_in_score") and _num(item.get("item_score")) is not None
     ]
+    raw_score = sum(_num(item.get("item_score")) or 0 for item in scored_items)
+    connected_base = sum(_num(item.get("base_score")) or 0 for item in scored_items)
+    normalized = raw_score / connected_base * 100 if connected_base else None
+    return [f"- 总得分：{'待计算' if normalized is None else f'{normalized:.1f}'}/100"]
 
 
 def _room_type_line(item: dict[str, Any]) -> str:

@@ -12,6 +12,7 @@ SKILL_ID = "s14-operation-diagnosis"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = SKILL_ROOT.parents[1]
 DEFAULT_REPORT_ROOT = Path("/var/lib/ota-marketing-diagnosis/reports")
+TRUE_VALUES = {"1", "true", "yes", "on"}
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -34,6 +35,13 @@ def _safe_segment(value: Any, fallback: str) -> str:
     text = str(value or fallback).strip().lower()
     text = re.sub(r"[^a-z0-9._-]+", "-", text)
     return text.strip("-._") or fallback
+
+
+def _card_callback_enabled(config: dict[str, Any] | None = None) -> bool:
+    configured = os.environ.get("S14_FEISHU_CARD_CALLBACK_ENABLED")
+    if configured is None:
+        configured = (config or {}).get("feishu_card_callback_enabled")
+    return str(configured or "").strip().lower() in TRUE_VALUES
 
 
 def _json_safe(value: Any) -> Any:
@@ -118,8 +126,59 @@ def _inject_manual_room_names(
     )
 
 
-def _source_selection_result() -> dict[str, Any]:
+def _source_selection_result(
+    config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     message = "请选择本次数据来源：数据库 / 上传Excel。"
+    elements: list[dict[str, Any]] = [
+        {
+            "tag": "div",
+            "text": {
+                "tag": "lark_md",
+                "content": (
+                    "本次按已经映射好的字段执行**整体诊断**。\n\n"
+                    "请选择从服务器数据库读取，或随后上传 Excel。"
+                ),
+            },
+        }
+    ]
+    if _card_callback_enabled(config):
+        elements.append(
+            {
+                "tag": "action",
+                "actions": [
+                    {
+                        "tag": "button",
+                        "type": "primary",
+                        "text": {"tag": "plain_text", "content": "数据库"},
+                        "value": {
+                            "action": "s14_source",
+                            "source": "database",
+                        },
+                    },
+                    {
+                        "tag": "button",
+                        "type": "default",
+                        "text": {"tag": "plain_text", "content": "上传Excel"},
+                        "value": {
+                            "action": "s14_source",
+                            "source": "excel",
+                        },
+                    },
+                ],
+            }
+        )
+    else:
+        elements.append(
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": "请直接回复 **数据库** 或 **上传Excel**。",
+                },
+            }
+        )
+
     card = {
         "msg_type": "interactive",
         "card": {
@@ -131,41 +190,7 @@ def _source_selection_result() -> dict[str, Any]:
                     "content": "S14诊断｜请选择数据来源",
                 },
             },
-            "elements": [
-                {
-                    "tag": "div",
-                    "text": {
-                        "tag": "lark_md",
-                        "content": (
-                            "本次按已经映射好的字段执行**整体诊断**。\n\n"
-                            "请选择从服务器数据库读取，或随后上传 Excel。"
-                        ),
-                    },
-                },
-                {
-                    "tag": "action",
-                    "actions": [
-                        {
-                            "tag": "button",
-                            "type": "primary",
-                            "text": {"tag": "plain_text", "content": "数据库"},
-                            "value": {
-                                "action": "s14_source",
-                                "source": "database",
-                            },
-                        },
-                        {
-                            "tag": "button",
-                            "type": "default",
-                            "text": {"tag": "plain_text", "content": "上传Excel"},
-                            "value": {
-                                "action": "s14_source",
-                                "source": "excel",
-                            },
-                        },
-                    ],
-                },
-            ],
+            "elements": elements,
         },
     }
     return {
@@ -255,7 +280,7 @@ class S14OperationDiagnosis:
         # executing scripts/s14_feishu_entry.py. These two modes keep that path
         # deterministic, JSON-serializable, and free from accidental DB runs.
         if mode == "source_selection":
-            return _source_selection_result()
+            return _source_selection_result(self.config)
         if mode == "excel_pending":
             return _excel_pending_result()
 

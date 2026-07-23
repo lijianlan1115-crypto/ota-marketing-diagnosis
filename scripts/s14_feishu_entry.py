@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import os
 import re
@@ -57,6 +56,7 @@ HOTEL_ALIASES = {
     "璞悦": ("puyue", "璞悦"),
     "璞悦酒店": ("puyue", "璞悦"),
 }
+TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 def _load_env_file() -> None:
@@ -68,6 +68,15 @@ def _load_env_file() -> None:
             continue
         key, _, value = line.partition("=")
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def _card_callback_enabled() -> bool:
+    return (
+        str(os.environ.get("S14_FEISHU_CARD_CALLBACK_ENABLED") or "")
+        .strip()
+        .lower()
+        in TRUE_VALUES
+    )
 
 
 def _safe_id(value: str | None) -> str:
@@ -320,6 +329,50 @@ def _source_selection_card(manual_names: list[str] | None = None) -> dict[str, A
         if manual_names
         else "\n\n第11项为人工输入项；可发送：`房型名称：五人战队套房、电竞双床房`。"
     )
+    elements: list[dict[str, Any]] = [
+        {
+            "tag": "div",
+            "text": {
+                "tag": "lark_md",
+                "content": (
+                    "本次按已经映射好的字段执行**整体诊断**。\n\n"
+                    "请选择从服务器数据库读取，或随后上传 Excel。"
+                    + manual_note
+                ),
+            },
+        }
+    ]
+    if _card_callback_enabled():
+        elements.append(
+            {
+                "tag": "action",
+                "actions": [
+                    {
+                        "tag": "button",
+                        "type": "primary",
+                        "text": {"tag": "plain_text", "content": "数据库"},
+                        "value": {"action": "s14_source", "source": "database"},
+                    },
+                    {
+                        "tag": "button",
+                        "type": "default",
+                        "text": {"tag": "plain_text", "content": "上传Excel"},
+                        "value": {"action": "s14_source", "source": "excel"},
+                    },
+                ],
+            }
+        )
+    else:
+        elements.append(
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": "请直接回复 **数据库** 或 **上传Excel**。",
+                },
+            }
+        )
+
     return {
         "msg_type": "interactive",
         "card": {
@@ -328,36 +381,7 @@ def _source_selection_card(manual_names: list[str] | None = None) -> dict[str, A
                 "template": "blue",
                 "title": {"tag": "plain_text", "content": "S14诊断｜请选择数据来源"},
             },
-            "elements": [
-                {
-                    "tag": "div",
-                    "text": {
-                        "tag": "lark_md",
-                        "content": (
-                            "本次按已经映射好的字段执行**整体诊断**。\n\n"
-                            "请选择从服务器数据库读取，或随后上传 Excel。"
-                            + manual_note
-                        ),
-                    },
-                },
-                {
-                    "tag": "action",
-                    "actions": [
-                        {
-                            "tag": "button",
-                            "type": "primary",
-                            "text": {"tag": "plain_text", "content": "数据库"},
-                            "value": {"action": "s14_source", "source": "database"},
-                        },
-                        {
-                            "tag": "button",
-                            "type": "default",
-                            "text": {"tag": "plain_text", "content": "上传Excel"},
-                            "value": {"action": "s14_source", "source": "excel"},
-                        },
-                    ],
-                },
-            ],
+            "elements": elements,
         },
     }
 
@@ -395,29 +419,30 @@ def _waiting_excel_card(manual_names: list[str] | None = None) -> dict[str, Any]
     }
 
 
-def _prepend_source(payload: Any, source_label: str, output_format: str) -> Any:
-    if output_format == "text":
-        return f"数据来源：{source_label}\n{payload or ''}"
-    if not isinstance(payload, dict):
-        return payload
-    card = copy.deepcopy(payload)
-    try:
-        elements = card["card"]["elements"]
-        for element in elements:
-            text = element.get("text") if isinstance(element, dict) else None
-            if isinstance(text, dict) and text.get("tag") == "lark_md":
-                text["content"] = f"**数据来源：** {source_label}\n" + str(
-                    text.get("content") or ""
-                )
-                break
-    except (KeyError, TypeError):
-        pass
-    return card
+def _result_payload(result: dict[str, Any], output_format: str) -> Any:
+    """Select one already-complete outbound representation.
+
+    The adapter includes the source label in both representations. Prepending a
+    second label produced the duplicated “数据来源/来源” lines seen in Feishu.
+    """
+    return (
+        result.get("feishu_card")
+        if output_format == "card"
+        else result.get("feishu_message")
+    )
 
 
-def _result_payload(result: dict[str, Any], source_label: str, output_format: str) -> Any:
-    payload = result.get("feishu_card") if output_format == "card" else result.get("feishu_message")
-    return _prepend_source(payload, source_label, output_format)
+def _resolved_output_format(requested: str, raw_card_json: bool) -> str:
+    """Keep native card JSON out of ordinary OpenClaw stdout replies.
+
+    OpenClaw renders channel UI through its message/presentation layer. A shell
+    command's stdout is plain text, so printing provider-native card JSON there
+    makes the JSON visible to the user. Raw JSON remains available only for a
+    dedicated adapter that opts in explicitly.
+    """
+    if requested == "card" and not raw_card_json:
+        return "text"
+    return requested
 
 
 def _normalize_choice(value: str) -> str | None:
@@ -458,7 +483,7 @@ def _handle_source_choice(
                 sender_id=sender_id,
             )
             _clear_flow_state(chat_id, sender_id)
-            return _result_payload(result, "数据库", output_format)
+            return _result_payload(result, output_format)
         except Exception:
             _set_flow_state(
                 "awaiting_source",
@@ -488,6 +513,27 @@ def _handle_source_choice(
     )
 
 
+def handle_card_source_choice(
+    source: str,
+    *,
+    chat_id: str,
+    sender_id: str,
+) -> dict[str, Any] | str:
+    """Run one trusted card source action and return a structured reply.
+
+    This is the public bridge used by the Feishu callback service. The returned
+    card remains an in-process object and must be sent through Feishu OpenAPI;
+    callers must never print or forward its serialized JSON as assistant text.
+    """
+    return _handle_source_choice(
+        source,
+        chat_id=chat_id,
+        sender_id=sender_id,
+        text="数据库" if source == "database" else "上传Excel",
+        output_format="card",
+    )
+
+
 def _manual_input_ack(names: list[str], state: dict[str, Any]) -> str:
     next_step = {
         "awaiting_source": "请继续选择“数据库”或“上传Excel”。",
@@ -508,12 +554,27 @@ def main() -> int:
     parser.add_argument(
         "--format",
         choices=("text", "card"),
-        default=os.environ.get("S14_FEISHU_REPLY_FORMAT", "card"),
+        default=os.environ.get("S14_FEISHU_REPLY_FORMAT", "text"),
+        help=(
+            "stdout format; card requires --raw-card-json and is intended only "
+            "for a structured Feishu/OpenClaw adapter"
+        ),
+    )
+    parser.add_argument(
+        "--raw-card-json",
+        action="store_true",
+        help="allow provider-native card JSON on stdout for a caller that parses it",
     )
     args = parser.parse_args()
     _load_env_file()
     chat_id = args.chat_id or None
     sender_id = args.sender_id or None
+    output_format = _resolved_output_format(args.format, args.raw_card_json)
+    if args.format == "card" and output_format == "text":
+        print(
+            "S14: --format card requires --raw-card-json; using safe text output.",
+            file=sys.stderr,
+        )
 
     try:
         if args.make_template or _is_template_request(args.text):
@@ -526,7 +587,7 @@ def main() -> int:
                     chat_id=chat_id,
                     sender_id=sender_id,
                     text=args.text,
-                    output_format=args.format,
+                    output_format=output_format,
                 )
             )
 
@@ -550,7 +611,7 @@ def main() -> int:
                             ],
                         },
                     }
-                    if args.format == "card"
+                    if output_format == "card"
                     else message
                 )
 
@@ -566,7 +627,7 @@ def main() -> int:
                 sender_id=sender_id,
             )
             _clear_flow_state(chat_id, sender_id)
-            return _print(_result_payload(result, "Excel", args.format))
+            return _print(_result_payload(result, output_format))
 
         if args.text and any(token in args.text for token in TRIGGERS):
             old_names = list(state.get("manual_room_type_names") or [])
@@ -579,7 +640,7 @@ def main() -> int:
             )
             return _print(
                 _source_selection_card(new_state.get("manual_room_type_names"))
-                if args.format == "card"
+                if output_format == "card"
                 else "请选择本次数据来源：数据库 / 上传Excel。当前报告不再区分渠道。"
             )
 
@@ -591,7 +652,7 @@ def main() -> int:
                     chat_id=chat_id,
                     sender_id=sender_id,
                     text=args.text,
-                    output_format=args.format,
+                    output_format=output_format,
                 )
             )
 
@@ -618,7 +679,7 @@ def main() -> int:
                 manual_room_type_names=names,
                 sender_id=sender_id,
             )
-            return _print(_result_payload(result, "Excel", args.format))
+            return _print(_result_payload(result, output_format))
 
         return _print(
             "收到。需要生成 S14 OTA 诊断报告时，请发送「S14诊断」；"

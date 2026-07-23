@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
+import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,7 +19,11 @@ class LiveS14SourceSelectionTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory(prefix="s14_live_flow_")
         self.previous_state_dir = os.environ.get("S14_STATE_DIR")
+        self.previous_callback_enabled = os.environ.get(
+            "S14_FEISHU_CARD_CALLBACK_ENABLED"
+        )
         os.environ["S14_STATE_DIR"] = self.tmp.name
+        os.environ.pop("S14_FEISHU_CARD_CALLBACK_ENABLED", None)
 
         spec = importlib.util.spec_from_file_location(
             f"s14_feishu_entry_test_{id(self)}",
@@ -32,9 +40,24 @@ class LiveS14SourceSelectionTest(unittest.TestCase):
             os.environ.pop("S14_STATE_DIR", None)
         else:
             os.environ["S14_STATE_DIR"] = self.previous_state_dir
+        if self.previous_callback_enabled is None:
+            os.environ.pop("S14_FEISHU_CARD_CALLBACK_ENABLED", None)
+        else:
+            os.environ["S14_FEISHU_CARD_CALLBACK_ENABLED"] = (
+                self.previous_callback_enabled
+            )
         self.tmp.cleanup()
 
-    def test_trigger_card_only_asks_database_or_excel(self) -> None:
+    def test_trigger_card_defaults_to_typed_choice_without_callback(self) -> None:
+        card = self.module._source_selection_card()
+        fallback = card["card"]["elements"][1]
+
+        self.assertEqual(fallback["tag"], "div")
+        self.assertIn("直接回复", fallback["text"]["content"])
+        self.assertNotIn('"tag": "action"', json.dumps(card, ensure_ascii=False))
+
+    def test_trigger_card_adds_buttons_only_when_callback_is_enabled(self) -> None:
+        os.environ["S14_FEISHU_CARD_CALLBACK_ENABLED"] = "1"
         card = self.module._source_selection_card()
         actions = card["card"]["elements"][1]["actions"]
         labels = [action["text"]["content"] for action in actions]
@@ -119,7 +142,56 @@ class LiveS14SourceSelectionTest(unittest.TestCase):
         run.assert_called_once()
         self.assertIsNone(self.module._get_flow_state("chat-a", "user-a"))
         content = payload["card"]["elements"][0]["text"]["content"]
-        self.assertTrue(content.startswith("**数据来源：** 数据库"))
+        self.assertEqual(content, "报告完成")
+
+    def test_card_format_does_not_leak_json_without_explicit_raw_opt_in(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        argv = [
+            str(SCRIPT),
+            "--text",
+            "S14诊断",
+            "--chat-id",
+            "chat-safe",
+            "--sender-id",
+            "user-safe",
+            "--format",
+            "card",
+        ]
+        with (
+            patch.object(sys, "argv", argv),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            self.assertEqual(self.module.main(), 0)
+
+        self.assertIn("请选择本次数据来源", stdout.getvalue())
+        self.assertNotIn('"msg_type"', stdout.getvalue())
+        self.assertIn("--raw-card-json", stderr.getvalue())
+
+    def test_raw_card_json_requires_explicit_opt_in(self) -> None:
+        stdout = io.StringIO()
+        argv = [
+            str(SCRIPT),
+            "--text",
+            "S14诊断",
+            "--chat-id",
+            "chat-raw",
+            "--sender-id",
+            "user-raw",
+            "--format",
+            "card",
+            "--raw-card-json",
+        ]
+        with patch.object(sys, "argv", argv), contextlib.redirect_stdout(stdout):
+            self.assertEqual(self.module.main(), 0)
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["msg_type"], "interactive")
+        self.assertEqual(
+            payload["card"]["header"]["title"]["content"],
+            "S14诊断｜请选择数据来源",
+        )
 
 
 if __name__ == "__main__":
