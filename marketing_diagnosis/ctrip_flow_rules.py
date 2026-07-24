@@ -4,6 +4,7 @@ from typing import Any
 
 from marketing_diagnosis.ctrip_flow_rank_rules import build_flow_item
 from marketing_diagnosis.ctrip_rights_data import build_rights_item
+from marketing_diagnosis.meituan_reservation_invoice import patch_reservation_invoice
 from marketing_diagnosis.meituan_score_summary import refresh_meituan_summary
 from marketing_diagnosis.rules_v5 import _refresh_ctrip_summary
 from marketing_diagnosis.rules_v5 import process as upstream_process
@@ -56,6 +57,7 @@ def process(data: dict[str, Any]) -> dict[str, Any]:
     )
 
     _zero_inactive_points_metrics(items)
+    patch_reservation_invoice(result, sections)
     _refresh_ctrip_summary(result)
     refresh_meituan_summary(result)
     return result
