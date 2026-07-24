@@ -4,6 +4,7 @@ from typing import Any
 
 from marketing_diagnosis.ctrip_flow_rank_rules import build_flow_item
 from marketing_diagnosis.ctrip_rights_data import build_rights_item
+from marketing_diagnosis.meituan_score_summary import refresh_meituan_summary
 from marketing_diagnosis.rules_v5 import _refresh_ctrip_summary
 from marketing_diagnosis.rules_v5 import process as upstream_process
 
@@ -36,7 +37,7 @@ def _zero_inactive_points_metrics(items: dict[str, Any]) -> None:
 
 
 def process(data: dict[str, Any]) -> dict[str, Any]:
-    """Apply final Ctrip rule corrections after the established rule pipeline."""
+    """Apply final channel rule corrections after the established rule pipeline."""
 
     result = upstream_process(data)
     sections = data.get("sections") or {}
@@ -56,6 +57,7 @@ def process(data: dict[str, Any]) -> dict[str, Any]:
 
     _zero_inactive_points_metrics(items)
     _refresh_ctrip_summary(result)
+    refresh_meituan_summary(result)
     return result
 
 
