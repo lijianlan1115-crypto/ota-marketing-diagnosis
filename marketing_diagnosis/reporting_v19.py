@@ -41,21 +41,27 @@ def _e(value: Any) -> str:
     return html.escape("" if value is None else str(value), quote=True)
 
 
-def _score_base(result: dict[str, Any]) -> tuple[float, float]:
+def _score_base(result: dict[str, Any]) -> float:
+    """Sum scored Meituan items before the manual crown item.
+
+    Display-only items and the crown item itself are excluded. Missing scores are
+    ignored rather than converted to zero; the browser adds the crown score only
+    after a valid manual selection is saved.
+    """
+
     visual = result.get("visual_diagnosis") or {}
     items = list(visual.get("items") or [])
     raw = 0.0
-    connected = 0.0
     for item in items:
         if int(item.get("standard_item_id") or 0) == 22:
+            continue
+        if item.get("participates_in_score") is False:
             continue
         score = item.get("item_score")
         if score is None:
             continue
         raw += float(score)
-        if item.get("participates_in_score"):
-            connected += float(item.get("base_score") or 0)
-    return round(raw, 4), round(connected, 4)
+    return round(raw, 4)
 
 
 def _manual_crown_card(result: dict[str, Any]) -> str:
@@ -63,7 +69,7 @@ def _manual_crown_card(result: dict[str, Any]) -> str:
     start = str(result.get("period_start") or "")
     end = str(result.get("period_end") or "")
     storage_key = "s14:crown:" + hotel + ":" + start + ":" + end
-    base_raw, base_connected = _score_base(result)
+    base_raw = _score_base(result)
 
     return f"""
 <article class='diagnosis-card' data-status='manual_pending' data-title='酒店挂冠' id='rule-22'>
@@ -109,8 +115,6 @@ def _manual_crown_card(result: dict[str, Any]) -> str:
 (function(){{
   const STORAGE_KEY={json.dumps(storage_key, ensure_ascii=False)};
   const BASE_RAW={base_raw};
-  const BASE_CONNECTED={base_connected};
-  const CROWN_BASE=1;
   function el(id){{return document.getElementById(id);}}
   function nowLocal(){{
     const d=new Date(),pad=n=>String(n).padStart(2,'0');
@@ -131,8 +135,7 @@ def _manual_crown_card(result: dict[str, Any]) -> str:
     const node=document.querySelector('.total-score-v17 strong');
     if(!node)return;
     const raw=BASE_RAW+(score===null?0:score);
-    const connected=BASE_CONNECTED+(score===null?0:CROWN_BASE);
-    node.textContent=connected>0?(raw/connected*100).toFixed(1):'待计算';
+    node.textContent=String(Math.round(raw*100)/100);
   }}
   function apply(data){{
     const type=data.crown_type||'';
