@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from marketing_diagnosis import ctrip_reputation_report as _ctrip_reputation_report
+from marketing_diagnosis import meituan_reservation_invoice_report as _meituan_reservation_invoice_report
 from marketing_diagnosis import meituan_total_report as _meituan_total_report
 from marketing_diagnosis.reporting_runtime_v52 import (
     build_ctrip_html,
