@@ -162,7 +162,6 @@ def _information_item(row: dict[str, Any] | None) -> dict[str, Any]:
     )
 
 
-
 def _points_item(row: dict[str, Any] | None) -> dict[str, Any]:
     source = "携程 eBooking / 促销推广 / 积分联盟"
     if not row:
@@ -322,7 +321,7 @@ def build_configuration_items(sections: dict[str, Any]) -> dict[str, dict[str, A
         "14": _points_item(_activity(statuses, 14)),
         "15": _preferred_item(_activity(statuses, 15)),
         "16": _business_item(_activity(statuses, 16)),
-        "17": _item(17, None, "pending_rule", "携程 eBooking / 闪住服务入口", [_field("入口状态", None)], "暂无数据库表；待按实际后台菜单补充入口字段后计分。"),
+        "17": _item(17, None, "missing", "携程 eBooking / 闪住服务入口", [_field("入口状态", None)], "暂无数据库表和字段；待接入闪住状态数据后计分。"),
         "18": _hourly_item(hourly_status, hourly_order_count),
         "19": _travel_photo_item(_activity(statuses, 19)),
         "20": _video_item(_activity(statuses, 20)),
